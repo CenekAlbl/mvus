@@ -21,4 +21,6 @@ For each new functionality that you start proramming (e.g. epipolar geometry est
 
 Don't merge to master.
 
+Provide documentation for your code, see the example function x_() in ./multiviewunsynch/geometry.py
+
 
