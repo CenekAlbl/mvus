@@ -9,21 +9,29 @@ If you want to run the code, you only need to have pyhton and openCV downloaded.
 Including files:
 
 video_1.mp4:
-trimmed from the first video 00:20 - 01:20
+
+Trimmed from the first video 00:20 - 01:20
 
 video_2.mp4:
-trimmed from the second video 00:40 - 1:40
+
+Trimmed from the second video 00:40 - 1:40
 
 traj_1.py:
-input -> video_1.mp4
-output -> 2D points
+
+Input -> video_1.mp4
+
+Output -> 2D points
 
 traj_2.py:
-input -> video_2.mp4
-output -> 2D points
+
+Input -> video_2.mp4
+
+Output -> 2D points
 
 video_1_output:
+
 2D points with some descriptions at the end
 
 video_2_output:
+
 2D points with some descriptions at teh end
