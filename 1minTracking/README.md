@@ -6,6 +6,8 @@ To make it simple, I trim in one-minute scope from each video. I started trimmin
 
 If you want to run the code, you only need to have pyhton and openCV downloaded. By running the code, you can see how the template matching works and how the trajectory looks like.
 
+NOTE THAT: These two codes only work on the two specific videos. I will continue improving tracking in order to fit gerneral cases. If you cannot work on this data set for some practical reasons, please contact me.
+
 Contact me for any question: liao86632769@gmail.com
 
 Including files:
@@ -36,4 +38,4 @@ video_1_output:
 
 video_2_output:
 
-2D points with some descriptions at teh end
+2D points with some descriptions at the end
