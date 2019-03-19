@@ -1,16 +1,16 @@
 import cv2
 import numpy as np
 
-cv2.namedWindow("mask",0);
-cv2.resizeWindow("mask", 480, 320);
-cv2.namedWindow("template_matching",0);
-cv2.resizeWindow("template_matching", 480, 320);
+cv2.namedWindow("mask",0)
+cv2.resizeWindow("mask", 480, 320)
+cv2.namedWindow("template_matching",0)
+cv2.resizeWindow("template_matching", 480, 320)
 cv2.namedWindow("trajectory", 0)
 cv2.resizeWindow("trajectory", 720, 540)
 
-f = open("video_1_output.txt", "w+")
+f = open("data/video_1_output_temp.txt", "w+")
 
-video = cv2.VideoCapture("video_1.mp4")
+video = cv2.VideoCapture("data/video_1.mp4")
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3,3))
 fgbg = cv2.createBackgroundSubtractorKNN()
 
@@ -29,7 +29,7 @@ for i in range(bs_use_frames):
 
 x_pre = 1240
 y_pre = 550
-f.write("start with initial picked point: (%d, %d)\n" % (x_pre, y_pre))
+f.write("start with initial picked point: (%d, %d), Output: frame, x, y\n" % (x_pre, y_pre))
 
 width = 30
 height = 30
@@ -69,7 +69,7 @@ while True:
     cv2.imshow("template_matching", frame)
     cv2.imshow("trajectory", traj)
     frame_draw += 1
-    f.write("%d %d\n" % (x_post, y_post))
+    f.write("%d %d %d\n" % (frame_draw, x_post, y_post))
 
     x_pre = x_post
     y_pre = y_post
@@ -78,9 +78,9 @@ while True:
     if key == 27:
         break
 
-f.write("frames used for background subtraction (only in the beginning): %d\n" % bs_use_frames)
-f.write("read in frames: %d\n" % frame_read)
-f.write("draw out frames: %d\n" % frame_draw)
+# f.write("frames used for background subtraction (only in the beginning): %d\n" % bs_use_frames)
+# f.write("read in frames: %d\n" % frame_read)
+# f.write("draw out frames: %d\n" % frame_draw)
 f.close()
 video.release()
 cv2.destroyAllWindows()
