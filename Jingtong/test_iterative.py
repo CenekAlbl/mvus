@@ -1,16 +1,34 @@
 import numpy as np
 import cv2
-# from matplotlib import pyplot as plt
 import epipolar as ep
+import pickle
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 '''
 This script tests the case of iteratively using image pairs to estimate F
 '''
 
-# Parameters
-match_ratio = 0.9
-RansacReproErr = 3
+
+'''
+Parameters
+'''
+match_ratio = 0.8
+RansacReproErr = 10
 Frame_interval = 30
+
+Use_traj = True
+start_traj_1 = 153
+start_traj_2 = 71
+num_traj = 1500
+
+calibration = open('data/results.pickle','rb')
+K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
+K2 = K1
+
+'''
+Main implementation
+'''
 
 # Input Videos
 video1_path = 'data/video_1.mp4'
@@ -29,11 +47,12 @@ searchParams = dict(checks=50)
 flann = cv2.FlannBasedMatcher(indexParams,searchParams)
 
 # Load drone trajectories
-traj_1 = np.loadtxt('data/video_1_outputss.txt',skiprows=1,dtype=np.int32)
-traj_2 = np.loadtxt('data/video_2_outputss.txt',skiprows=1,dtype=np.int32)
+if Use_traj:
+    traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
+    traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
 
-traj = np.hstack((traj_1[153:153+1500,1:],traj_2[70:70+1500,1:]))
-traj = np.unique(traj,axis=0)
+    traj = np.hstack((traj_1[start_traj_1:start_traj_1+num_traj,1:],traj_2[start_traj_2:start_traj_2+num_traj,1:]))
+    traj = np.unique(traj,axis=0)
 
 # Starting
 time = 1
@@ -44,9 +63,6 @@ while time:
 
     read1,img1 = cap1.read()
     read2,img2 = cap2.read()
-
-    if cv2.waitKey(1) & 0xff == ord("q"):
-        break
     
     # Convert images from RGB to graysclae
     img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
@@ -68,10 +84,11 @@ while time:
     cv2.waitKey()
     
     # Match features
+    print("\nMatching features...")
     pts1, pts2, matches, goodmatch = ep.matching_feature(kp1, kp2, des1, des2, ratio=match_ratio)
 
     # Show results of feature matching
-    print('\n{} features are matched'.format(sum(np.array(goodmatch)[:,0])))
+    print('{} features are matched'.format(sum(np.array(goodmatch)[:,0])))
     draw_params = dict(matchColor = (0,255,0),
                     singlePointColor = (255,0,0),
                     matchesMask = goodmatch,
@@ -84,11 +101,19 @@ while time:
     cv2.waitKey()
 
     # Add trajectory matches
-    pts1 = np.vstack((np.int32(pts1),traj[:,:2]))
-    pts2 = np.vstack((np.int32(pts2),traj[:,2:]))
+    if Use_traj:
+        print('\n{} matches from drone trajectory are appended'.format(traj.shape[0]))
+        if pts1:
+            pts1 = np.vstack((np.int32(pts1),traj[:,:2]))
+            pts2 = np.vstack((np.int32(pts2),traj[:,2:]))
+        else:
+            pts1 = traj[:,:2]
+            pts2 = traj[:,2:]
 
     # Compute fundametal matrix F and return inlier matches(optional)
-    F, pts1, pts2 = ep.computeFundamentalMat(pts1, pts2, error=RansacReproErr)
+    F, mask = ep.computeFundamentalMat(pts1, pts2, error=RansacReproErr)
+    pts1 = np.int32(pts1)[mask.ravel()==1]
+    pts2 = np.int32(pts2)[mask.ravel()==1]
     print('\n{} feature correspondences are valid after estimating F'.format(pts1.shape[0]))
 
     # Draw epipolar lines
@@ -96,6 +121,36 @@ while time:
 
     time = time + Frame_interval
 
+    # Use ESC to exit
+    k = cv2.waitKey(0) & 0xFF
+    if k == 27:
+        break
+
 cap1.release()
 cap2.release()
+
+
+# Compute essential matrix E from fundamental matrix F
+E = np.dot(np.dot(K2.T,F),K1)
+num, R, t, mask = cv2.recoverPose(E,pts1,pts2,K1)
+P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
+P2 = np.dot(K2,np.hstack((R,t)))
+
+# Compute projection matrix P from fundamental matrix F
+# P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+# P2 = ep.compute_P_from_F(F)
+
+# Triangulate points
+print("\nTriangulating feature points...")
+pts1=pts1.astype(np.float64)
+pts2=pts2.astype(np.float64)
+X = cv2.triangulatePoints(P1,P2,pts1.T,pts2.T)
+X/=X[-1]
+
+# Show 3D results
+fig = plt.figure()
+ax = Axes3D(fig)
+ax.scatter(X[0],X[1],X[2])
+plt.show()
+
 cv2.destroyAllWindows()

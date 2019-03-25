@@ -5,6 +5,10 @@ import video
 import epipolar as ep
 
 
+'''
+This script tests the case of estimating F from two frames
+'''
+
 # Get path of videos
 video1_path = 'C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/C0028.MP4'
 video2_path = 'C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/VID_20190115_140427.MP4'
@@ -50,7 +54,10 @@ cv2.waitKey()
 
 
 # Compute fundametal matrix F and return inlier matches(optional)
-F, pts1, pts2 = ep.computeFundamentalMat(pts1, pts2, error=10)
+F, mask = ep.computeFundamentalMat(pts1, pts2, error=10)
+pts1 = np.int32(pts1)[mask.ravel()==1]
+pts2 = np.int32(pts2)[mask.ravel()==1]
+
 print('\n{} feature correspondences are valid after estimating F'.format(pts1.shape[0]))
 
 # Draw epipolar lines

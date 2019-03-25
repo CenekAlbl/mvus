@@ -116,4 +116,8 @@ dmypy.json
 .pyre/
 
 # Visual Studio Code settings
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json

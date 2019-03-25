@@ -11,10 +11,11 @@ This script tests the case of using multiple frames to estimate F
 match_ratio = 0.9
 RansacReproErr = 10
 numFrame = 5
+rangeFrame = 1000
 
 # Input Videos
-video1_path = 'C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/C0028.MP4'
-video2_path = 'C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/VID_20190115_140427.MP4'
+video1_path = 'data/video_1.mp4'
+video2_path = 'data/video_2.mp4'
 
 cap1 = cv2.VideoCapture(video1_path)
 cap2 = cv2.VideoCapture(video2_path)
@@ -27,7 +28,7 @@ searchParams = dict(checks=50)
 flann = cv2.FlannBasedMatcher(indexParams,searchParams)
 
 
-Frames = np.random.randint(0,1000,numFrame)
+Frames = np.random.randint(0,rangeFrame,numFrame)
 P1 = np.array([])
 P2 = np.array([])
 for i in range(numFrame):
@@ -62,7 +63,9 @@ for i in range(numFrame):
 
 # Compute fundametal matrix F and return inlier matches(optional)
 print('\n\n{} feature correspondences are valid Before estimating F'.format(P1.shape[0]))
-F, P1, P2 = ep.computeFundamentalMat(P1, P2, error=RansacReproErr)
+F, mask = ep.computeFundamentalMat(P1, P2, error=RansacReproErr)
+P1 = np.int32(P1)[mask.ravel()==1]
+P2 = np.int32(P2)[mask.ravel()==1]
 print('{} feature correspondences are valid After estimating F'.format(P1.shape[0]))
 
 # Draw epipolar lines

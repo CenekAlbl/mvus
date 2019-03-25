@@ -93,11 +93,11 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
                      cv2.FM_8POINT: Using 8 points algorithm
             error = reprojection threshold that describes maximal distance from a 
                     point to a epipolar line
-            inlier = True: return F and the sets of inlier corresponding features
+            inlier = True: return F and the mask for inliers
                      False: only reture F
     Output:
             F = Fundamental matrix with size 3*3
-            pts1, pts2 = sets of inlier corresponding features (optional)
+            mask = index for inlier correspondences (optional)
     '''
 
     pts1 = np.int32(pts1)
@@ -105,13 +105,21 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
 
     F, mask = cv2.findFundamentalMat(pts1,pts2,method,error)
 
-    pts1 = pts1[mask.ravel()==1]
-    pts2 = pts2[mask.ravel()==1]
-
     if inliers:
-        return F, pts1, pts2
+        return F, mask
     else:
         return F
+
+
+def compute_P_from_F(F):
+    # Compute the left epipole
+    U,S,V = np.linalg.svd(F.T)
+    e = V[-1]
+    e = e/e[2]
+
+    Te = np.array([[0,-e[2],e[1]],[e[2],0,-e[0]],[-e[1],e[0],0]])
+    P = np.vstack((np.dot(Te,F.T).T,e)).T
+    return P
 
 
 def drawlines(img1,img2,lines,pts1,pts2):
@@ -169,12 +177,7 @@ def plotEpiline(img1, img2, pts1, pts2, F):
     lines2 = lines2.reshape(-1,3)
     img5 = drawlines(img2,img1,lines2,pts2,pts1)[0]
 
-    # plot
-#     plt.subplots(1,2,figsize=(25,25))
-#     plt.subplot(121),plt.imshow(img3)
-#     plt.subplot(122),plt.imshow(img5)
-#     plt.show()
-
+    # Show results
     cv2.namedWindow('Epipolar lines in img1',cv2.WINDOW_NORMAL)
     cv2.resizeWindow('Epipolar lines in img1',500,300)
     cv2.imshow('Epipolar lines in img1',img3)
@@ -184,11 +187,9 @@ def plotEpiline(img1, img2, pts1, pts2, F):
     cv2.waitKey(0)
 
 
-
 if __name__ == "__main__":
 
     ''' Test '''
-
     img1 = cv2.imread('C:/Users/tong2/MyStudy/ETH/2018HS/ComputerVision/lab/lab04/cv_lab04_model_fitting/src/epipolar_geometry/images/pumpkin1.jpg',0)
     img2 = cv2.imread('C:/Users/tong2/MyStudy/ETH/2018HS/ComputerVision/lab/lab04/cv_lab04_model_fitting/src/epipolar_geometry/images/pumpkin2.jpg',0)
 
@@ -197,10 +198,13 @@ if __name__ == "__main__":
     kp2, des2 = extract_SIFT_feature(img2)
 
     # Match features
-    pts1, pts2 = matching_feature(kp1, kp2, des1, des2, ratio=0.8)
+    pts1, pts2, matches, matchesMask = matching_feature(kp1, kp2, des1, des2, ratio=0.8)
 
-    # Compute fundametal matrix F and return inlier matches(optional)
-    F, pts1, pts2 = computeFundamentalMat(pts1, pts2)
+    # Compute fundametal matrix F and return inlier mask(optional)
+    F, mask = computeFundamentalMat(pts1, pts2)
+
+    pts1 = np.int32(pts1)[mask.ravel()==1]
+    pts2 = np.int32(pts2)[mask.ravel()==1]
 
     # Draw epipolar lines
     plotEpiline(img1, img2, pts1, pts2, F)
