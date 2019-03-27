@@ -13,8 +13,8 @@ This script tests the case of iteratively using image pairs to estimate F
 '''
 Parameters
 '''
-match_ratio = 0.8
-RansacReproErr = 10
+match_ratio = 0.5
+RansacReproErr = 5
 Frame_interval = 30
 
 Use_traj = True
@@ -22,7 +22,7 @@ start_traj_1 = 153
 start_traj_2 = 71
 num_traj = 1500
 
-calibration = open('data/results.pickle','rb')
+calibration = open('data/calibration.pickle','rb')
 K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
 K2 = K1
 
@@ -128,7 +128,7 @@ while time:
 
 cap1.release()
 cap2.release()
-
+cv2.destroyAllWindows()
 
 # Compute essential matrix E from fundamental matrix F
 E = np.dot(np.dot(K2.T,F),K1)
@@ -137,8 +137,8 @@ P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
 P2 = np.dot(K2,np.hstack((R,t)))
 
 # Compute projection matrix P from fundamental matrix F
-# P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
-# P2 = ep.compute_P_from_F(F)
+P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+P2 = ep.compute_P_from_F(F)
 
 # Triangulate points
 print("\nTriangulating feature points...")
@@ -152,5 +152,3 @@ fig = plt.figure()
 ax = Axes3D(fig)
 ax.scatter(X[0],X[1],X[2])
 plt.show()
-
-cv2.destroyAllWindows()
