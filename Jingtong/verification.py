@@ -1,6 +1,7 @@
 import pickle
 import cv2
 import numpy as np
+import epipolar as ep
 
 # Load trajectory data
 X = np.loadtxt('data/Synthetic_Trajectory.txt')
@@ -31,13 +32,16 @@ x1_train = x1[:,idx[:num_train]]
 x1_val = x1[:,idx[num_train:]]
 x2_train = x2[:,idx[:num_train]]
 x2_val = x2[:,idx[num_train:]]
-print("\n{} points are used to compute F, {} points to validate by calculating x\'Fx".format(num_train,num_val))
+print("\n{} points are used to compute F, {} points to validate using Sampson distance".format(num_train,num_val))
 
-# Compute fundamental matrix F
-F,mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_RANSAC)
-pts1 = x1_train[:2].T[mask.ravel()==1]
-pts2 = x2_train[:2].T[mask.ravel()==1]
+# Compute F in two ways
+F1,mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_8POINT)
+F2 = ep.compute_fundamental(x1_train,x2_train)
 
-residual = np.diag(np.dot(np.dot(x2_val.T, F),x1_val))
-print("\nThe maxmial residual is {}".format(residual.max()))
+# Compute errors and compare
+error_1 = ep.Sampson_error(x1_val, x2_val, F1)
+error_2 = ep.Sampson_error(x1_val, x2_val, F2)
 
+print("\nThe maxmial residual from OpenCV is {}".format(error_1.max()))
+print("\nThe maxmial residual from Own implementation is {}".format(error_2.max()))
+print("\nFinished\n")

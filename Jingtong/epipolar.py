@@ -111,6 +111,123 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
         return F
 
 
+def normalize_2d_points(x):
+    '''
+    Function:
+            normalize input points such that mean = 0 and distance to center = sqrt(2)
+    Input:
+            x = 2D points in numpy array
+    Output:
+            x_n = normalized 2D points in form of 3*N
+            T = 3x3 normalization matrix
+                (s.t. x_n=T*x when x is in homogenous coords)
+    '''
+
+    # Make sure x has the form of 3*N
+    if x.shape[0]==2:
+        x = np.vstack((x,np.ones(x.shape[1])))
+    elif x.shape[1] == 2:
+        x = np.hstack((x,np.ones(x.shape[0]).reshape(-1,1))).T
+    elif x.shape[1] == 3:
+        x = x.T
+    
+    # Calculate mean and scale
+    x_mean = np.mean(x[:2],axis=1)
+    x_scale = np.sqrt(2) / np.std(x[:2])
+
+    # Create normalization matrix T
+    T = np.array([[x_scale,0,-x_scale*x_mean[0]],[0,x_scale,-x_scale*x_mean[1]],[0,0,1]])
+    x_n = np.dot(T,x)
+
+    return x_n, T
+
+
+def compute_fundamental(x1,x2):
+    '''
+    Compute fundamental matrix from 2d points in image coordinates.
+
+    Input points do not need to be normalized in advance.
+    '''
+
+    # Check that x1,x2 have same number of points
+    num = x1.shape[1]
+    if x2.shape[1] != num:
+        raise ValueError("Number of points do not match!")
+    elif num < 8:
+        raise ValueError("At least 8 points needed!")
+
+    # Normalize input points
+    x1, T1 = normalize_2d_points(x1)
+    x2, T2 = normalize_2d_points(x2)
+
+    # Design matrix A
+    A = np.array([x1[0]*x2[0],x1[0]*x2[1],x1[0],
+                  x1[1]*x2[0],x1[1]*x2[1],x1[1],
+                  x2[0],x2[1],np.ones(x1.shape[1])]).T
+    
+    # Solve F by SVD
+    U,S,V = np.linalg.svd(A)
+    F = V[-1].reshape(3,3)
+
+    # Constrain of det(F)=0
+    U,S,V = np.linalg.svd(F)
+    S[2] = 0
+    F = np.dot(np.dot(U,np.diag(S)),V)
+
+    # Denormalization
+    F = np.dot(np.dot(T1.T,F),T2)
+
+    return F.T/F[2,2]
+
+
+def compute_essential(x1,x2):
+    '''
+    Compute essential matrix from 2d points correspondences, 
+    
+    which have to be normalized by calibration matrix K in advance.
+    '''
+
+    # Check that x1,x2 have same number of points
+    num = x1.shape[1]
+    if x2.shape[1] != num:
+        raise ValueError("Number of points do not match!")
+    elif num < 8:
+        raise ValueError("At least 8 points needed!")
+
+    # Normalize input points
+    x1, T1 = normalize_2d_points(x1)
+    x2, T2 = normalize_2d_points(x2)
+
+    # Design matrix A
+    A = np.array([x1[0]*x2[0],x1[0]*x2[1],x1[0],
+                  x1[1]*x2[0],x1[1]*x2[1],x1[1],
+                  x2[0],x2[1],np.ones(x1.shape[1])]).T
+    
+    # Solve F by SVD
+    U,S,V = np.linalg.svd(A)
+    E = V[-1].reshape(3,3)
+
+    # Constrain of det(E)=0 and first two singular values are equal (set to 1)
+    U,S,V = np.linalg.svd(E)
+    S[0], S[1], S[2] = 1, 1, 0
+    E = np.dot(np.dot(U,np.diag(S)),V)
+
+    # Denormalization
+    E = np.dot(np.dot(T1.T,E),T2)
+
+    return E.T/E[2,2]
+
+
+def Sampson_error(x1,x2,F):
+    Fx1 = np.dot(F,x1)
+    Fx2 = np.dot(F,x2)
+
+    w = Fx1[0]**2 + Fx1[1]**2 + Fx2[0]**2 + Fx2[1]**2
+    error = np.diag(np.dot(np.dot(x2.T, F),x1))**2 / w
+
+    return error
+
+
 def compute_P_from_F(F):
     # Compute the left epipole
     U,S,V = np.linalg.svd(F.T)
