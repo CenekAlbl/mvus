@@ -3,6 +3,19 @@ import cv2
 import numpy as np
 import epipolar as ep
 
+'''
+This script verifies the functionality of computing fundamental matrix F
+
+in two ways (OpenCV and own function). As input a synthetic dataset is used
+
+so that the resulting F should be nearly perfect.
+'''
+
+# Decide whether to add noises on point correspondences.
+add_noise = True
+noise_mean = 0
+noise_std = 0
+
 # Load trajectory data
 X = np.loadtxt('data/Synthetic_Trajectory.txt')
 X_homo = np.insert(X.T,3,1,axis=0)
@@ -15,11 +28,27 @@ with open('data/Synthetic_Camera.pickle', 'rb') as file:
 P1 = np.dot(Camera["K1"],np.hstack((Camera["R1"],Camera["t1"])))
 x1 = np.dot(P1,X_homo)
 x1 /= x1[-1]
+img1 = Camera["img1"]
 
 # Camara 2
 P2 = np.dot(Camera["K2"],np.hstack((Camera["R2"],Camera["t2"])))
 x2 = np.dot(P2,X_homo)
 x2 /= x2[-1]
+img2 = Camera["img2"]
+
+# Add noise (optional)
+if add_noise:
+    x1[:2] = x1[:2] + np.random.randn(2, x1.shape[1]) * noise_std
+    x2[:2] = x2[:2] + np.random.randn(2, x2.shape[1]) * noise_std
+
+    x1[0][x1[0]>img1.shape[1]] = img1.shape[1]
+    x1[1][x1[1]>img1.shape[0]] = img1.shape[0]
+    x1[0][x1[0]<0] = 0
+    x1[1][x1[1]<0] = 0
+    x2[0][x2[0]>img2.shape[1]] = img2.shape[1]
+    x2[1][x2[1]>img2.shape[0]] = img2.shape[0]
+    x2[0][x2[0]<0] = 0
+    x2[1][x2[1]<0] = 0
 
 # Use a certain percentage of data to compute F, the rest for validation
 part = 0.7
@@ -47,7 +76,4 @@ print("\nThe maxmial residual from Own implementation is {}".format(error_2.max(
 print("\nFinished\n")
 
 # Visualize epipolar lines
-img1 = Camera["img1"]
-img2 = Camera["img2"]
-
 ep.plot_epipolar_line(img1,img2,F2,x1_val,x2_val)
