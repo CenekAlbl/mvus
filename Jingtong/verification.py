@@ -45,3 +45,9 @@ error_2 = ep.Sampson_error(x1_val, x2_val, F2)
 print("\nThe maxmial residual from OpenCV is {}".format(error_1.max()))
 print("\nThe maxmial residual from Own implementation is {}".format(error_2.max()))
 print("\nFinished\n")
+
+# Visualize epipolar lines
+img1 = Camera["img1"]
+img2 = Camera["img2"]
+
+ep.plot_epipolar_line(img1,img2,F2,x1_val,x2_val)
