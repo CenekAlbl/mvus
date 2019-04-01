@@ -341,10 +341,9 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
         line = line2[:,i]
         y1_coord = np.array([(line[2]+line[0]*x)/(-line[1]) for x in x1_coord])
         idx = (y1_coord>=0) & (y1_coord<r1)
-        plt.plot(x1_coord[idx],y1_coord[idx],linewidth=1)
+        plt.plot(x1_coord[idx],y1_coord[idx])
     plt.scatter(x1[0],x1[1])
     
-
     # plot epipolar lines in img2, which are calculated using key points in img1
     plt.subplot(122),plt.imshow(img2,cmap='gray')
     for i in range(num):

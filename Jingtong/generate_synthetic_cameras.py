@@ -7,11 +7,10 @@ from mpl_toolkits.mplot3d import Axes3D
 '''
 This script generates synthetic camera(s) for a given trajectory.
 
-It works currently for the dataset in 'data/Synthetic_Trajectory.txt'
-
 Please set the number of cameras that should be generated.
 
 Important:
+
 When an image from a generated camera is displayed, PRESS "s" to save it, otherwise it will be ignored
 '''
 
@@ -19,14 +18,14 @@ When an image from a generated camera is displayed, PRESS "s" to save it, otherw
 num_cam = 2
 
 # Load trajectory data
-X = np.loadtxt('data/Synthetic_Trajectory.txt')
-X_homo = np.insert(X.T,3,1,axis=0)
+X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+X_homo = np.insert(X,3,1,axis=0)
 
 # Show the 3D trajectory
 fig = plt.figure()
 ax = fig.gca(projection='3d')
-ax.plot3D(X[:,0],X[:,1],X[:,2])
-ax.scatter3D(X[:,0],X[:,1],X[:,2])
+ax.plot3D(X[0],X[1],X[2])
+ax.scatter3D(X[0],X[1],X[2])
 plt.xlabel('x')
 plt.ylabel('y')
 plt.show()
