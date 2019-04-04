@@ -21,7 +21,8 @@ while True:
     v = np.ones([3,time])
 
     for t in range(1,time):
-        a = np.random.randn(3)
+        #a = np.random.randn(3)
+        a = np.random.uniform(-0.5,0.5,3)
         v[:,t] = v[:,t-1] + a*dt
         r[:,t] = r[:,t-1] + v[:,t-1]*dt + 0.5*a*dt**2
 

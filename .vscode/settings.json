@@ -1,5 +1,11 @@
 {
-    "python.pythonPath": "C:\\Users\\tong2\\Anaconda3\\envs\\thesis\\python.exe",
+    "python.pythonPath": "/usr/bin/python3",
     "terminal.integrated.env.windows": {"PYTHONPATH":"Jingtong"},
-    "python.linting.pylintArgs": ["--disable","all","--enable","F,E,unreachable,duplicate-key,unnecessary-semicolon,global-variable-not-assigned,binary-op-exception,bad-format-string,anomalous-backslash-in-string,bad-open-mode"]
+    "python.linting.pylintArgs": [
+        "--disable",
+        "all",
+        "--enable",
+        "F,E,unreachable,duplicate-key,unnecessary-semicolon,global-variable-not-assigned,binary-op-exception,bad-format-string,anomalous-backslash-in-string,bad-open-mode"
+    ],
+    "python.linting.pylintEnabled": true
 }
