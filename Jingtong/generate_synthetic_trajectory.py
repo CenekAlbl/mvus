@@ -11,6 +11,7 @@ Parameters
 '''
 time = 1000     # total time
 dn = 5          # time interval to sample a point
+random_sample = True
 dt = 0.1        # time interval for movement, not important due to rescaling later
 filename = "data/Synthetic_Trajectory_generated.txt"
 
@@ -24,13 +25,16 @@ while True:
         v[:,t] = v[:,t-1] + a*dt
         r[:,t] = r[:,t-1] + v[:,t-1]*dt + 0.5*a*dt**2
 
-    # Random sampling
-    idx_1 = np.array(range(0,time,dn))
-    idx_2 = np.random.randint(dn-1, size=len(idx_1))
-    idx = idx_1 + idx_2
+    # Sampling
+    if random_sample:
+        idx_1 = np.array(range(0,time,dn))
+        idx_2 = np.random.randint(dn-1, size=len(idx_1))
+        idx = idx_1 + idx_2
+    else:
+        idx = np.array(range(0,time,dn))
 
     # Rescale into final data
-    data = np.zeros([3,len(idx_1)])
+    data = np.zeros([3,len(idx)])
     data[0] = mapminmax(r[0,idx],-5,5)
     data[1] = mapminmax(r[1,idx],-5,5)
     data[2] = mapminmax(r[2,idx],-5,5)

@@ -21,11 +21,11 @@ part = 0.5
 
 # Decide whether to add noises on point correspondences.
 add_noise = True
-noise_std = 4
+noise_std = 1
 
 # Using Ransac
 Use_Ransac = True
-inlier_ratio = 0.5
+inlier_ratio = 0.6
 
 '''
 Verification
@@ -87,8 +87,9 @@ if add_noise:
 if Use_Ransac:
     # Compute F using 8-points algorithm + Ransac
     F1, mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_RANSAC)
+    inlier_should = int(num_train*inlier_ratio)
     model = ransac.Ransac_Fundamental()
-    F2, inliers = ransac.F_from_Ransac(x1_train, x2_train, model, threshold=1e-3, inliers=int((inlier_should-8)*0.7))
+    F2, inliers = ransac.F_from_Ransac(x1_train, x2_train, model, threshold=1e-2, inliers=int((inlier_should-8)*0.3))
 else:
     # Compute F using 8-points algorithm
     F1,mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_8POINT)

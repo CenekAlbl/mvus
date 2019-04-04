@@ -9,6 +9,41 @@ def getFrame(video,numFrame):
     cap.release()
     return img
 
+def play_two_videos(v1,v2,f1,f2,t):
+    '''
+    Currently not working !!
+    '''
+
+    cap1 = cv2.VideoCapture(v1)
+    cap2 = cv2.VideoCapture(v2)
+
+    for i in range(t):
+        # cap1.set(cv2.CAP_PROP_POS_FRAMES,f1+t)
+        # cap2.set(cv2.CAP_PROP_POS_FRAMES,f2+t)
+
+        read1,img1 = cap1.read()
+        read2,img2 = cap2.read()
+
+        if not read1 or not read2:
+            print("Can't receive frame. Exiting...")
+            break
+        
+        gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+        cv2.namedWindow('video1', cv2.WINDOW_NORMAL)
+        cv2.namedWindow('video2', cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('video1',500,300)
+        cv2.resizeWindow('video2',500,300)
+        cv2.imshow('video1', gray1)
+        cv2.imshow('video2', gray2)
+        if cv2.waitKey(1000 // 12) & 0xFF == 27:
+            break
+    
+    cap1.release()
+    cap2.release()
+    cv2.destroyAllWindows()
+
 if __name__ == "__main__":
     video = 'C:\\Users\\tong2\\MyStudy\\ETH\\2019FS\\Thesis\\data\\C0028.MP4'
     img = getFrame(video,50)

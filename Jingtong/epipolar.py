@@ -328,8 +328,8 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     num = x1.shape[1]
     r1,c1 = img1.shape
     r2,c2 = img2.shape
-    x1_coord = np.linspace(0,c1,100)
-    x2_coord = np.linspace(0,c2,100)
+    x1_coord = np.linspace(0,c1-1,100)
+    x2_coord = np.linspace(0,c2-1,100)
 
     # Calculate epipolar lines
     line1 = np.dot(F,x1)
@@ -340,7 +340,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     for i in range(num):
         line = line2[:,i]
         y1_coord = np.array([(line[2]+line[0]*x)/(-line[1]) for x in x1_coord])
-        idx = (y1_coord>=0) & (y1_coord<r1)
+        idx = (y1_coord>=0) & (y1_coord<r1-1)
         plt.plot(x1_coord[idx],y1_coord[idx])
     plt.scatter(x1[0],x1[1])
     
@@ -349,7 +349,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     for i in range(num):
         line = line1[:,i]
         y2_coord = np.array([(line[2]+line[0]*x)/(-line[1]) for x in x2_coord])
-        idx = (y2_coord>=0) & (y2_coord<r2)
+        idx = (y2_coord>=0) & (y2_coord<r2-1)
         plt.plot(x2_coord[idx],y2_coord[idx])
     plt.scatter(x2[0],x2[1])
 
