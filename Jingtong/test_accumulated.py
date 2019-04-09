@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 # from matplotlib import pyplot as plt
 import epipolar as ep
+import visualization as vis
 
 '''
 This script tests the case of using multiple frames to estimate F
@@ -69,7 +70,7 @@ P2 = np.int32(P2)[mask.ravel()==1]
 print('{} feature correspondences are valid After estimating F'.format(P1.shape[0]))
 
 # Draw epipolar lines
-ep.plotEpiline(img1, img2, P1, P2, F)
+vis.plotEpiline(img1, img2, P1, P2, F)
 
 cap1.release()
 cap2.release()

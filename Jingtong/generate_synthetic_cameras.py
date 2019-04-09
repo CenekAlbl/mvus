@@ -1,6 +1,8 @@
 import os,math,pickle
 import cv2
 import numpy as np
+import util
+import visualization as vis
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -17,28 +19,15 @@ When an image from a generated camera is displayed, PRESS "s" to save it, otherw
 # Set the number of camera
 num_cam = 2
 
+# Select the trajectory data
+filename = 'data/Real_Trajectory.txt'
+
 # Load trajectory data
-X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+X = np.loadtxt(filename)
 X_homo = np.insert(X,3,1,axis=0)
 
 # Show the 3D trajectory
-fig = plt.figure()
-ax = fig.gca(projection='3d')
-ax.plot3D(X[0],X[1],X[2])
-ax.scatter3D(X[0],X[1],X[2])
-plt.xlabel('x')
-plt.ylabel('y')
-plt.show()
-
-# define a function for rotation matrix
-def rotation(x,y,z):
-    x,y,z = x/180*math.pi, y/180*math.pi, z/180*math.pi
-
-    Rx = np.array([[1,0,0],[0,math.cos(x),-math.sin(x)],[0,math.sin(x),math.cos(x)]])
-    Ry = np.array([[math.cos(y),0,math.sin(y)],[0,1,0],[-math.sin(y),0,math.cos(y)]])
-    Rz = np.array([[math.cos(z),-math.sin(z),0],[math.sin(z),math.cos(z),0],[0,0,1]])
-
-    return np.dot(np.dot(Rz,Ry),Rx)
+vis.show_trajectory_3D(X,color=True,line=True)
 
 ''' 
 Start generating cameras
@@ -56,7 +45,7 @@ while num_temp <= num_cam:
     K = np.array([[f,0,px],
                [0,f,py],
                [0,0,1]])
-    R = rotation(r[0],r[1],r[2])
+    R = util.rotation(r[0],r[1],r[2])
     t = 20*np.random.random_sample((3,1))-10
 
     P = np.dot(K,np.hstack((R,t)))

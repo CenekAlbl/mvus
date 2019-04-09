@@ -1,6 +1,8 @@
 import numpy as np
 import cv2
 import epipolar as ep
+import visualization as vis
+import util
 import pickle
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -13,7 +15,7 @@ This script tests the case of iteratively using image pairs to estimate F
 '''
 Parameters
 '''
-match_ratio = 0.5
+match_ratio = 0.5   # set to 0.5 resulting in no matches
 RansacReproErr = 5
 Frame_interval = 30
 
@@ -52,7 +54,7 @@ if Use_traj:
     traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
 
     traj = np.hstack((traj_1[start_traj_1:start_traj_1+num_traj,1:],traj_2[start_traj_2:start_traj_2+num_traj,1:]))
-    traj = np.unique(traj,axis=0)
+    # traj = np.unique(traj,axis=0)
 
 # Starting
 time = 1
@@ -112,12 +114,12 @@ while time:
 
     # Compute fundametal matrix F and return inlier matches(optional)
     F, mask = ep.computeFundamentalMat(pts1, pts2, error=RansacReproErr)
-    pts1 = np.int32(pts1)[mask.ravel()==1]
-    pts2 = np.int32(pts2)[mask.ravel()==1]
+    # pts1 = np.int32(pts1)[mask.ravel()==1]
+    # pts2 = np.int32(pts2)[mask.ravel()==1]
     print('\n{} feature correspondences are valid after estimating F'.format(pts1.shape[0]))
 
     # Draw epipolar lines
-    ep.plotEpiline(img1, img2, pts1, pts2, F)
+    vis.plotEpiline(img1, img2, pts1, pts2, F)
 
     time = time + Frame_interval
 
@@ -137,8 +139,8 @@ P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
 P2 = np.dot(K2,np.hstack((R,t)))
 
 # Compute projection matrix P from fundamental matrix F
-P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
-P2 = ep.compute_P_from_F(F)
+# P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+# P2 = ep.compute_P_from_F(F)
 
 # Triangulate points
 print("\nTriangulating feature points...")
@@ -147,8 +149,28 @@ pts2=pts2.astype(np.float64)
 X = cv2.triangulatePoints(P1,P2,pts1.T,pts2.T)
 X/=X[-1]
 
+# Show 2D results
+vis.show_trajectory_2D(pts1.T,color=True,line=True)
+vis.show_trajectory_2D(pts2.T,color=True,line=True)
+
+# Rescale
+X[0] = util.mapminmax(X[0],-5,5)
+X[1] = util.mapminmax(X[1],-5,5)
+X[2] = util.mapminmax(X[2],-5,5)
+
 # Show 3D results
-fig = plt.figure()
-ax = Axes3D(fig)
-ax.scatter(X[0],X[1],X[2])
-plt.show()
+vis.show_trajectory_3D(X,color=True,line=True)
+
+# Ask if the data is accepted
+print("\nDo you want to save this trajectory?")
+decision = input("Enter 'y' to save it, enter anyother key to exit: ")
+filename = "data/Real_Trajectory.txt"
+
+if decision == 'y':
+    np.savetxt(filename, X[:3], header="This is a real 3D trajectory dataset created by test_iterative.py")
+    print('\nThe trajectory is saved under the name "Real_Trajectory.txt".\n')
+
+else:
+    print('\nNo trajectory is generated')
+
+print('\nFinished')

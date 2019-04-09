@@ -3,6 +3,7 @@ import cv2
 from matplotlib import pyplot as plt
 import video
 import epipolar as ep
+import visualization as vis
 
 
 '''
@@ -61,5 +62,5 @@ pts2 = np.int32(pts2)[mask.ravel()==1]
 print('\n{} feature correspondences are valid after estimating F'.format(pts1.shape[0]))
 
 # Draw epipolar lines
-ep.plotEpiline(img1, img2, pts1, pts2, F)
+vis.plotEpiline(img1, img2, pts1, pts2, F)
 cv2.destroyAllWindows()

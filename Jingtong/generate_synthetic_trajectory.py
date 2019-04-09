@@ -1,9 +1,8 @@
 import numpy as np
+import util
+import visualization as vis
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
-def mapminmax(x,ymin,ymax):
-    return (ymax-ymin)*(x-min(x))/(max(x)-min(x)) + ymin
 
 
 '''
@@ -36,17 +35,12 @@ while True:
 
     # Rescale into final data
     data = np.zeros([3,len(idx)])
-    data[0] = mapminmax(r[0,idx],-5,5)
-    data[1] = mapminmax(r[1,idx],-5,5)
-    data[2] = mapminmax(r[2,idx],-5,5)
+    data[0] = util.mapminmax(r[0,idx],-5,5)
+    data[1] = util.mapminmax(r[1,idx],-5,5)
+    data[2] = util.mapminmax(r[2,idx],-5,5)
 
     # Show the 3D trajectory
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.scatter3D(data[0],data[1],data[2])
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.show()
+    vis.show_trajectory_3D(data,color=True,line=True)
 
     # Ask if the data is accepted
     print("\nDo you want to save this trajectory?")
