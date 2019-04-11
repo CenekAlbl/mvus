@@ -221,7 +221,7 @@ def compute_essential(x1,x2):
 
 def Sampson_error(x1,x2,F):
     Fx1 = np.dot(F,x1)
-    Fx2 = np.dot(F,x2)
+    Fx2 = np.dot(F.T,x2)
 
     w = Fx1[0]**2 + Fx1[1]**2 + Fx2[0]**2 + Fx2[1]**2
     error = np.diag(np.dot(np.dot(x2.T, F),x1))**2 / w

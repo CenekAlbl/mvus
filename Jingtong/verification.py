@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import epipolar as ep
 import visualization as vis
-import ransac
+import ransac1
 from matplotlib import pyplot as plt
 
 
@@ -47,8 +47,8 @@ def verify_fundamental(x1,x2,img1,img2,part=0.5,add_noise=True,noise_std=1,Use_R
         # Compute F using 8-points algorithm + Ransac
         F1, mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_RANSAC)
         inlier_should = int(num_train*inlier_ratio)
-        model = ransac.Ransac_Fundamental()
-        F2, inliers = ransac.F_from_Ransac(x1_train, x2_train, model, threshold=1e-2, inliers=int((inlier_should-8)*0.3))
+        model = ransac1.Ransac_Fundamental()
+        F2, inliers = ransac1.F_from_Ransac(x1_train, x2_train, model, threshold=1e-2, inliers=int((inlier_should-8)*0.3))
     else:
         # Compute F using 8-points algorithm
         F1,mask = cv2.findFundamentalMat(x1_train[:2].T, x2_train[:2].T, method=cv2.FM_8POINT)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     Load data
     '''
     # Load trajectory data
-    X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+    X = np.loadtxt('data/Real_Trajectory.txt')
     X_homo = np.insert(X,3,1,axis=0)
 
     # Load camera parameter
