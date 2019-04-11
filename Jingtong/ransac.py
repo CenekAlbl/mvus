@@ -41,6 +41,8 @@ def vanillaRansac(estimateFn, verifyFn, data, minSamples, threshold, maxIter, ve
         sampleIdxs = np.random.choice(idxs, size=minSamples)
         M = estimateFn(data[:,sampleIdxs])
         if len(M) is not 0:
+            if len(M.shape)==1:
+                M = np.expand_dims(M,axis=0)
             for Mi in M:
                 err = verifyFn(Mi,data)
                 if(len(err.shape)>1):
@@ -110,6 +112,8 @@ def loRansacSimple(estimateFn, verifyFn, data, n, threshold, maxIter, optimizeFn
         sampleIdxs = np.random.choice(idxs, size=n)
         M = estimateFn(data[:,sampleIdxs])
         if len(M) is not 0:
+            if len(M.shape)==1:
+                M = np.expand_dims(M,axis=0)
             for Mi in M:
                 #Mi = M[:,j]
                 err = verifyFn(Mi,data)

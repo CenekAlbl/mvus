@@ -36,9 +36,8 @@ def shift_trajectory(x,beta):
         y = x[:,:-1]
     else:
         if beta_dec:
-            y_int = x[:,beta_int+1:]
+            y_int = x[:,1:x.shape[1]-beta_int]
             y_dec = -ds[:,:ds.shape[1]-beta_int] * beta_dec
-            # y_dec = -ds[:,1:ds.shape[1]-beta_int+1] * beta_dec
             y = y_int + y_dec
         else:
             y = x[:,:-beta_int]
@@ -72,7 +71,7 @@ def compute_beta(data):
                 ds[0],ds[1],np.zeros(9)]).T
 
     # Compute eigenvalue
-    w, vr = scipy.linalg.eig(A1,b=A2)
+    w = scipy.linalg.eigvals(A1,A2)
 
     return -w
 
@@ -102,6 +101,20 @@ def compute_beta_fundamental(data):
     return M
 
 
+def compute_beta_fundamental_Ransac(x1,x2,threshold=10e-4,maxiter=500,verbose=False,loRansac=False):
+    '''
+    This function calls the Ransac for computing Beta and F and returns the best model and inliers.
+    '''
+
+    ds = x2[:,1:] - x2[:,:-1]
+    data = np.append(np.append(x1[:,:-1],x2[:,:-1],axis=0),ds,axis=0)
+
+    if loRansac:
+        return ransac.loRansacSimple(compute_beta_fundamental,error_beta_fundamental,data,9,threshold,maxiter,verbose=verbose)
+    else:
+        return ransac.vanillaRansac(compute_beta_fundamental,error_beta_fundamental,data,9,threshold,maxiter,verbose=verbose)
+
+
 def error_beta_fundamental(M,data):
     '''
     This function computes the Sampson error given Beta and F
@@ -120,7 +133,10 @@ def error_beta_fundamental(M,data):
     # Alternative:
     if abs(beta) < data.shape[1]:
         x2_shift = shift_trajectory(data[3:6,:],beta)
-        x2[:,:x2_shift.shape[1]] = x2_shift
+        if beta >= 0:
+            x2[:,:x2_shift.shape[1]] = x2_shift
+        else:
+            x2[:,data.shape[1]-x2_shift.shape[1]:] = x2_shift
 
     return ep.Sampson_error(x1,x2,F)
 
@@ -155,15 +171,20 @@ def verify_beta(x1,x2,beta,show=True):
     return M
 
 
-def verify_beta_Ransac(x1,x2,beta,threshold=10e-4,maxiter=500,verbose=False,loRansac=False):
+def verify_beta_fundamental_Ransac(x1,x2,beta,threshold=10e-4,maxiter=500,verbose=False,loRansac=False):
     '''
-    This function calls the Ransac for computing Beta and F and returns the best model and inliers.
+    This function verifies the computation of Beta and F (Beta should be given)
     '''
 
     ds = x2[:,1:] - x2[:,:-1]
-    s1 = shift_trajectory(x1,beta)
-    num_data = s1.shape[1]
-    data = np.append(np.append(s1,x2[:,:num_data],axis=0),ds[:,:num_data],axis=0)
+    if beta >= 0:
+        s1 = shift_trajectory(x1,beta)
+        num_data = s1.shape[1]
+        data = np.append(np.append(s1,x2[:,:num_data],axis=0),ds[:,:num_data],axis=0)
+    else:
+        s1 = shift_trajectory(x1,beta)
+        s2 = shift_trajectory(x2,-np.floor(beta))
+        data = np.append(np.append(s1[:,:-1],s2[:,:-1],axis=0),ds[:,int(-np.floor(beta)):],axis=0)
 
     if loRansac:
         return ransac.loRansacSimple(compute_beta_fundamental,error_beta_fundamental,data,9,threshold,maxiter,verbose=verbose)
@@ -206,8 +227,8 @@ if __name__ == "__main__":
     start=datetime.now()
 
     # parameters
-    beta_min = 0
-    beta_max = 3
+    beta_min = -3
+    beta_max = 0
     beta_step = 0.1
     maxiter = 500
     threshold = 0.01
@@ -218,7 +239,7 @@ if __name__ == "__main__":
     beta = np.arange(beta_min,beta_max,beta_step)
     results = {"beta":[],"beta_error":[],"numinliers":[]}
     for i in range(len(beta)):
-        estimate = verify_beta_Ransac(x1,x2,beta[i],threshold=threshold,maxiter=maxiter,loRansac=LoRansac)
+        estimate = verify_beta_fundamental_Ransac(x1,x2,beta[i],threshold=threshold,maxiter=maxiter,loRansac=LoRansac)
 
         results['beta'].append(estimate['model'][-1])
         results['beta_error'].append(abs(estimate['model'][-1]-beta[i]))

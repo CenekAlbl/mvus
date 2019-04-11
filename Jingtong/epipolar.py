@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
+import ransac
 import visualization as vis
-from matplotlib import pyplot as plt
 
 
 def extract_SIFT_feature(img, mask_range=None):
@@ -179,6 +179,27 @@ def compute_fundamental(x1,x2):
     F = np.dot(np.dot(T1.T,F),T2)
 
     return F.T/F[2,2]
+
+
+def compute_fundamental_Ransac(x1,x2,threshold=10e-4,maxiter=500,verbose=False,loRansac=False):
+    
+    def model_function(data):
+        s1 = data[:3]
+        s2 = data[3:]
+        F = compute_fundamental(s1,s2)
+        return np.ravel(F)
+
+    def error_function(M,data):
+        s1 = data[:3]
+        s2 = data[3:]
+        F = M.reshape((3,3))
+        return Sampson_error(s1,s2,F)
+
+    data = np.append(x1,x2,axis=0)
+    if loRansac:
+        return ransac.loRansacSimple(model_function,error_function,data,8,threshold,maxiter,verbose=verbose)
+    else:
+        return ransac.vanillaRansac(model_function,error_function,data,8,threshold,maxiter,verbose=verbose)
 
 
 def compute_essential(x1,x2):
