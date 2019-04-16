@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import util
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -105,7 +106,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     plt.show()
 
 
-def show_trajectory_2D(*x, color=True,line=True):
+def show_trajectory_2D(*x,title=None,color=True,line=True,text=False):
 
     num = len(x)
     for i in range(num):
@@ -113,20 +114,27 @@ def show_trajectory_2D(*x, color=True,line=True):
         plt.scatter(x[i][0],x[i][1],c=np.arange(x[i].shape[1])*color)
         if line:
             plt.plot(x[i][0],x[i][1])
+        if text:
+            for j in range(len(x[i][0])):
+                plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
         plt.gca().invert_yaxis()
         plt.xlabel('X')
         plt.ylabel('Y')
+    if title:
+        plt.suptitle(title)
     plt.show()
 
 
-def show_trajectory_3D(X,color=True,line=True):
+def show_trajectory_3D(*X,color=True,line=True):
     fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    ax.scatter3D(X[0],X[1],X[2],c=np.arange(X.shape[1])*color)
-    if line:
-        ax.plot(X[0],X[1],X[2])
-    plt.xlabel('X')
-    plt.ylabel('Y')
+    num = len(X)
+    for i in range(num):
+        ax = fig.add_subplot(1,num,i+1,projection='3d')
+        ax.scatter3D(X[i][0],X[i][1],X[i][2],c=np.arange(X[i].shape[1])*color)
+        if line:
+            ax.plot(X[i][0],X[i][1],X[i][2])
+        plt.xlabel('X')
+        plt.ylabel('Y')
     plt.show()
 
 
@@ -135,4 +143,13 @@ if __name__ == "__main__":
     X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
     X_homo = np.insert(X,3,1,axis=0)
 
-    show_trajectory_3D(X,color=True)
+    # show_trajectory_3D(X,color=True)
+
+    # Load data from fixposition
+    X1 = np.loadtxt('data/fixposition_1_kml.txt',delimiter=',')
+    X1 = X1.T
+
+    X2 = np.loadtxt('data/fixposition_2_kml.txt',delimiter=',')
+    X2 = X2.T
+    show_trajectory_3D(X1,X2)
+    print('finished')

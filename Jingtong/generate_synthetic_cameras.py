@@ -50,42 +50,43 @@ while num_temp <= num_cam:
 
     P = np.dot(K,np.hstack((R,t)))
     x = np.dot(P,X_homo)
-    x /= x[-1]
+    if x[2].min() > 0:
+        x /= x[-1]
 
-    if max(x[0])<2*px and min(x[0])>0 and max(x[1])<2*py and min(x[1])>0 \
-       and max(x[0])>2*px-200 and min(x[0])<200 and max(x[1])>2*py-200 and min(x[1])<200 :
+        if max(x[0])<2*px and min(x[0])>0 and max(x[1])<2*py and min(x[1])>0 \
+        and max(x[0])>2*px-200 and min(x[0])<200 and max(x[1])>2*py-200 and min(x[1])<200 :
 
-        print("got it!\n")
-        print("K=",K)
-        print("R=",R)
-        print("t=",t)
-        print("X-coordinates of all points fall into the range {} and {}".format(min(x[0]),max(x[0])))
-        print("Y-coordinates of all points fall into the range {} and {}".format(min(x[1]),max(x[1])))
-        print("\nPress 's' if you want to save this one, otherwise press anykey to continue")
+            print("got it!\n")
+            print("K=",K)
+            print("R=",R)
+            print("t=",t)
+            print("X-coordinates of all points fall into the range {} and {}".format(min(x[0]),max(x[0])))
+            print("Y-coordinates of all points fall into the range {} and {}".format(min(x[1]),max(x[1])))
+            print("\nPress 's' if you want to save this one, otherwise press anykey to continue")
 
-        img = np.zeros((py*2,px*2),dtype=np.uint8)
-        x = np.int16(x[:2])
+            img = np.zeros((py*2,px*2),dtype=np.uint8)
+            x = np.int16(x[:2])
 
-        for i in range(x.shape[1]):
-            img[x[1,i],x[0,i]]= 255
+            for i in range(x.shape[1]):
+                img[x[1,i],x[0,i]]= 255
 
-        cv2.imshow("Synthetic Image",img)
-        k = cv2.waitKey(0)
-        if k == ord("s"):
-            Camera["K{}".format(num_temp)] = K
-            Camera["R{}".format(num_temp)] = R
-            Camera["t{}".format(num_temp)] = t
-            Camera["img{}".format(num_temp)] = img
+            cv2.imshow("Synthetic Image",img)
+            k = cv2.waitKey(0)
+            if k == ord("s"):
+                Camera["K{}".format(num_temp)] = K
+                Camera["R{}".format(num_temp)] = R
+                Camera["t{}".format(num_temp)] = t
+                Camera["img{}".format(num_temp)] = img
 
-            num_temp += 1
-            cv2.destroyAllWindows()
-        else:
-            cv2.destroyAllWindows()
+                num_temp += 1
+                cv2.destroyAllWindows()
+            else:
+                cv2.destroyAllWindows()
 
-        if num_temp <= num_cam:
-            print("\nGenerating the next camera...\n")
-        else:
-            print("\nFinished!\n")
+            if num_temp <= num_cam:
+                print("\nGenerating the next camera...\n")
+            else:
+                print("\nFinished!\n")
 
 # save the camera(s) in a pickle file
 if not os.path.isdir("data"):
