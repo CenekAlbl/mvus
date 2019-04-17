@@ -120,7 +120,7 @@ def compute_beta_fundamental_Ransac(x1,x2,param,threshold=10e-4,maxiter=500,verb
     if loRansac:
         return ransac.loRansacSimple(compute_beta_fundamental,error_beta_fundamental,data,9,param,threshold,maxiter,verbose=verbose)
     else:
-        return ransac.vanillaRansac(compute_beta_fundamental,error_beta_fundamental,data,9,threshold,maxiter,verbose=verbose)
+        return ransac.vanillaRansac(compute_beta_fundamental,error_beta_fundamental,data,9,param,threshold,maxiter,verbose=verbose)
 
 
 def error_beta_fundamental(M,data,param):
@@ -141,6 +141,7 @@ def error_beta_fundamental(M,data,param):
     # decompose input data
     x1 = data[:3,:]
     if data.shape[1] > 5:
+        x1 = shift_trajectory(x1,0,k=k,s=s)
         x2 = shift_trajectory(data[3:6,:],beta,k=k,s=s)
         return ep.Sampson_error(x1,x2,F)
     else:
@@ -159,16 +160,16 @@ def verify_beta(x1,x2,beta,param,show=True):
 
     # Create the approximated velocity vectors
     ds = velocity_vector(x2,d)
-    if d>0:
-        s1 = shift_trajectory(x1,beta,k=k,s=s)[:,:-d]
-        s2 = x2[:,:-d]
+    if beta>0:
+        s1 = shift_trajectory(x1,beta,k=k,s=s)[:,:-beta]
+        s2 = x2[:,:-beta]
     else:
-        s1 = shift_trajectory(x1,beta,k=k,s=s)[:,-d:]
-        s2 = x2[:,-d:]
+        s1 = shift_trajectory(x1,beta,k=k,s=s)[:,-beta:]
+        s2 = x2[:,-beta:]
 
     # Show shifted 2D trajectory
     if show:
-        vis.show_trajectory_2D(x1[:,:100],s1[:,:100],text=True,
+        vis.show_trajectory_2D(x1[:,:],s1[:,:-200],text=False,
         title='Original (left) vs Shifted (right), Beta={}, k={} and s={}'.format(beta,k,s))
 
     # Normalize points
@@ -190,7 +191,7 @@ def verify_beta(x1,x2,beta,param,show=True):
     return M
 
 
-def iter_sync(x1,x2,param,it_max=100,p_min=0,p_max=8,threshold=1,maxiter=500,loRansac=False):
+def iter_sync(x1,x2,param,it_max=100,p_min=0,p_max=7,threshold=1,maxiter=500,loRansac=False):
     '''
     Iterative algorithm beyond the solver for Beta and F
     '''
@@ -199,28 +200,34 @@ def iter_sync(x1,x2,param,it_max=100,p_min=0,p_max=8,threshold=1,maxiter=500,loR
     k = param['k']
     s = param['s']
 
+    # Initialize
+    num_all = x1.shape[1]
     beta, inliers = np.zeros(it_max),np.zeros(it_max)
     F = np.zeros((it_max,9))
     beta[0], inliers[0], j, skip, it = 0,0,0,0,1
     p = p_min
     param['d'] = 2**p_min
-    x2_shifted = x2
+    s1, s2 = x1, x2
     
+    # Iteration
     while it<it_max:
-        R1 = compute_beta_fundamental_Ransac(x1,x2_shifted,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
+        # Try d and -d
+        R1 = compute_beta_fundamental_Ransac(s1,s2,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
         param['d'] = -param['d']
-        R2 = compute_beta_fundamental_Ransac(x1,x2_shifted,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
+        R2 = compute_beta_fundamental_Ransac(s1,s2,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
         param['d'] = -param['d']
 
+        # Choose the better result
         if R1['inliers'].shape[0] < R2['inliers'].shape[0]:
             R1 = R2
-        inliers[it] = R1['inliers'].shape[0]
+        inliers[it] = R1['inliers'].shape[0] / (s1.shape[1]-abs(R1['model'][-1]))
         beta[it] = R1['model'][-1]
         F[it] = R1['model'][:-1]
 
         if skip > p_max:
-            return F[it-1], j+beta[it-1]
-        elif inliers[it] < inliers[it-1]:
+            return F[it-1], j
+        # Less inlier -> change interpolation distance d
+        elif inliers[it] < inliers[it-1] or abs(j+beta[it])>num_all:
             if p < p_max:
                 p += 1
             else:
@@ -228,12 +235,65 @@ def iter_sync(x1,x2,param,it_max=100,p_min=0,p_max=8,threshold=1,maxiter=500,loR
             param['d'] = 2**p
             skip += 1
             print("skip:{}".format(skip))
+        # More inlier -> shift trajectory
         else:
             j = j + beta[it]
-            x2_shifted = shift_trajectory(x2,j,k=k,s=s)
+            s2 = shift_trajectory(x2,j,k=k,s=s)
+            if j >= 1:
+                s1 = x1[:,:-int(j)]
+                s2 = s2[:,:-int(j)]
+            else:
+                s1 = x1[:,-int(j):]
+                s2 = s2[:,-int(j):]
             skip = 0
-            print('Iteration of {} is finished, beta:{}, ratio of inliers:{:.3f}'.format(it, j, inliers[it]/x1.shape[1]))
+            print('Iteration of {} is finished, beta:{}, ratio of inliers:{:.3f}'.format(it, j, inliers[it]))
             it += 1
+        
+        print('d={}'.format(param['d']))
+
+
+def search_sync(x1,x2,param,d_max=8,threshold=1,maxiter=500,loRansac=False):
+
+    # Brute-force running for different interpolation d
+    inliers = 0
+    d_all = np.arange(-10,11)*20+1
+    for d in d_all:
+        param['d'] = d
+        result = compute_beta_fundamental_Ransac(x1,x2,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
+        beta_temp = result['model'][-1]
+        inliers_temp = result['inliers'].shape[0] / (x1.shape[1]-abs(beta_temp))
+        if inliers_temp > 0.6:
+            beta = beta_temp
+            inliers = inliers_temp
+            print('The rough Beta is {}, with ratio of inliers of {}'.format(beta,inliers))
+            break
+        elif inliers_temp > inliers:
+            beta = beta_temp
+            inliers = inliers_temp
+            print('The current estimated Beta is {}, with ratio of inliers of {}, d={}'.format(beta,inliers,d))
+
+    # Fine search using d=1, until no improvement in 3 iter or inlier > 0.99
+    t, inliers = 0, 0
+    param['d'] = 1
+    while t<3 and inliers<0.99:
+        s2 = shift_trajectory(x2,beta,k=param['k'],s=param['s'])
+        if beta >= 1:
+            s1 = x1[:,:-int(beta)]
+            s2 = s2[:,:-int(beta)]
+        else:
+            s1 = x1[:,-int(beta):]
+            s2 = s2[:,-int(beta):]
+        result2 = compute_beta_fundamental_Ransac(s1,s2,param,threshold=threshold,maxiter=maxiter,loRansac=loRansac)
+        beta_temp = beta + result2['model'][-1]
+        inliers_temp = result2['inliers'].shape[0] / (s1.shape[1]-abs(result2['model'][-1]))
+        if inliers_temp > inliers:
+            beta = beta_temp
+            inliers = inliers_temp
+            t = 0
+            print('The current estimated Beta is {}, with ratio of inliers of {}'.format(beta,inliers))
+        else:
+            t+=1
+    return beta
 
 
 if __name__ == "__main__":
@@ -246,9 +306,9 @@ if __name__ == "__main__":
     num_points = X.shape[1]
 
     # Smooth trajectory
-    t = np.arange(num_points, dtype=float)
-    spline = [UnivariateSpline(t, X[0], s=1),UnivariateSpline(t, X[1], s=1),UnivariateSpline(t, X[2], s=1)]
-    X[0], X[1], X[2] = spline[0](t), spline[1](t), spline[2](t)
+    # t = np.arange(num_points, dtype=float)
+    # spline = [UnivariateSpline(t, X[0], s=1),UnivariateSpline(t, X[1], s=1),UnivariateSpline(t, X[2], s=1)]
+    # X[0], X[1], X[2] = spline[0](t), spline[1](t), spline[2](t)
 
     # Load camera parameter
     with open('data/Synthetic_Camera.pickle', 'rb') as file:
@@ -272,31 +332,54 @@ if __name__ == "__main__":
 
     '''Verify beta'''
     # 1. Single verification
-    # verify_beta(x1,x2,5,{'d':-10, 'k':1, 's':0})
+    # verify_beta(x1,x2,200,{'d':1, 'k':1, 's':0})
 
 
     # 2. Iterative algorithm
+    # start=datetime.now()
+
+    # beta = 78.5
+    # param = {'d':20, 'k':1, 's':0}
+    # s1 = shift_trajectory(x1,beta,k=param['k'],s=param['s'])
+    # if beta >= 1:   
+    #     s1 = s1[:,:-int(beta)]
+    #     s2 = x2[:,:-int(beta)]
+    # else:
+    #     s1 = s1[:,-int(beta):]
+    #     s2 = x2[:,-int(beta):]
+    # result = iter_sync(s1,s2,param,threshold=0.1,maxiter=100,loRansac=True)
+    # 
+    # print('\nTime: ',datetime.now()-start)
+
+
+    # 2.1 Search algorithm
     start=datetime.now()
 
-    beta = 100
-    param = {'d':1, 'k':1, 's':0}
+    beta = -71.48
+    param = {'d':20, 'k':1, 's':0}
     s1 = shift_trajectory(x1,beta,k=param['k'],s=param['s'])
-    result = iter_sync(s1,x2,param,maxiter=100,loRansac=True)
-
+    if beta >= 1:   
+        s1 = s1[:,:-int(beta)]
+        s2 = x2[:,:-int(beta)]
+    else:
+        s1 = s1[:,-int(beta):]
+        s2 = x2[:,-int(beta):]
+    hh = search_sync(s1,s2,param,threshold=10,maxiter=200,loRansac=True)
+    
     print('\nTime: ',datetime.now()-start)
 
 
-    # 3. Solver for Beta and F
+    # 3. Solver for Beta and F, set d, test different Beta
     start=datetime.now()
 
     # parameters
-    beta_min = -20
-    beta_max = 20
-    beta_step = 1
-    maxiter = 500
-    threshold = 0.1
-    LoRansac = True
-    param = {'d':-10, 'k':3, 's':0.1}
+    beta_min = 0
+    beta_max = 30
+    beta_step = 5
+    maxiter = 300
+    threshold = 10
+    LoRansac = False
+    param = {'d':1, 'k':1, 's':0}
 
     # Compute beta and F using Ransac
     print('Start iteraing...\n')
@@ -304,12 +387,17 @@ if __name__ == "__main__":
     results = {"beta":[],"beta_error":[],"ratio_inliers":[]}
     for i in range(len(beta)):
         s1 = shift_trajectory(x1,beta[i],k=param['k'],s=param['s'])
-        s2 = x2
+        if beta[i] > 0:
+            s1 = s1[:,:-beta[i]]
+            s2 = x2[:,:-beta[i]]
+        else:
+            s1 = s1[:,-beta[i]:]
+            s2 = x2[:,-beta[i]:]
         estimate = compute_beta_fundamental_Ransac(s1,s2,param,threshold=threshold,maxiter=maxiter,loRansac=LoRansac)
 
         results['beta'].append(estimate['model'][-1])
         results['beta_error'].append(beta[i]-estimate['model'][-1])
-        results['ratio_inliers'].append(estimate['inliers'].shape[0] / num_points)
+        results['ratio_inliers'].append(estimate['inliers'].shape[0] / (s1.shape[1]-abs(estimate['model'][-1])))
 
         print('Beta={} is finished, estimated Beta={}, ratio of inliers={}'.format(beta[i], results['beta'][-1], results['ratio_inliers'][-1]))
 
