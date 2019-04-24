@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import cv2
 import ransac
 import visualization as vis
@@ -183,13 +184,13 @@ def compute_fundamental(x1,x2):
 
 def compute_fundamental_Ransac(x1,x2,threshold=10e-4,maxiter=500,verbose=False,loRansac=False):
     
-    def model_function(data):
+    def model_function(data,param=None):
         s1 = data[:3]
         s2 = data[3:]
         F = compute_fundamental(s1,s2)
         return np.ravel(F)
 
-    def error_function(M,data):
+    def error_function(M,data,param=None):
         s1 = data[:3]
         s2 = data[3:]
         F = M.reshape((3,3))
@@ -274,6 +275,32 @@ def compute_P_from_F(F):
     Te = np.array([[0,-e[2],e[1]],[e[2],0,-e[0]],[-e[1],e[0],0]])
     P = np.vstack((np.dot(Te,F.T).T,e)).T
     return P
+
+
+def focal_length_from_F(F):
+    e1 = compute_epipole_from_F(F)
+    e2 = compute_epipole_from_F(F.T)
+
+    e1_rot = np.array([np.sqrt(e1[0]**2+e1[1]**2), 0, e1[2]])
+    e2_rot = np.array([np.sqrt(e2[0]**2+e2[1]**2), 0, e2[2]])
+
+    phi_1 = math.acos(np.dot(e1[:2],e1_rot[:2]) / (e1[0]**2+e1[1]**2)) * ((e1[1]<0)*2-1)
+    phi_2 = math.acos(np.dot(e2[:2],e2_rot[:2]) / (e2[0]**2+e2[1]**2)) * ((e2[1]<0)*2-1)
+
+    T1 = np.array([[math.cos(phi_1), -math.sin(phi_1), 0], [math.sin(phi_1), math.cos(phi_1), 0], [0,0,1]])
+    T2 = np.array([[math.cos(phi_2), -math.sin(phi_2), 0], [math.sin(phi_2), math.cos(phi_2), 0], [0,0,1]])
+
+    F_new = np.dot(np.dot(np.linalg.inv(T2).T, F), np.linalg.inv(T1))
+    D_1 = np.diag(np.array([e1_rot[2],1,-e1_rot[0]]))
+    D_2 = np.diag(np.array([e2_rot[2],1,-e2_rot[0]]))
+
+    conic = np.dot(np.dot(np.linalg.inv(D_2), F_new), np.linalg.inv(D_1))
+
+    a,b,c,d = conic[0,0],conic[0,1],conic[1,0],conic[1,1]
+    k1 = np.sqrt(-a*c*e1_rot[0]**2 / (a*c*e1_rot[2]**2+b*d))
+    k2 = np.sqrt(-a*b*e2_rot[0]**2 / (a*b*e2_rot[2]**2+c*d))
+    
+    return k1,k2
 
 
 if __name__ == "__main__":

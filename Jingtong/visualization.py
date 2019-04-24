@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import util
+import pickle
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -125,7 +126,7 @@ def show_trajectory_2D(*x,title=None,color=True,line=True,text=False):
     plt.show()
 
 
-def show_trajectory_3D(*X,color=True,line=True):
+def show_trajectory_3D(*X,title=None,color=True,line=True):
     fig = plt.figure()
     num = len(X)
     for i in range(num):
@@ -135,21 +136,45 @@ def show_trajectory_3D(*X,color=True,line=True):
             ax.plot(X[i][0],X[i][1],X[i][2])
         plt.xlabel('X')
         plt.ylabel('Y')
+    if title:
+        plt.suptitle(title)
     plt.show()
 
 
 if __name__ == "__main__":
-    # Load trajectory data
-    X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
-    X_homo = np.insert(X,3,1,axis=0)
-
+    # # Synthetic trajectory data
+    # X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+    # X_homo = np.insert(X,3,1,axis=0)
+    
     # show_trajectory_3D(X,color=True)
 
-    # Load data from fixposition
-    X1 = np.loadtxt('data/fixposition_1_kml.txt',delimiter=',')
-    X1 = X1.T
+    # # Fixposition data
+    # X1 = np.loadtxt('data/fixposition_1_kml.txt',delimiter=',')
+    # X1 = X1.T
 
-    X2 = np.loadtxt('data/fixposition_2_kml.txt',delimiter=',')
-    X2 = X2.T
-    show_trajectory_3D(X1,X2)
+    # X2 = np.loadtxt('data/fixposition_2_kml.txt',delimiter=',')
+    # X2 = X2.T
+    # show_trajectory_3D(X1,X2)
+
+    # Triangulated real trajectory
+    with open('data/test_trajectory_spl_3_s_1000.pickle', 'rb') as file:
+        results = pickle.load(file)
+
+    # for i in range(len(results['Beta'])):
+    #     traj_1, traj_2 = results['X1'][i], results['X2'][i]
+    #     show_trajectory_3D(traj_1,traj_2,
+    #     title='Shift:{}, estimated beta:{:.3f}, without sync (left), with sync (right)'.format(
+    #         results['shift'][i],results['Beta'][i],))
+
+    fig,ax = plt.subplots(1,2,sharex=True)
+    ax[0].plot(results['shift'],results['Beta'])
+    ax[1].plot(results['shift'],np.asarray(results['Beta'])-np.asarray(results['shift']))
+    ax[0].set_title('Estimation of Beta with different shifts')
+    ax[1].set_title('Error of Beta with different shifts')
+    ax[0].set_ylabel('Estimated Beta')
+    ax[1].set_ylabel('Error of Beta')
+    plt.xlabel('Shifts from -10 to 10')
+    fig.suptitle('Threshold 1 = {}, Threshold 2 = {}, Degree of spline = {}, Smooth factor = {}'.format(5,5,3,1000))
+    plt.show()
+
     print('finished')

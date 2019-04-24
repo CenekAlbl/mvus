@@ -2,7 +2,7 @@
 import numpy as np
 import warnings
 from scipy.optimize import least_squares
-def vanillaRansac(estimateFn, verifyFn, data, minSamples, param, threshold, maxIter, verbose=0):
+def vanillaRansac(estimateFn, verifyFn, data, minSamples, threshold, maxIter, param=None, verbose=0):
     """A vanilla implementation of RANSAC with fixed number of iterations
 
     Runs fixed number of iterations of RANSAC and outputs the model that has the most inliers. Model is represented as a set of parameters in a (n,1) numpy array where n is the number of the model parameters. Input data is a shape (m,k) numpy array where m is the dimension of one sample and k is the number of samples. 
@@ -20,12 +20,12 @@ def vanillaRansac(estimateFn, verifyFn, data, minSamples, param, threshold, maxI
         Input data where m is the size of one sample and k is the number of samples
     minSamples : int
         number of samples needed to produce a model by estimateFn
-    param: dict
-        optional parameters or settings that can be used by estimateFn and estimateFn
     threshold : float 
         maximum error for data point to be considered an inlier
     maxIter : int
         number of iterations
+    param: dict
+        optional parameters or settings that can be used by estimateFn and estimateFn
     verbose : bool, optional
         switch to display warnings
 
@@ -65,7 +65,7 @@ def vanillaRansac(estimateFn, verifyFn, data, minSamples, param, threshold, maxI
 def f(x, y):
     print(x, y)
 
-def loRansacSimple(estimateFn, verifyFn, data, n, param, threshold, maxIter, optimizeFn=None, optimizeThr=None, verbose=0):
+def loRansacSimple(estimateFn, verifyFn, data, n, threshold, maxIter, param=None, optimizeFn=None, optimizeThr=None, verbose=0):
     """An implementation of simple version of LO-RANSAC as in [1] with fixed number of iterations
 
     Runs fixed number of iterations of LO-RANSAC in the simple version from [1] and outputs the model that has the most inliers. Model is represented as a set of parameters in a (n,1) numpy array where n is the number of the model parameters. Input data is a shape (m,k) numpy array where m is the dimension of one sample and k is the number of samples. 
@@ -83,12 +83,12 @@ def loRansacSimple(estimateFn, verifyFn, data, n, param, threshold, maxIter, opt
         Input data where m is the size of one sample and k is the number of samples
     minSamples : int
         number of samples needed to produce a model by estimateFn
-    param: dict
-        optional parameters or settings that can be used by estimateFn and estimateFn
     threshold : float 
         maximum error for data point to be considered an inlier
     maxIter : int
         number of iterations
+    param: dict
+        optional parameters or settings that can be used by estimateFn and estimateFn
     optimizeFn : function handle, optional
         function that takes data and model as input and computes error on each datapoint. This one is used in the optimization part, therefore the error computed by this function will be minimized. By default, verifyFn is used, but this parameter allows to define a different function to be optimized than the one used to compute the error of the model.
     optimizeThr : float, optional
