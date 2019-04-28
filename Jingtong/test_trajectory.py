@@ -23,24 +23,24 @@ traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
 traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
 
 # Spline fitting
-# k, s = 3, 1000
-# t1 = np.arange(traj_1.shape[0])
-# t2 = np.arange(traj_2.shape[0])
-# spl_1_x = UnivariateSpline(t1, traj_1[:,1], k=k, s=s)
-# spl_1_y = UnivariateSpline(t1, traj_1[:,2], k=k, s=s)
-# spl_2_x = UnivariateSpline(t2, traj_2[:,1], k=k, s=s)
-# spl_2_y = UnivariateSpline(t2, traj_2[:,2], k=k, s=s)
+k, s = 1, 0
+t1 = np.arange(traj_1.shape[0])
+t2 = np.arange(traj_2.shape[0])
+spl_1_x = UnivariateSpline(t1, traj_1[:,1], k=k, s=s)
+spl_1_y = UnivariateSpline(t1, traj_1[:,2], k=k, s=s)
+spl_2_x = UnivariateSpline(t2, traj_2[:,1], k=k, s=s)
+spl_2_y = UnivariateSpline(t2, traj_2[:,2], k=k, s=s)
 
-# traj_1[:,1] = spl_1_x(t1)
-# traj_1[:,2] = spl_1_y(t1)
-# traj_2[:,1] = spl_2_x(t2)
-# traj_2[:,2] = spl_2_y(t2)
+traj_1[:,1] = spl_1_x(t1)
+traj_1[:,2] = spl_1_y(t1)
+traj_2[:,1] = spl_2_x(t2)
+traj_2[:,2] = spl_2_y(t2)
 
-# print('Degree of spline:{}, smoothing factor:{}\n'.format(k,s))
-# print('Numbers of control points for traj 1, x:{}, y:{}\n'.format(len(spl_1_x.get_knots()),len(spl_1_y.get_knots())))
-# print('Numbers of control points for traj 2, x:{}, y:{}\n'.format(len(spl_2_x.get_knots()),len(spl_2_y.get_knots())))
-# print('Residual of these splines: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]\n'.format(
-#     spl_1_x.get_residual(),spl_1_y.get_residual(),spl_2_x.get_residual(),spl_2_y.get_residual()))
+print('Degree of spline:{}, smoothing factor:{}\n'.format(k,s))
+print('Numbers of control points for traj 1, x:{}, y:{}\n'.format(len(spl_1_x.get_knots()),len(spl_1_y.get_knots())))
+print('Numbers of control points for traj 2, x:{}, y:{}\n'.format(len(spl_2_x.get_knots()),len(spl_2_y.get_knots())))
+print('Residual of these splines: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]\n'.format(
+    spl_1_x.get_residual(),spl_1_y.get_residual(),spl_2_x.get_residual(),spl_2_y.get_residual()))
 
 # Load calibration matrix
 calibration = open('data/calibration.pickle','rb')
@@ -51,10 +51,10 @@ K2 = K1
 start_1 = 153
 start_2 = 71
 num_traj = 1500
-shift_range = np.arange(-100,101,10)
+shift_range = np.arange(-10,11,1)
 
 # iterate over all shifts
-results = {'shift':[], 'Beta':[], 'X1':[], 'X2':[], 'inlier1':[], 'inlier2':[]}
+results = {'shift':[], 'Beta':[], 'X1':[], 'X2':[], 'P2_1':[], 'P2_2':[], 'inlier1':[], 'inlier2':[], 'k':k, 's':s}
 it = 0
 while it < len(shift_range):
     shift = shift_range[it]
@@ -67,35 +67,21 @@ while it < len(shift_range):
 
     '''Compute fundamental Matrix'''
     # Without synchronization
-    estimate1 = ep.compute_fundamental_Ransac(x1,x2,threshold=10,maxiter=300,loRansac=True)
-    F1 = estimate1['model'].reshape(3,3)
-    inliers1 = estimate1['inliers']
+    F1, mask = ep.computeFundamentalMat(x1, x2, error=5)
+    inliers1 = sum(mask.T[0]==1) / num_traj
 
     # With synchronization
     param = {'k':1, 's':0}
     # Brute-force
-    beta, F2, inliers2 = synchronization.search_sync(x1,x2,param,d_min=-6,d_max=6,threshold1=5,threshold2=5,maxiter=300,loRansac=True)
+    # beta, F2, inliers2 = synchronization.search_sync(x1,x2,param,d_min=-6,d_max=6,threshold1=5,threshold2=5,maxiter=300,loRansac=True)
     # iterative
-    # beta, F2, inliers2 = synchronization.iter_sync(x1,x2,param,p_max=7,threshold=10,maxiter=300,loRansac=False)
+    beta, F2, inliers2 = synchronization.iter_sync(x1,x2,param,p_max=3,threshold=5,maxiter=500,loRansac=False)
     F2 = F2.reshape((3,3))
 
     '''Triangulation'''
     # Without Beta
     E1 = np.dot(np.dot(K2.T,F1),K1)
-    num, R1, t1, mask = cv2.recoverPose(E1, x1[:2].T, x2[:2].T, K1)
-    P1_1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
-    P2_1 = np.dot(K2,np.hstack((R1,t1)))
-
-    print("\nTriangulating feature points...")
-    pts1_1 = x1[:2].astype(np.float64)
-    pts2_1 = x2[:2].astype(np.float64)
-    X1 = cv2.triangulatePoints(P1_1,P2_1,pts1_1,pts2_1)
-    X1/=X1[-1]
-
-    # Rescale
-    X1[0] = util.mapminmax(X1[0],-5,5)
-    X1[1] = util.mapminmax(X1[1],-5,5)
-    X1[2] = util.mapminmax(X1[2],-5,5)
+    X1, P2_1 = ep.triangulate_from_E(E1,K1,K2,x1,x2)
 
     # Show 3D results
     # vis.show_trajectory_3D(X1)
@@ -109,20 +95,7 @@ while it < len(shift_range):
     else:
         s2 = x2_shift[:,-int(beta):]
         s1 = x1[:,-int(beta):]
-    num, R2, t2, mask = cv2.recoverPose(E2, s1[:2].T, s2[:2].T, K1)
-    P1_2 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
-    P2_2 = np.dot(K2,np.hstack((R2,t2)))
-
-    print("\nTriangulating feature points...")
-    pts1_2 = s1[:2].astype(np.float64)
-    pts2_2 = s2[:2].astype(np.float64)
-    X2 = cv2.triangulatePoints(P1_2,P2_2,pts1_2,pts2_2)
-    X2/=X2[-1]
-
-    # Rescale
-    X2[0] = util.mapminmax(X2[0],-5,5)
-    X2[1] = util.mapminmax(X2[1],-5,5)
-    X2[2] = util.mapminmax(X2[2],-5,5)
+    X2, P2_2 = ep.triangulate_from_E(E1,K1,K2,s1,s2)
 
     # Show 3D results
     # vis.show_trajectory_3D(X1,X2)
@@ -132,7 +105,9 @@ while it < len(shift_range):
     results['Beta'].append(beta)
     results['X1'].append(X1)
     results['X2'].append(X2)
-    results['inlier1'].append(inliers1/num_traj)
+    results['P2_1'].append(P2_1)
+    results['P2_2'].append(P2_2)
+    results['inlier1'].append(inliers1)
     results['inlier2'].append(inliers2)
     it += 1
 

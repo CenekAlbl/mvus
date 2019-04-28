@@ -20,7 +20,7 @@ When an image from a generated camera is displayed, PRESS "s" to save it, otherw
 num_cam = 2
 
 # Select the trajectory data
-filename = 'data/Real_Trajectory.txt'
+filename = 'data/Synthetic_Trajectory_generated.txt'
 
 # Load trajectory data
 X = np.loadtxt(filename)

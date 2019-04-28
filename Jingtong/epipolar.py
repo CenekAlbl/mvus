@@ -102,8 +102,8 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
             mask = index for inlier correspondences (optional)
     '''
 
-    pts1 = np.int32(pts1)
-    pts2 = np.int32(pts2)
+    pts1 = pts1[:2].T
+    pts2 = pts2[:2].T
 
     F, mask = cv2.findFundamentalMat(pts1,pts2,method,error)
 
@@ -300,7 +300,131 @@ def focal_length_from_F(F):
     k1 = np.sqrt(-a*c*e1_rot[0]**2 / (a*c*e1_rot[2]**2+b*d))
     k2 = np.sqrt(-a*b*e2_rot[0]**2 / (a*b*e2_rot[2]**2+c*d))
     
+    # print('a={}, b={}, c={}, d={}\n'.format(a,b,c,d))
     return k1,k2
+
+
+def triangulate_point(x1,x2,P1,P2):
+    '''
+    Triangulate a single point using least square (SVD)
+    '''
+
+    M = np.zeros((6,6))
+    M[:3,:4] = P1
+    M[3:,:4] = P2
+    M[:3,4] = -x1
+    M[3:,5] = -x2
+
+    U,S,V = np.linalg.svd(M)
+    X = V[-1,:4]
+
+    return X / X[3]
+
+
+def triangulate(x1,x2,P1,P2):
+    '''
+    Triangulate multiple points, x1 and x2 in form of (3*N)
+    '''
+
+    X = [triangulate_point(x1[:,i],x2[:,i],P1,P2) for i in range(x1.shape[1])]
+    return np.array(X).T
+
+
+def compute_Rt_from_E(E):
+    '''
+    Compute the camera matrix P2, where P1=[I 0] assumed
+
+    Return 4 possible combinations of R and t as a list
+    '''
+
+    U,S,V = np.linalg.svd(E)
+    if np.linalg.det(np.dot(U,V))<0:
+        V = -V
+    E = np.dot(U,np.dot(np.diag([1,1,0]),V))
+
+    W = np.array([[0,-1,0],[1,0,0],[0,0,1]])
+    R1 = np.dot(U,np.dot(W,V))
+    R2 = np.dot(U,np.dot(W.T,V))
+    R1 = R1 * np.linalg.det(R1)
+    R2 = R2 * np.linalg.det(R2)
+    t1 = U[:,2].reshape((-1,1))
+    t2 = -U[:,2].reshape((-1,1))
+
+    Rt = [np.hstack((R1,t1)),np.hstack((R1,t2)),np.hstack((R2,t1)),np.hstack((R2,t2))]    
+
+    # P2 = [np.vstack((np.dot(U,np.dot(W,V)).T,U[:,2])).T,
+    #       np.vstack((np.dot(U,np.dot(W,V)).T,-U[:,2])).T,
+    #       np.vstack((np.dot(U,np.dot(W.T,V)).T,U[:,2])).T,
+    #       np.vstack((np.dot(U,np.dot(W.T,V)).T,-U[:,2])).T]
+    return Rt
+
+
+def triangulate_from_E_old(E,K1,K2,x1,x2):
+    '''
+    Not correct !! 
+
+    Use "triangulate_from_E" instead
+    '''
+
+    infront_max = 0
+
+    Rt = compute_Rt_from_E(E)
+    P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
+    for i in range(4):
+        P2_temp = np.dot(K2,Rt[i])
+        X = triangulate(x1,x2,P1,P2_temp)
+        d1 = np.dot(P1,X)[2]
+        d2 = np.dot(P2_temp,X)[2]
+
+        if sum(d1>0)+sum(d2>0) > infront_max:
+            infront_max = sum(d1>0)+sum(d2>0)
+            infront = (d1>0) & (d2>0)
+            P2 = P2_temp
+    
+    X = triangulate(x1,x2,P1,P2) 
+    return X[:,:], P2
+
+
+def triangulate_from_E(E,K1,K2,x1,x2):
+    x1n = np.dot(np.linalg.inv(K1),x1)
+    x2n = np.dot(np.linalg.inv(K2),x2)
+
+    infront_max = 0
+
+    Rt = compute_Rt_from_E(E)
+    P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+    for i in range(4):
+        P2_temp = Rt[i]
+        X = triangulate(x1n,x2n,P1,P2_temp)
+        d1 = np.dot(P1,X)[2]
+        d2 = np.dot(P2_temp,X)[2]
+
+        if sum(d1>0)+sum(d2>0) > infront_max:
+            infront_max = sum(d1>0)+sum(d2>0)
+            infront = (d1>0) & (d2>0)
+            P2 = P2_temp
+    
+    X = triangulate(x1n,x2n,P1,P2) 
+    return X[:,:], P2
+
+
+def triangulate_cv(E,K1,K2,x1,x2):
+    '''
+    Triangulation with OpenCV functions
+    '''
+
+    num, R, t, mask = cv2.recoverPose(E, x1[:2].T, x2[:2].T, K1)
+    P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
+    P2 = np.dot(K2,np.hstack((R,t)))
+
+    pts1 = x1[:2].astype(np.float64)
+    pts2 = x2[:2].astype(np.float64)
+    X = cv2.triangulatePoints(P1,P2,pts1,pts2)
+    return X/X[-1], P2
+
+
+def reprojection_error(x,x_p):
+    return np.sqrt((x[0]-x_p[0])**2 + (x[1]-x_p[1])**2)
 
 
 if __name__ == "__main__":

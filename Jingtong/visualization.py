@@ -131,11 +131,35 @@ def show_trajectory_3D(*X,title=None,color=True,line=True):
     num = len(X)
     for i in range(num):
         ax = fig.add_subplot(1,num,i+1,projection='3d')
-        ax.scatter3D(X[i][0],X[i][1],X[i][2],c=np.arange(X[i].shape[1])*color)
+        
+        if color:
+            ax.scatter3D(X[i][0],X[i][1],X[i][2],c=np.arange(X[i].shape[1])*color)
+        else:
+            ax.scatter3D(X[i][0],X[i][1],X[i][2])
+
         if line:
             ax.plot(X[i][0],X[i][1],X[i][2])
         plt.xlabel('X')
         plt.ylabel('Y')
+    if title:
+        plt.suptitle(title)
+    plt.show()
+
+
+def show_spline(*spline,title=None):
+
+    num = len(spline)
+    for i in range(num):
+        plt.subplot(1,num,i+1)
+        x, y = spline[i][0], spline[i][1]
+        plt.scatter(x[0],x[1],s=10,label='Origin')
+        plt.plot(y[0],y[1],c='r',label='Spline interpolation')
+
+        plt.gca().invert_yaxis()
+        plt.xlabel('X')
+        plt.ylabel('Y')
+        plt.legend()
+
     if title:
         plt.suptitle(title)
     plt.show()
@@ -157,14 +181,14 @@ if __name__ == "__main__":
     # show_trajectory_3D(X1,X2)
 
     # Triangulated real trajectory
-    with open('data/test_trajectory_spl_3_s_1000.pickle', 'rb') as file:
+    with open('data/test_trajectory.pickle', 'rb') as file:
         results = pickle.load(file)
 
-    # for i in range(len(results['Beta'])):
-    #     traj_1, traj_2 = results['X1'][i], results['X2'][i]
-    #     show_trajectory_3D(traj_1,traj_2,
-    #     title='Shift:{}, estimated beta:{:.3f}, without sync (left), with sync (right)'.format(
-    #         results['shift'][i],results['Beta'][i],))
+    for i in range(len(results['Beta'])):
+        traj_1, traj_2 = results['X1'][i], results['X2'][i]
+        show_trajectory_3D(traj_1,traj_2,
+        title='Shift:{}, estimated beta:{:.3f}, without sync (left), with sync (right)'.format(
+            results['shift'][i],results['Beta'][i],))
 
     fig,ax = plt.subplots(1,2,sharex=True)
     ax[0].plot(results['shift'],results['Beta'])
@@ -174,7 +198,7 @@ if __name__ == "__main__":
     ax[0].set_ylabel('Estimated Beta')
     ax[1].set_ylabel('Error of Beta')
     plt.xlabel('Shifts from -10 to 10')
-    fig.suptitle('Threshold 1 = {}, Threshold 2 = {}, Degree of spline = {}, Smooth factor = {}'.format(5,5,3,1000))
+    fig.suptitle('Threshold 1 = {}, Threshold 2 = {}, Degree of spline = {}, Smooth factor = {}'.format(5,5,3,100))
     plt.show()
 
     print('finished')
