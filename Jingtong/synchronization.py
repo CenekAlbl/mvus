@@ -97,8 +97,8 @@ def compute_beta_fundamental(data,param):
     M = np.zeros((len(beta),10))
     for i in range(len(beta)):
         x2 = s2 + beta[i]*ds
-        F = ep.compute_fundamental(s1,x2)
-        # F, mask = cv2.findFundamentalMat(s1[:2].T,x2[:2].T,method=cv2.FM_8POINT)
+        # F = ep.compute_fundamental(s1,x2)
+        F, mask = cv2.findFundamentalMat(s1[:2].T,x2[:2].T,method=cv2.FM_8POINT)
         M[i] = np.append(np.ravel(F),np.array([beta[i]*param['d']]))
 
     return M
@@ -446,13 +446,13 @@ if __name__ == "__main__":
     start=datetime.now()
 
     # parameters
-    beta_min = -30
-    beta_max = 30
+    beta_min = -50
+    beta_max = 50
     beta_step = 3
     maxiter = 500
     threshold = 5
     LoRansac = False
-    param = {'d':1, 'k':1, 's':0}
+    param = {'d':16, 'k':1, 's':0}
 
     # Set number of iterations and whether to show individual results in each run
     it_max = 10
@@ -530,7 +530,7 @@ if __name__ == "__main__":
                    'LoRansac':      LoRansac,
                    'd':             param['d']}
 
-    file = open('data/interpolation_distance.pickle', 'wb')
+    file = open('data/interpolation_distance_d16_cv.pickle', 'wb')
     pickle.dump(interp_dist, file)
     file.close()
 

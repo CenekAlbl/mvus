@@ -198,7 +198,7 @@ if __name__ == "__main__":
     ax[0].set_ylabel('Estimated Beta')
     ax[1].set_ylabel('Error of Beta')
     plt.xlabel('Shifts from -10 to 10')
-    fig.suptitle('Threshold 1 = {}, Threshold 2 = {}, Degree of spline = {}, Smooth factor = {}'.format(5,5,3,100))
+    # fig.suptitle('Threshold 1 = {}, Threshold 2 = {}, Degree of spline = {}, Smooth factor = {}'.format(5,5,3,100))
     plt.show()
 
     print('finished')

@@ -3,6 +3,7 @@ import math
 import cv2
 import ransac
 import visualization as vis
+from scipy.optimize import least_squares
 
 
 def extract_SIFT_feature(img, mask_range=None):
@@ -251,6 +252,10 @@ def Sampson_error(x1,x2,F):
     return error
 
 
+def skew(a):
+    return np.array([[0,-a[2],a[1]],[a[2],0,-a[0]],[-a[1],a[0],0]])
+
+
 def compute_epipole_from_F(F,left=False):
     '''
     Compute the epipole given the fundamental matrix, by default return the right epipole
@@ -272,7 +277,7 @@ def compute_P_from_F(F):
     # Compute the left epipole
     e = compute_epipole_from_F(F,left=True)
 
-    Te = np.array([[0,-e[2],e[1]],[e[2],0,-e[0]],[-e[1],e[0],0]])
+    Te = skew(e)
     P = np.vstack((np.dot(Te,F.T).T,e)).T
     return P
 
@@ -304,6 +309,92 @@ def focal_length_from_F(F):
     return k1,k2
 
 
+def focal_length_from_F_and_P(F,p1,p2):
+    '''
+    This function computes the focal length corresponding to the principle point p1
+
+    To get the other focal length, interchange the parameter into (F.T, p2, p1)
+    '''
+
+    I = np.diag([1,1,0])
+    e2 = compute_epipole_from_F(F,left=True)
+
+    num = np.linalg.multi_dot([p2,skew(e2),I,F,p1]) * np.linalg.multi_dot([p1,F.T,p2])
+    denom = np.linalg.multi_dot([p2,skew(e2),I,F,I,F.T,p2])
+
+    return -num/denom
+
+
+def focal_length_iter(x1,x2,p1,p2,f1,f2):
+
+    # Ensure F has rank 2
+    def F_rank2(x1,x2,p1,p2,f1,f2):
+        F, mask = computeFundamentalMat(x1,x2,error=5)
+        K1 = np.array([[f1,0,p1[0]],[0,f1,p1[1]],[0,0,1]])
+        K2 = np.array([[f2,0,p2[0]],[0,f2,p2[1]],[0,0,1]])
+
+        E = np.dot(np.dot(K2.T,F),K1)
+        U,S,V = np.linalg.svd(E)
+        S[0], S[1], S[2] = 1, 1, 0
+        E = np.dot(np.dot(U,np.diag(S)),V)
+        F = np.dot(np.dot(np.linalg.inv(K2).T,E),np.linalg.inv(K1))
+        return F
+
+
+    # Define cost function
+    def focal_length_cost(M,data,guess):
+        # Decompose model, data and guess
+        F, p1, p2 = M[:9].reshape((3,3)), np.append(M[9:11],1), np.append(M[11:],1)
+        x1, x2 = data[:3], data[3:]
+        p1_g, p2_g, f1_g, f2_g = guess[:3], guess[3:6], guess[6]**2, guess[7]**2
+
+        # Cost 1
+        c1 = np.sum(Sampson_error(x1,x2,F))
+
+        # Cost 2
+        w2 = 0.01
+        c2_1 = (p1[0]-p1_g[0])**2 + (p1[1]-p1_g[1])**2
+        c2_2 = (p2[0]-p2_g[0])**2 + (p2[1]-p2_g[1])**2
+
+        # Cost 3
+        w3 = 0
+        f1 = focal_length_from_F_and_P(F,p1,p2)
+        f2 = focal_length_from_F_and_P(F.T,p2,p1)
+        c3_1 = (f1-f1_g)**2
+        c3_2 = (f2-f2_g)**2
+
+        # Cost dependent
+        w4 = 0.01
+        f_min = 100*2
+        d1 = f_min > f1
+        d2 = f_min > f2
+        c4_1 = (f1-f_min)**2
+        c4_2 = (f2-f_min)**2
+
+        cost = c1 + w2**2*(c2_1+c2_2) + w3**2*(c3_1+c3_2) + w3**2*(c4_1*d1+c4_2*d2)
+        return cost
+
+
+    # Initial values
+    # F_ini = F_rank2(x1,x2,p1,p2,f1,f2)
+    # F_ini /= F_ini[2,2]
+    F_ini, mask = computeFundamentalMat(x1,x2,error=5)
+    M_ini = np.concatenate((np.ravel(F_ini),p1[:2],p2[:2]),axis=0)
+    guess = np.concatenate((p1,p2,np.array([f1,f2])),axis=0)
+
+    # Least square optimization
+    data = np.vstack((x1,x2))
+    fn = lambda x: focal_length_cost(x,data,guess)
+    res = least_squares(fn,M_ini)
+    M_o = res["x"]
+
+    F_o, p1_o, p2_o = M_o[:9].reshape((3,3)), np.append(M_o[9:11],1), np.append(M_o[11:],1)
+    f1_o = focal_length_from_F_and_P(F_o, p1_o, p2_o)
+    f2_o = focal_length_from_F_and_P(F_o.T, p2_o, p1_o)
+
+    return f1_o, f2_o
+
+
 def triangulate_point(x1,x2,P1,P2):
     '''
     Triangulate a single point using least square (SVD)
@@ -329,6 +420,22 @@ def triangulate(x1,x2,P1,P2):
     X = [triangulate_point(x1[:,i],x2[:,i],P1,P2) for i in range(x1.shape[1])]
     return np.array(X).T
 
+
+def triangulate_matlab(x1,x2,P1,P2):
+
+    X = np.zeros((4,x1.shape[1]))
+    for i in range(x1.shape[1]):
+        r1 = x1[0,i]*P1[2] - P1[0]
+        r2 = x1[1,i]*P1[2] - P1[1]
+        r3 = x2[0,i]*P2[2] - P2[0]
+        r4 = x2[1,i]*P2[2] - P2[1]
+
+        A = np.array([r1,r2,r3,r4])
+        U,S,V = np.linalg.svd(A)
+        X[:,i] = V[-1]/V[-1,-1]
+    
+    return X
+    
 
 def compute_Rt_from_E(E):
     '''
@@ -395,7 +502,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
     P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
     for i in range(4):
         P2_temp = Rt[i]
-        X = triangulate(x1n,x2n,P1,P2_temp)
+        X = triangulate_matlab(x1n,x2n,P1,P2_temp)
         d1 = np.dot(P1,X)[2]
         d2 = np.dot(P2_temp,X)[2]
 
@@ -404,7 +511,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
             infront = (d1>0) & (d2>0)
             P2 = P2_temp
     
-    X = triangulate(x1n,x2n,P1,P2) 
+    X = triangulate_matlab(x1n,x2n,P1,P2) 
     return X[:,:], P2
 
 
@@ -417,10 +524,15 @@ def triangulate_cv(E,K1,K2,x1,x2):
     P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
     P2 = np.dot(K2,np.hstack((R,t)))
 
+    # x1 = np.dot(np.linalg.inv(K1),x1)
+    # x2 = np.dot(np.linalg.inv(K2),x2)
+    # P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+    # P2 = np.hstack((R,t))
+
     pts1 = x1[:2].astype(np.float64)
     pts2 = x2[:2].astype(np.float64)
     X = cv2.triangulatePoints(P1,P2,pts1,pts2)
-    return X/X[-1], P2
+    return X/X[-1], np.hstack((R,t))
 
 
 def reprojection_error(x,x_p):

@@ -1,13 +1,23 @@
 import numpy as np
 import cv2
 
+
 def getFrame(video,numFrame):
+    '''
+    This function reads a video and a list of frame numbers,
+    returns then the frames as a list of images
+    '''
+
+    imgs = []
     cap = cv2.VideoCapture(video)
-    cap.set(cv2.CAP_PROP_POS_FRAMES,numFrame)
-    img = cap.read()[1]
+    for i in numFrame:
+        cap.set(cv2.CAP_PROP_POS_FRAMES,i)
+        img = cap.read()[1]
+        imgs.append(img)
     
     cap.release()
-    return img
+    return imgs
+
 
 def play_two_videos(v1,v2,f1,f2,t):
     '''
@@ -43,6 +53,7 @@ def play_two_videos(v1,v2,f1,f2,t):
     cap1.release()
     cap2.release()
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     video = 'C:\\Users\\tong2\\MyStudy\\ETH\\2019FS\\Thesis\\data\\C0028.MP4'

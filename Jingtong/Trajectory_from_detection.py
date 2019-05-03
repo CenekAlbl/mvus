@@ -67,7 +67,7 @@ y2_s = util.spline_fitting(x2[1], np.arange(0,num_traj,0.1), k=k, s=s)
 
 # vis.show_spline((x1, np.vstack((x1_s,y1_s))), (x2, np.vstack((x2_s,y2_s))), title='k={}, s={}'.format(k,s))
 
-shift_range = np.arange(0,6)
+shift_range = np.arange(-5,5)
 it = 0
 while it < len(shift_range):
     print('\n\n------------------Iteration {}------------------\n'.format(it+1))
@@ -80,28 +80,13 @@ while it < len(shift_range):
  
     # Compute F
     if Ransac:
-        estimate = ep.compute_fundamental_Ransac(x1,x2,threshold=2,maxiter=1500,loRansac=False)
-        F = estimate['model'].reshape(3,3)
-        F_svd = ep.compute_fundamental(x1[:,estimate['inliers']],x2[:,estimate['inliers']])
-        F_cv, mask = ep.computeFundamentalMat(x1, x2, error=3)
-        # F_all = ep.compute_fundamental(x1,x2)
-        # model = ransac1.Ransac_Fundamental()
-        # F_old, inliers = ransac1.F_from_Ransac(x1, x2, model, maxiter=500, threshold=2, inliers=100)
-
-        # F_cv = F_cv/F_cv[2,2]
-
-        # print('\nF using Ransac: \n{}\n'.format(F))
-        # print('F using SVD on inliers: \n{}\n'.format(F_svd))
-        # print('F using OpenCV: \n{}\n'.format(F_cv))
-        # print('F using SVD on all points: \n{}\n'.format(F_all))
-        # print('F using old Ransac: \n{}\n'.format(F_old))
+        # estimate = ep.compute_fundamental_Ransac(x1,x2,threshold=5,maxiter=1500,loRansac=False)
+        # F = estimate['model'].reshape(3,3)
+        # F_svd = ep.compute_fundamental(x1[:,estimate['inliers']],x2[:,estimate['inliers']])
+        F_cv, mask = ep.computeFundamentalMat(x1, x2, error=5)
 
         # error = np.mean(ep.Sampson_error(x1[:,estimate['inliers']], x2[:,estimate['inliers']], F))
-        # error_svd = np.mean(ep.Sampson_error(x1[:,estimate['inliers']], x2[:,estimate['inliers']], F_svd))
         error_cv = np.mean(ep.Sampson_error(x1[:,mask.T[0]==1], x2[:,mask.T[0]==1], F_cv))
-        # error_all = np.mean(ep.Sampson_error(x1, x2, F_all))
-        # error_old = np.mean(ep.Sampson_error(x1[:,inliers], x2[:,inliers], F_old))
-        # print('Error: {}, {}, {}, {}, {}'.format(error, error_svd, error_cv, error_all, error_old))
 
         print('Error: {}'.format(error_cv))
         # print('\nRatio of inliers: {:.3f}\n'.format(len(estimate['inliers']) / num_traj))
@@ -111,19 +96,28 @@ while it < len(shift_range):
 
     # Compute Beta and F
     # param = {'k':1, 's':0}
-    # beta, F_beta, inliers = synchronization.iter_sync(x1,x2,param,p_max=7,threshold=5,maxiter=500,loRansac=False)
+    # beta, F_beta, inliers = synchronization.iter_sync(x1,x2,param,p_max=2,threshold=5,maxiter=500,loRansac=False)
     # F_beta = F_beta.reshape((3,3))
+
+    # x2_shift = synchronization.shift_trajectory(x2,beta,k=param['k'],s=param['s'])
+    # if beta >= 1:
+    #     s2 = x2_shift[:,:-int(beta)]
+    #     s1 = x1[:,:-int(beta)]
+    # else:
+    #     s2 = x2_shift[:,-int(beta):]
+    #     s1 = x1[:,-int(beta):]
+
 
     # Show epipolar lines
     idx = np.random.choice(num_traj,size=100,replace=False)
-    vis.plot_epipolar_line(img1,img2,F,   x1[:,idx],x2[:,idx])
+    # vis.plot_epipolar_line(img1,img2,F,   x1[:,idx],x2[:,idx])
     vis.plot_epipolar_line(img1,img2,F_cv,x1[:,idx],x2[:,idx])
 
     # Compute epipole
-    e_r = ep.compute_epipole_from_F(F)
-    e_l = ep.compute_epipole_from_F(F,left=True)
-    print('\nLeft epipole: {}\n'.format(e_l))
-    print('Right epipole: {}\n'.format(e_r))
+    # e_r = ep.compute_epipole_from_F(F)
+    # e_l = ep.compute_epipole_from_F(F,left=True)
+    # print('\nLeft epipole: {}\n'.format(e_l))
+    # print('Right epipole: {}\n'.format(e_r))
 
     e_r_cv = ep.compute_epipole_from_F(F_cv)
     e_l_cv = ep.compute_epipole_from_F(F_cv,left=True)
@@ -131,61 +125,46 @@ while it < len(shift_range):
     print('Right epipole from OpenCV: {}\n'.format(e_r_cv))
 
     # Compute focal length
-    # k1,k2 = ep.focal_length_from_F(F)
-    # print('\nThe two estimated focal lengths are {:.3f} and {:.3f}\n'.format(k1,k2))
-
     k1,k2 = ep.focal_length_from_F(F_cv)
     print('The two estimated focal lengths are {:.3f} and {:.3f}'.format(k1,k2))
     
-    # Triangulation 
-    # E = np.dot(np.dot(K2.T,F),K1)
-    # P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
-    # X1,P2_1 = ep.triangulate_from_E(E,K1,K2,x1,x2)
-    # X2,P2_2 = ep.triangulate_cv(E,K1,K2,x1,x2)
-
     # Triangulation OpenCV
     E = np.dot(np.dot(K2.T,F_cv),K1)
-    P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
-    X4,P2_4 = ep.triangulate_from_E(E,K1,K2,x1,x2)
-    X5,P2_5 = ep.triangulate_cv(E,K1,K2,x1,x2)
+    P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
+    X1,P2_1 = ep.triangulate_from_E(E,K1,K2,x1,x2)
+    X2,P2_2 = ep.triangulate_cv(E,K1,K2,x1,x2)
+    X3      = ep.triangulate_matlab(np.dot(np.linalg.inv(K1),x1), np.dot(np.linalg.inv(K2),x2), P1, P2_2)
 
     # Reprojection
-    # h1_1 = np.dot(P1,X1)
-    # h1_1 = h1_1/h1_1[-1]
-    # h1_2 = np.dot(P2_1,X1)
-    # h1_2 = h1_2/h1_2[-1]
+    h1_1 = np.dot(np.dot(K1,P1),X1)
+    h1_1 = h1_1/h1_1[-1]
+    h1_2 = np.dot(np.dot(K2,P2_1),X1)
+    h1_2 = h1_2/h1_2[-1]
 
-    # h2_1 = np.dot(P1,X2)
-    # h2_1 = h2_1/h2_1[-1]
-    # h2_2 = np.dot(P2_2,X2)
-    # h2_2 = h2_2/h2_2[-1]
+    h2_1 = np.dot(np.dot(K1,P1),X2)
+    h2_1 = h2_1/h2_1[-1]
+    h2_2 = np.dot(np.dot(K2,P2_2),X2)
+    h2_2 = h2_2/h2_2[-1]
 
-    h4_1 = np.dot(P1,X4)
-    h4_1 = h4_1/h4_1[-1]
-    h4_2 = np.dot(np.dot(K2,P2_4),X4)
-    h4_2 = h4_2/h4_2[-1]
-
-    h5_1 = np.dot(P1,X5)
-    h5_1 = h5_1/h5_1[-1]
-    h5_2 = np.dot(P2_5,X5)
-    h5_2 = h5_2/h5_2[-1]
+    h3_1 = np.dot(np.dot(K1,P1),X3)
+    h3_1 = h3_1/h3_1[-1]
+    h3_2 = np.dot(np.dot(K2,P2_2),X3)
+    h3_2 = h3_2/h3_2[-1]
 
     # Reprojection error
-    # r1_1, r1_2 = np.mean(ep.reprojection_error(x1,h1_1)), np.mean(ep.reprojection_error(x2,h1_2))
-    # r2_1, r2_2 = np.mean(ep.reprojection_error(x1,h2_1)), np.mean(ep.reprojection_error(x2,h2_2))
-    r4_1, r4_2 = np.mean(ep.reprojection_error(x1,h4_1)), np.mean(ep.reprojection_error(x2,h4_2))
-    r5_1, r5_2 = np.mean(ep.reprojection_error(x1,h5_1)), np.mean(ep.reprojection_error(x2,h5_2))
+    r1_1, r1_2 = np.mean(ep.reprojection_error(x1,h1_1)), np.mean(ep.reprojection_error(x2,h1_2))
+    r2_1, r2_2 = np.mean(ep.reprojection_error(x1,h2_1)), np.mean(ep.reprojection_error(x2,h2_2))
+    r3_1, r3_2 = np.mean(ep.reprojection_error(x1,h3_1)), np.mean(ep.reprojection_error(x2,h3_2))
 
-    # print('\nReprojection error 1: {}, {}'.format(r1_1,r1_2))
-    # print('\nReprojection error 2: {}, {}'.format(r2_1,r2_2))
-    print('\nReprojection error 4: {}, {}'.format(r4_1,r4_2))
-    print('\nReprojection error 5: {}, {}'.format(r5_1,r5_2))
+    print('\nReprojection error 1: {}, {}'.format(r1_1,r1_2))
+    print('\nReprojection error 2: {}, {}'.format(r2_1,r2_2))
+    print('\nReprojection error 3: {}, {}'.format(r3_1,r3_2))
 
     # Show 3D results
     # vis.show_trajectory_3D(X1,X2,title='F from Jingtong, Triangulation left: from Jingtong, right: from OpenCV')
 
     # Show 3D results
-    vis.show_trajectory_3D(X4,X5,title='F from OpenCV, Triangulation left: from Jingtong, right: from OpenCV',line=False)
+    vis.show_trajectory_3D(X1,X2,X3,title='F from OpenCV, Triangulation left: from Jingtong, right: from OpenCV',line=False)
 
     it += 1
 

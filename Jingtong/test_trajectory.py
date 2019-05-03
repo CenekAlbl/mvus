@@ -51,7 +51,7 @@ K2 = K1
 start_1 = 153
 start_2 = 71
 num_traj = 1500
-shift_range = np.arange(-10,11,1)
+shift_range = np.arange(-20,21,2)
 
 # iterate over all shifts
 results = {'shift':[], 'Beta':[], 'X1':[], 'X2':[], 'P2_1':[], 'P2_2':[], 'inlier1':[], 'inlier2':[], 'k':k, 's':s}
@@ -75,7 +75,7 @@ while it < len(shift_range):
     # Brute-force
     # beta, F2, inliers2 = synchronization.search_sync(x1,x2,param,d_min=-6,d_max=6,threshold1=5,threshold2=5,maxiter=300,loRansac=True)
     # iterative
-    beta, F2, inliers2 = synchronization.iter_sync(x1,x2,param,p_max=3,threshold=5,maxiter=500,loRansac=False)
+    beta, F2, inliers2 = synchronization.iter_sync(x1,x2,param,p_max=5,threshold=5,maxiter=500,loRansac=False)
     F2 = F2.reshape((3,3))
 
     '''Triangulation'''
@@ -112,6 +112,10 @@ while it < len(shift_range):
     it += 1
 
     print('\nTime: ',datetime.now()-start)
+
+# Save parameters
+results['k'], results['s'] = k, s
+results['error'], results['threshold'], results['maxiter'], results['loRansac'] = 5, 5, 500, False
 
 file = open('data/test_trajectory.pickle', 'wb')
 pickle.dump(results, file)
