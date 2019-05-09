@@ -502,7 +502,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
     P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
     for i in range(4):
         P2_temp = Rt[i]
-        X = triangulate_matlab(x1n,x2n,P1,P2_temp)
+        X = triangulate(x1n,x2n,P1,P2_temp)
         d1 = np.dot(P1,X)[2]
         d2 = np.dot(P2_temp,X)[2]
 
@@ -511,7 +511,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
             infront = (d1>0) & (d2>0)
             P2 = P2_temp
     
-    X = triangulate_matlab(x1n,x2n,P1,P2) 
+    X = triangulate(x1n,x2n,P1,P2) 
     return X[:,:], P2
 
 

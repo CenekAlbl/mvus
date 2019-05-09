@@ -17,7 +17,7 @@ When an image from a generated camera is displayed, PRESS "s" to save it, otherw
 '''
 
 # Set the number of camera
-num_cam = 2
+num_cam = 4
 
 # Select the trajectory data
 filename = 'data/Synthetic_Trajectory_generated.txt'
@@ -92,7 +92,7 @@ while num_temp <= num_cam:
 if not os.path.isdir("data"):
     os.mkdir("data")
 
-file = open('data/Synthetic_Camera.pickle', 'wb')
-pickle.dump(Camera, file)
-file.close()
+with open('data/Synthetic_Camera.pickle', 'wb') as f:
+    pickle.dump(Camera, f)
+
 

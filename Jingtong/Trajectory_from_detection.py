@@ -8,6 +8,7 @@ import ransac1
 import synchronization
 from scipy.interpolate import splprep, splev
 from scipy.interpolate import UnivariateSpline
+import scipy.io as scio
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -23,19 +24,23 @@ Ransac = True
 # Compute focal length
 focal_length = False
 
-# Define shifting of trajectory
+# Define shifting of trajectory (153,71,119)
 start_1 = 153
-start_2 = 71
+start_2 = 118
 num_traj = 1500
 
 # Load calibration
 calibration = open('data/calibration.pickle','rb')
 K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
 K2 = K1
+camera1 = scio.loadmat('data/calibration/first_flight/gopro/calibration_narrow.mat')
+K1 = camera1['intrinsic']
+camera2 = scio.loadmat('data/calibration/first_flight/phone_2/calibration.mat')
+K2 = camera2['intrinsic']
 
 # Load data
 traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
-traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
+traj_2 = np.loadtxt('data/video_3_output.txt',skiprows=1,dtype=np.int32)
 
 x1 = np.vstack((traj_1[start_1:start_1+num_traj,1:].T, np.ones(num_traj)))
 x2 = np.vstack((traj_2[start_2:start_2+num_traj,1:].T, np.ones(num_traj)))
@@ -67,7 +72,7 @@ y2_s = util.spline_fitting(x2[1], np.arange(0,num_traj,0.1), k=k, s=s)
 
 # vis.show_spline((x1, np.vstack((x1_s,y1_s))), (x2, np.vstack((x2_s,y2_s))), title='k={}, s={}'.format(k,s))
 
-shift_range = np.arange(-5,5)
+shift_range = np.arange(-1,0)
 it = 0
 while it < len(shift_range):
     print('\n\n------------------Iteration {}------------------\n'.format(it+1))
@@ -97,15 +102,17 @@ while it < len(shift_range):
     # Compute Beta and F
     # param = {'k':1, 's':0}
     # beta, F_beta, inliers = synchronization.iter_sync(x1,x2,param,p_max=2,threshold=5,maxiter=500,loRansac=False)
-    # F_beta = F_beta.reshape((3,3))
+    # F_cv = F_beta.reshape((3,3))
 
+    # param = {'k':1, 's':0}
+    # beta = -0.2
     # x2_shift = synchronization.shift_trajectory(x2,beta,k=param['k'],s=param['s'])
     # if beta >= 1:
-    #     s2 = x2_shift[:,:-int(beta)]
-    #     s1 = x1[:,:-int(beta)]
+    #     x2 = x2_shift[:,:-int(beta)]
+    #     x1 = x1[:,:-int(beta)]
     # else:
-    #     s2 = x2_shift[:,-int(beta):]
-    #     s1 = x1[:,-int(beta):]
+    #     x2 = x2_shift[:,-int(beta):]
+    #     x1 = x1[:,-int(beta):]
 
 
     # Show epipolar lines
@@ -125,14 +132,22 @@ while it < len(shift_range):
     print('Right epipole from OpenCV: {}\n'.format(e_r_cv))
 
     # Compute focal length
-    k1,k2 = ep.focal_length_from_F(F_cv)
-    print('The two estimated focal lengths are {:.3f} and {:.3f}'.format(k1,k2))
+    p1 = K1[:,-1]
+    p2 = K2[:,-1]
+    f1_g, f2_g = K1[0,0],K2[0,0]
+
+    k1 = np.sqrt(ep.focal_length_from_F_and_P(F_cv  ,p1,p2))
+    k2 = np.sqrt(ep.focal_length_from_F_and_P(F_cv.T,p2,p1))
+    k3,k4 = np.sqrt(ep.focal_length_iter(x1,x2,p1,p2,f1_g,f2_g))
+    print('The two estimated focal lengths from Bougnoux  are {:.3f} and {:.3f}'.format(k1,k2))
+    print('The two estimated focal lengths from iterative are {:.3f} and {:.3f}'.format(k3,k4))
     
     # Triangulation OpenCV
     E = np.dot(np.dot(K2.T,F_cv),K1)
     P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
     X1,P2_1 = ep.triangulate_from_E(E,K1,K2,x1,x2)
-    X2,P2_2 = ep.triangulate_cv(E,K1,K2,x1,x2)
+    # X2,P2_2 = ep.triangulate_cv(E,K1,K2,x1,x2)
+    X2,P2_2 = cv2.triangulatePoints(np.dot(K1,P1),np.dot(K2,P2_1),x1[:2],x2[:2]), P2_1
     X3      = ep.triangulate_matlab(np.dot(np.linalg.inv(K1),x1), np.dot(np.linalg.inv(K2),x2), P1, P2_2)
 
     # Reprojection

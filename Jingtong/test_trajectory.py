@@ -5,6 +5,7 @@ import pickle
 import epipolar as ep
 import synchronization
 import visualization as vis
+import scipy.io as scio
 from datetime import datetime
 from scipy.interpolate import UnivariateSpline
 
@@ -20,7 +21,7 @@ start=datetime.now()
 
 # Load data
 traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
-traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
+traj_2 = np.loadtxt('data/video_3_output.txt',skiprows=1,dtype=np.int32)
 
 # Spline fitting
 k, s = 1, 0
@@ -46,15 +47,19 @@ print('Residual of these splines: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]\n'.format(
 calibration = open('data/calibration.pickle','rb')
 K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
 K2 = K1
+camera1 = scio.loadmat('data/calibration/first_flight/gopro/calibration_narrow.mat')
+K1 = camera1['intrinsic']
+camera2 = scio.loadmat('data/calibration/first_flight/phone_2/calibration.mat')
+K2 = camera2['intrinsic']
 
 # Define shifting of trajectory
 start_1 = 153
-start_2 = 71
+start_2 = 119
 num_traj = 1500
-shift_range = np.arange(-20,21,2)
+shift_range = np.arange(1)
 
 # iterate over all shifts
-results = {'shift':[], 'Beta':[], 'X1':[], 'X2':[], 'P2_1':[], 'P2_2':[], 'inlier1':[], 'inlier2':[], 'k':k, 's':s}
+results = {'shift':[], 'Beta':[], 's1':[], 's2':[], 'X1':[], 'X2':[], 'P2_1':[], 'P2_2':[], 'inlier1':[], 'inlier2':[], 'k':k, 's':s}
 it = 0
 while it < len(shift_range):
     shift = shift_range[it]
@@ -73,7 +78,7 @@ while it < len(shift_range):
     # With synchronization
     param = {'k':1, 's':0}
     # Brute-force
-    # beta, F2, inliers2 = synchronization.search_sync(x1,x2,param,d_min=-6,d_max=6,threshold1=5,threshold2=5,maxiter=300,loRansac=True)
+    # beta, F2, inliers2 = synchronization.search_sync(x1,x2,param,d_min=-1,d_max=1,threshold1=5,threshold2=5,maxiter=500,loRansac=False)
     # iterative
     beta, F2, inliers2 = synchronization.iter_sync(x1,x2,param,p_max=5,threshold=5,maxiter=500,loRansac=False)
     F2 = F2.reshape((3,3))
@@ -103,6 +108,8 @@ while it < len(shift_range):
     # Save results
     results['shift'].append(shift)
     results['Beta'].append(beta)
+    results['s1'].append(s1)
+    results['s2'].append(s2)
     results['X1'].append(X1)
     results['X2'].append(X2)
     results['P2_1'].append(P2_1)
@@ -117,9 +124,9 @@ while it < len(shift_range):
 results['k'], results['s'] = k, s
 results['error'], results['threshold'], results['maxiter'], results['loRansac'] = 5, 5, 500, False
 
-file = open('data/test_trajectory.pickle', 'wb')
-pickle.dump(results, file)
-file.close()
+# file = open('data/test_trajectory.pickle', 'wb')
+# pickle.dump(results, file)
+# file.close()
 
 print('\nfinished\n')
     

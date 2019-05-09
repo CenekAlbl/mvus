@@ -5,10 +5,10 @@ import scipy.io as scio
 
 
 # Extract and save frames from a video for calibration
-video_file = 'C:\\Users\\tong2\\Desktop\\calibration\\VID_20190429_141058.mp4'
-img_folder = 'C:\\Users\\tong2\\Desktop\\calibration\\'
+video_file = 'C:\\Users\\tong2\\Desktop\\calibration\\fixposition\\cam4\\Fx_Pt_C4.MP4'
+img_folder = 'C:\\Users\\tong2\\Desktop\\calibration\\calibration_imgs\\'
 
-frames = np.arange(0,1001,100)
+frames = np.arange(1,1002,5)
 imgs = video.getFrame(video_file,frames)
 
 for i in range(len(imgs)):
@@ -17,7 +17,7 @@ for i in range(len(imgs)):
 
 
 # Example of load calibration matrix from mat file
-# camera_1 = scio.loadmat('C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/calibration/first_flight/phone_1/intrinsic.mat')
-# print('\nIntrinsic parameters:\n',camera_1['intrinsic'])
+# camera = scio.loadmat('C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/data/calibration/first_flight/phone_1/calibration.mat')
+# print('\nIntrinsic parameters:\n',camera['intrinsic'])
 
 print('\nFinished\n')

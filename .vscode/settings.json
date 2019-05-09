@@ -1,6 +1,6 @@
 {
     "python.pythonPath": "C:\\Users\\tong2\\Anaconda3\\envs\\thesis\\python.exe",
-    "terminal.integrated.env.windows": {"PYTHONPATH":"Jingtong"},
+    "terminal.integrated.env.windows": {"PYTHONPATH":"Jingtong;multiviewunsynch"},
     "python.linting.pylintArgs": [
         "--disable",
         "all",
