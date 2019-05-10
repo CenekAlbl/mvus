@@ -79,11 +79,11 @@ if __name__ == "__main__":
     Load data
     '''
     # Load trajectory data
-    X = np.loadtxt('data/Real_Trajectory.txt')
+    X = np.loadtxt('./data/Real_Trajectory.txt')
     X_homo = np.insert(X,3,1,axis=0)
 
     # Load camera parameter
-    with open('data/Synthetic_Camera.pickle', 'rb') as file:
+    with open('./data/Synthetic_Camera.pickle', 'rb') as file:
         Camera =pickle.load(file)
 
     # Camara 1
@@ -105,8 +105,8 @@ if __name__ == "__main__":
     start_2 = 71
     num_traj = 1500
 
-    traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
-    traj_2 = np.loadtxt('data/video_2_output.txt',skiprows=1,dtype=np.int32)
+    traj_1 = np.loadtxt('./data/video_1_output.txt',skiprows=1,dtype=np.int32)
+    traj_2 = np.loadtxt('./data/video_2_output.txt',skiprows=1,dtype=np.int32)
 
     x1 = np.vstack((traj_1[start_1:start_1+num_traj,1:].T, np.ones(num_traj)))
     x2 = np.vstack((traj_2[start_2:start_2+num_traj,1:].T, np.ones(num_traj)))

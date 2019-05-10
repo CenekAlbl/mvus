@@ -20,7 +20,7 @@ When an image from a generated camera is displayed, PRESS "s" to save it, otherw
 num_cam = 4
 
 # Select the trajectory data
-filename = 'data/Synthetic_Trajectory_generated.txt'
+filename = './data/Synthetic_Trajectory_generated.txt'
 
 # Load trajectory data
 X = np.loadtxt(filename)
@@ -89,10 +89,10 @@ while num_temp <= num_cam:
                 print("\nFinished!\n")
 
 # save the camera(s) in a pickle file
-if not os.path.isdir("data"):
-    os.mkdir("data")
+if not os.path.isdir("./data"):
+    os.mkdir("./data")
 
-with open('data/Synthetic_Camera.pickle', 'wb') as f:
+with open('./data/Synthetic_Camera.pickle', 'wb') as f:
     pickle.dump(Camera, f)
 
 

@@ -30,7 +30,7 @@ start_2 = 118
 num_traj = 1500
 
 # Load calibration
-calibration = open('data/calibration.pickle','rb')
+calibration = open('./data/calibration.pickle','rb')
 K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
 K2 = K1
 camera1 = scio.loadmat('data/calibration/first_flight/gopro/calibration_narrow.mat')

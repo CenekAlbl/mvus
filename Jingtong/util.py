@@ -17,12 +17,12 @@ def rotation(x,y,z):
     return np.dot(np.dot(Rz,Ry),Rx)
 
 
-def spline_fitting(x,t,k=1,s=0):
+def spline_fitting(x,t,t0=False,k=1,s=0):
     '''
     This function reads an array of samples (x) and return interpolated values at given positions (t)
     '''
-
-    t0 = np.arange(x.shape[0])
+    if not t0:
+        t0 = np.arange(x.shape[0])
     spl = UnivariateSpline(t0, x, k=k, s=s)
 
     return spl(t)

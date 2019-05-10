@@ -15,12 +15,12 @@ This script tests the computation of focal length on a synthetic dataset
 noise = True
 
 # Load trajectory data
-X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+X = np.loadtxt('./data/Synthetic_Trajectory_generated.txt')
 X = np.insert(X,3,1,axis=0)
 num_points = X.shape[1]
 
 # Load camera parameter
-with open('data/Synthetic_Camera.pickle', 'rb') as file:
+with open('./data/Synthetic_Camera.pickle', 'rb') as file:
     Camera =pickle.load(file)
 
 # Camara 1

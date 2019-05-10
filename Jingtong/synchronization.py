@@ -388,7 +388,7 @@ if __name__ == "__main__":
     '''Load data'''
 
     # Load trajectory data
-    X = np.loadtxt('data/Real_Trajectory.txt')
+    X = np.loadtxt('./data/Real_Trajectory.txt')
     X = np.insert(X,3,1,axis=0)
     num_points = X.shape[1]
 
@@ -398,7 +398,7 @@ if __name__ == "__main__":
     # X[0], X[1], X[2] = spline[0](t), spline[1](t), spline[2](t)
 
     # Load camera parameter
-    with open('data/Synthetic_Camera.pickle', 'rb') as file:
+    with open('./data/Synthetic_Camera.pickle', 'rb') as file:
         Camera =pickle.load(file)
 
     # Camara 1

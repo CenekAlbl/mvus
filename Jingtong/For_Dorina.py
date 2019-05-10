@@ -8,14 +8,14 @@ import common
 import visualization as vis
 
 # Load trajectory data
-X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+X = np.loadtxt('./data/Synthetic_Trajectory_generated.txt')
 X = np.insert(X,3,1,axis=0)
 num_points = X.shape[1]
 
 # vis.show_trajectory_3D(X)
 
 # Load camera parameter
-with open('data/Synthetic_Camera.pickle', 'rb') as file:
+with open('./data/Synthetic_Camera.pickle', 'rb') as file:
     Camera = pickle.load(file)
 
 # 2D trajectories
@@ -30,7 +30,7 @@ for i in range(num_cam):
 # Save ground truth of R and t
 for i in range(num_cam):
     Rt_i = eval('np.hstack((Camera["R{}"],Camera["t{}"]))'.format(i+1,i+1))
-    np.savetxt('data/Rt_{}.txt'.format(i+1),Rt_i,fmt='%.4f')
+    np.savetxt('./data/Rt_{}.txt'.format(i+1),Rt_i,fmt='%.4f')
 
 # Pairwise camera poses
 E = {}
@@ -44,7 +44,7 @@ for i in range(num_cam-1):
         E_ij = np.linalg.multi_dot([K_j.T, F, K_i])
         
         X_ij, Rt = ep.triangulate_from_E(E_ij,K_i,K_j,x[i],x[j])
-        np.savetxt('data/Rt_{}{}.txt'.format(i+1,j+1),Rt,fmt='%.4f')
+        np.savetxt('./data/Rt_{}{}.txt'.format(i+1,j+1),Rt,fmt='%.4f')
 
         exec('E["E_{}{}"]=E_ij'.format(i+1,j+1))
 

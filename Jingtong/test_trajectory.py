@@ -20,8 +20,8 @@ This script tests the estimation of fundamental matrix F and 3D reconstruction o
 start=datetime.now()
 
 # Load data
-traj_1 = np.loadtxt('data/video_1_output.txt',skiprows=1,dtype=np.int32)
-traj_2 = np.loadtxt('data/video_3_output.txt',skiprows=1,dtype=np.int32)
+traj_1 = np.loadtxt('./data/video_1_output.txt',skiprows=1,dtype=np.int32)
+traj_2 = np.loadtxt('./data/video_3_output.txt',skiprows=1,dtype=np.int32)
 
 # Spline fitting
 k, s = 1, 0
@@ -44,12 +44,12 @@ print('Residual of these splines: [{:.2f}, {:.2f}, {:.2f}, {:.2f}]\n'.format(
     spl_1_x.get_residual(),spl_1_y.get_residual(),spl_2_x.get_residual(),spl_2_y.get_residual()))
 
 # Load calibration matrix
-calibration = open('data/calibration.pickle','rb')
+calibration = open('./data/calibration.pickle','rb')
 K1 = np.asarray(pickle.load(calibration)["intrinsic_matrix"])
 K2 = K1
-camera1 = scio.loadmat('data/calibration/first_flight/gopro/calibration_narrow.mat')
+camera1 = scio.loadmat('./data/calibration/first_flight/gopro/calibration_narrow.mat')
 K1 = camera1['intrinsic']
-camera2 = scio.loadmat('data/calibration/first_flight/phone_2/calibration.mat')
+camera2 = scio.loadmat('./data/calibration/first_flight/phone_2/calibration.mat')
 K2 = camera2['intrinsic']
 
 # Define shifting of trajectory
@@ -124,7 +124,7 @@ while it < len(shift_range):
 results['k'], results['s'] = k, s
 results['error'], results['threshold'], results['maxiter'], results['loRansac'] = 5, 5, 500, False
 
-# file = open('data/test_trajectory.pickle', 'wb')
+# file = open('./data/test_trajectory.pickle', 'wb')
 # pickle.dump(results, file)
 # file.close()
 

@@ -167,21 +167,21 @@ def show_spline(*spline,title=None):
 
 if __name__ == "__main__":
     # # Synthetic trajectory data
-    # X = np.loadtxt('data/Synthetic_Trajectory_generated.txt')
+    # X = np.loadtxt('./data/Synthetic_Trajectory_generated.txt')
     # X_homo = np.insert(X,3,1,axis=0)
     
     # show_trajectory_3D(X,color=True)
 
     # # Fixposition data
-    # X1 = np.loadtxt('data/fixposition_1_kml.txt',delimiter=',')
+    # X1 = np.loadtxt('./data/fixposition_1_kml.txt',delimiter=',')
     # X1 = X1.T
 
-    # X2 = np.loadtxt('data/fixposition_2_kml.txt',delimiter=',')
+    # X2 = np.loadtxt('./data/fixposition_2_kml.txt',delimiter=',')
     # X2 = X2.T
     # show_trajectory_3D(X1,X2)
 
     # Triangulated real trajectory
-    with open('data/test_trajectory.pickle', 'rb') as file:
+    with open('./data/test_trajectory.pickle', 'rb') as file:
         results = pickle.load(file)
 
     for i in range(len(results['Beta'])):

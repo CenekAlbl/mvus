@@ -1,6 +1,9 @@
 # Classes that are common to the entire project
 import numpy as np
 import util
+import epipolar as ep
+import synchronization
+import scipy.io as scio
 import pickle
 
 class Scene:
@@ -25,6 +28,7 @@ class Scene:
         """
         self.cameras = []
         self.detections = []
+        self.tracks = []
         self.numCam = 0
         self.beta = None
         self.traj = None
@@ -52,7 +56,7 @@ class Scene:
         Parameters
         ----------
         detection : 
-            2D detection in form of (x,y,frameId)*N
+            2D detection in form of (frameId,x,y)*N
         """
         for i in detection:
             assert i.shape[0]==3, "Detection must in form of (x,y,frameId)*N"
@@ -61,7 +65,12 @@ class Scene:
 
     def init_beta(self):
         '''Initialize the beta vector according to numCam'''
-        self.beta = np.zeros(self.numCam)
+        self.beta = np.zeros((self.numCam, self.numCam))
+
+    
+    def init_track(self):
+        '''Initialize the tracks identical to detections'''
+        self.tracks = self.detections
 
 
 class Camera:
@@ -145,18 +154,42 @@ class trackedObject:
 
 
 if __name__ == "__main__":
-    a = Camera()
-    a.P = np.random.randn(3,4)
-    x = a.projectPoint(np.random.randn(4,5))
-    print(x,'\n')
+    
+    # Load camara intrinsic
+    intrin_1 = scio.loadmat('./data/calibration/first_flight/gopro/calibration_narrow.mat')
+    intrin_2 = scio.loadmat('./data/calibration/first_flight/phone_1/calibration.mat')
+    intrin_3 = scio.loadmat('./data/calibration/first_flight/phone_2/calibration.mat')
 
-    R = util.rotation(40,120,50)
-    t = np.array([1,2,3])
-    K = np.array([[1200,0,300],[0,900,600],[0,0,1]])
-    b = Camera(P=np.dot(K,np.hstack((R,t.reshape((-1,1))))))
-    print(b.center(),b.K,'\n')
+    K1, K2, K3 = intrin_1['intrinsic'], intrin_2['intrinsic'], intrin_3['intrinsic']
+    cameras = [Camera(K=K1), Camera(K=K2), Camera(K=K3)]
 
-    c = trackedObject(4)
-    print(c.imageTracks)
+    # Load detections
+    detect_1 = np.loadtxt('./data/video_1_output.txt',skiprows=1,dtype=np.int32)
+    detect_2 = np.loadtxt('./data/video_2_output.txt',skiprows=1,dtype=np.int32)
+    detect_3 = np.loadtxt('./data/video_3_output.txt',skiprows=1,dtype=np.int32)
 
-    print('Finished')
+    # Create a scene
+    flight = Scene()
+    flight.addCamera(*cameras)
+    flight.addDetection(detect_1.T, detect_2.T, detect_3.T)
+    flight.init_beta()
+    flight.init_track()
+
+    # Compute Beta for the first two detections
+    beta_error = 0
+    for i in range(flight.numCam-1):
+        for j in range(i+1,flight.numCam):
+            d1 = util.homogeneous(flight.detections[i][1:])
+            d2 = util.homogeneous(flight.detections[j][1:])
+            numPoints = min(d1.shape[1], d2.shape[1])
+
+            param = {'k':1, 's':0}
+            flight.beta[i,j], F, inliers = synchronization.search_sync(d1[:,:numPoints], d2[:,:numPoints], param=param, d_min=-6, d_max=6, threshold2=5)
+            flight.beta[j,i] = flight.beta[i,j]
+        beta_error += flight.beta[i,i+1]
+    beta_error -= flight.beta[0,-1]
+
+    print('\nBeta error: {}\n'.format(beta_error))
+    print(flight.beta)
+
+    print('\nFinished')

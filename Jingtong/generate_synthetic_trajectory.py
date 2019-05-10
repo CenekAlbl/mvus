@@ -14,7 +14,7 @@ dn = 5          # time interval to sample a point
 random_sample = False
 dt = 0.1        # time interval for movement, not important due to rescaling later
 spline = False   # whether to create smooth trajectory using spline
-filename = "data/Synthetic_Trajectory_generated.txt"
+filename = "./data/Synthetic_Trajectory_generated.txt"
 
 while True:
     # Define position(r), velocity(v), acceleration(a)
