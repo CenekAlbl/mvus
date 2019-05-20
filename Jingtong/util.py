@@ -17,11 +17,38 @@ def rotation(x,y,z):
     return np.dot(np.dot(Rz,Ry),Rx)
 
 
+def rotation_decompose(R):
+    # x = np.arctan2(R[2,1],R[2,2])
+    # y = np.arctan2(-R[2,0],np.sqrt(R[2,1]**2+R[2,2]**2))
+    # z = np.arctan2(R[1,0],R[0,0])
+
+    Rt = np.transpose(R)
+    shouldBeIdentity = np.dot(Rt, R)
+    I = np.identity(3, dtype = R.dtype)
+    n = np.linalg.norm(I - shouldBeIdentity)
+    assert(n < 1e-6)
+
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    singular = sy < 1e-6
+
+    if not singular:
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+
+    # return x,y,z
+    return x*180/math.pi, y*180/math.pi, z*180/math.pi
+
+
 def spline_fitting(x,t,t0=False,k=1,s=0):
     '''
     This function reads an array of samples (x) and return interpolated values at given positions (t)
     '''
-    if not t0:
+    if not t0.all():
         t0 = np.arange(x.shape[0])
     spl = UnivariateSpline(t0, x, k=k, s=s)
 
@@ -101,3 +128,11 @@ def umeyama(src, dst, estimate_scale):
     T[:dim, :dim] *= scale
 
     return T
+
+
+if __name__ == "__main__":
+    R = rotation(0.38,-176.3,100)
+    x,y,z = rotation_decompose(R)
+    T = rotation(x,y,z)
+
+    print('Finished')

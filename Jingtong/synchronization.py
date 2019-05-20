@@ -302,30 +302,34 @@ def search_sync(x1,x2,param,d_min=-10,d_max=10,threshold1=10,threshold2=1,maxite
     # Brute-force running for different interpolation d
     inliers = 0
     d_all = np.arange(d_min,d_max+1)*20+1
-    for d in d_all:
-        param['d'] = d
-        result = compute_beta_fundamental_Ransac(x1,x2,param,threshold=threshold1,maxiter=maxiter,loRansac=loRansac)
-        beta_temp = result['model'][-1]
-        if abs(beta_temp) > x1.shape[1]:
-            continue
-        elif beta_temp > 0:
-            inliers_temp = sum(result['inliers'] < x1.shape[1]-beta_temp-1) / (x1.shape[1]-abs(beta_temp))
-        else:
-            inliers_temp = sum(result['inliers'] > -beta_temp) / (x1.shape[1]-abs(beta_temp))
+    beta = None
+    while True:
+        for d in d_all:
+            param['d'] = d
+            result = compute_beta_fundamental_Ransac(x1,x2,param,threshold=threshold1,maxiter=maxiter,loRansac=loRansac)
+            beta_temp = result['model'][-1]
+            if abs(beta_temp) > x1.shape[1]:
+                continue
+            elif beta_temp > 0:
+                inliers_temp = sum(result['inliers'] < x1.shape[1]-beta_temp-1) / (x1.shape[1]-abs(beta_temp))
+            else:
+                inliers_temp = sum(result['inliers'] > -beta_temp) / (x1.shape[1]-abs(beta_temp))
 
-        # if abs(d) - abs(beta_temp) < 20 and abs(d) - abs(beta_temp) > 0:
-        if abs(beta_temp-d) < 20:
-            if inliers_temp > 0.5:
-                beta = beta_temp
-                inliers = inliers_temp
-                d_1 = d
-                break
-            elif inliers_temp > inliers:
-                beta = beta_temp
-                inliers = inliers_temp
-                d_1 = d
-                print('The current estimated Beta is {}, with ratio of inliers of {}, d={}'.format(beta,inliers,d_1))
-    print('\nThe first stage: Beta is {}, with ratio of inliers of {}, d={}\n'.format(beta,inliers,d_1))
+            # if abs(d) - abs(beta_temp) < 20 and abs(d) - abs(beta_temp) > 0:
+            if abs(beta_temp-d) < 20:
+                if inliers_temp > 0.5:
+                    beta = beta_temp
+                    inliers = inliers_temp
+                    d_1 = d
+                    break
+                elif inliers_temp > inliers:
+                    beta = beta_temp
+                    inliers = inliers_temp
+                    d_1 = d
+                    print('The current estimated Beta is {}, with ratio of inliers of {}, d={}'.format(beta,inliers,d_1))
+        if beta is not None:
+            print('\nThe first stage: Beta is {}, with ratio of inliers of {}, d={}\n'.format(beta,inliers,d_1))
+            break
 
     # Fine search using d=1 or d=-1, until no improvement in 3 iter or inlier > 0.99
     t, inliers = 0, 0

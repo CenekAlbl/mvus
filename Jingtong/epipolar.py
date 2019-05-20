@@ -3,7 +3,7 @@ import math
 import cv2
 import ransac
 import visualization as vis
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, root
 
 
 def extract_SIFT_feature(img, mask_range=None):
@@ -109,7 +109,7 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
     F, mask = cv2.findFundamentalMat(pts1,pts2,method,error)
 
     if inliers:
-        return F, mask
+        return F, mask.reshape(-1,)
     else:
         return F
 
@@ -280,6 +280,66 @@ def compute_P_from_F(F):
     Te = skew(e)
     P = np.vstack((np.dot(Te,F.T).T,e)).T
     return P
+
+
+def solve_PnP(x,X):
+
+    n = x.shape[1]
+    M = np.zeros((3*n,12+n))
+    for i in range(n):
+        M[3*i,0:4] = X[:,i]
+        M[3*i+1,4:8] = X[:,i]
+        M[3*i+2,8:12] = X[:,i]
+        M[3*i:3*i+3,i+12] = -x[:,i]
+    U,S,V = np.linalg.svd(M)
+    return V[-1,:12].reshape((3,4))
+
+
+def PnP(x,X):
+    x_homo, X_homo = x,X
+    x,X = x[:2], X[:3]
+    num = x.shape[1]
+
+    x_mean = np.mean(x,axis=1)
+    X_mean = np.mean(X,axis=1)
+    x_scale = np.mean(np.sqrt(sum((x-x_mean.reshape(-1,1))**2))) / np.sqrt(2)
+    X_scale = np.mean(np.sqrt(sum((x-x_mean.reshape(-1,1))**2))) / np.sqrt(3)
+
+    T = np.linalg.inv(np.array([[x_scale,0,x_mean[0]],[0,x_scale,x_mean[1]],[0,0,1]]))
+    U = np.linalg.inv(np.array([[X_scale,0,0,X_mean[0]],[0,X_scale,0,X_mean[1]],[0,0,X_scale,X_mean[2]],[0,0,0,1]]))
+    x_n = np.dot(T,x_homo)
+    X_n = np.dot(U,X_homo)
+
+    A = np.vstack((np.concatenate((X_n.T,np.zeros((num,4)),(X_n*-x_n[0]).T),axis=1),
+                   np.concatenate((np.zeros((num,4)),-X_n.T,(X_n*x_n[1]).T),axis=1)))
+
+    u,s,v = np.linalg.svd(A)
+    P = np.dot(np.dot(np.linalg.inv(T),v[-1].reshape((3,4))),U)
+    return P
+
+
+def solve_PnP_Ransac(x,X,threshold=10):
+
+    def PnP_handle(data,*param):
+        x = data[:3]
+        X = data[3:]
+        P = solve_PnP(x,X)
+        # P = PnP(x,X)
+        return np.ravel(P)
+
+    def PnP_error(model,data,*param):
+        x_true = data[:3]
+        X = data[3:]
+        P = model.reshape((3,4))
+
+        x_cal = np.dot(P,X)
+        x_cal /= x_cal[-1]
+        return reprojection_error(x_true,x_cal)
+
+    data = np.vstack((x,X))
+    result = ransac.loRansacSimple(PnP_handle,PnP_error,data,6,threshold=threshold,maxIter=500)
+
+    return result['model'].reshape((3,4)), result['inliers']
 
 
 def focal_length_from_F(F):
@@ -479,7 +539,7 @@ def triangulate_from_E_old(E,K1,K2,x1,x2):
     P1 = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
     for i in range(4):
         P2_temp = np.dot(K2,Rt[i])
-        X = triangulate(x1,x2,P1,P2_temp)
+        X = triangulate_matlab(x1,x2,P1,P2_temp)
         d1 = np.dot(P1,X)[2]
         d2 = np.dot(P2_temp,X)[2]
 
@@ -488,7 +548,7 @@ def triangulate_from_E_old(E,K1,K2,x1,x2):
             infront = (d1>0) & (d2>0)
             P2 = P2_temp
     
-    X = triangulate(x1,x2,P1,P2) 
+    X = triangulate_matlab(x1,x2,P1,P2) 
     return X[:,:], P2
 
 
@@ -502,7 +562,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
     P1 = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]])
     for i in range(4):
         P2_temp = Rt[i]
-        X = triangulate(x1n,x2n,P1,P2_temp)
+        X = triangulate_matlab(x1n,x2n,P1,P2_temp)
         d1 = np.dot(P1,X)[2]
         d2 = np.dot(P2_temp,X)[2]
 
@@ -511,7 +571,7 @@ def triangulate_from_E(E,K1,K2,x1,x2):
             infront = (d1>0) & (d2>0)
             P2 = P2_temp
     
-    X = triangulate(x1n,x2n,P1,P2) 
+    X = triangulate_matlab(x1n,x2n,P1,P2) 
     return X[:,:], P2
 
 
@@ -533,6 +593,34 @@ def triangulate_cv(E,K1,K2,x1,x2):
     pts2 = x2[:2].astype(np.float64)
     X = cv2.triangulatePoints(P1,P2,pts1,pts2)
     return X/X[-1], np.hstack((R,t))
+
+
+def undistort(x_homo,coeff):
+
+    # Method 1
+    # x_dist = x_homo[:2]
+
+    # def dist_model(x):
+    #     u,v = np.split(x,2)
+    #     r = u**2 + v**2
+    #     res_1 = u + u*coeff[0]*r + u*coeff[1]*r**2 - x_dist[0]
+    #     res_2 = v + v*coeff[0]*r + v*coeff[1]*r**2 - x_dist[1]
+    #     return np.concatenate((res_1,res_2))
+
+    # sol = root(dist_model,x_dist.ravel())
+    # x_homo[:2] = sol.x.reshape((2,-1))
+
+    # Method 2
+    def dist_model(x,*arg):
+        c1, c2, x_dist, y_dist = arg[0], arg[1], arg[2], arg[3]
+        r = x[0]**2 + x[1]**2
+        return [x[0]*(1+c1*r+c2*r**2)-x_dist,x[1]*(1+c1*r+c2*r**2)-y_dist]
+
+    for i in range(x_homo.shape[1]):
+        sol = root(dist_model,[x_homo[0,i],x_homo[1,i]],args=(coeff[0],coeff[1],x_homo[0,i],x_homo[1,i]))
+        x_homo[:2,i] = sol.x
+
+    return x_homo
 
 
 def reprojection_error(x,x_p):

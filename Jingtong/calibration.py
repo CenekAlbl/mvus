@@ -5,10 +5,10 @@ import scipy.io as scio
 
 
 # Extract and save frames from a video for calibration
-video_file = 'C:\\Users\\tong2\\Desktop\\calibration\\fixposition\\cam4\\Fx_Pt_C4.MP4'
+video_file = 'C:\\Users\\tong2\\Desktop\\calibration\\fixposition\\cam1/FP_c1.mp4'
 img_folder = 'C:\\Users\\tong2\\Desktop\\calibration\\calibration_imgs\\'
 
-frames = np.arange(1,1002,5)
+frames = np.arange(1,701,5)
 imgs = video.getFrame(video_file,frames)
 
 for i in range(len(imgs)):
