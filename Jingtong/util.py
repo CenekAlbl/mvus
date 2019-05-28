@@ -44,15 +44,18 @@ def rotation_decompose(R):
     return x*180/math.pi, y*180/math.pi, z*180/math.pi
 
 
-def spline_fitting(x,t,t0=False,k=1,s=0):
+def spline_fitting(x,t,t0=[],k=1,s=0,return_object=False):
     '''
     This function reads an array of samples (x) and return interpolated values at given positions (t)
     '''
-    if not t0.all():
+    if not len(t0):
         t0 = np.arange(x.shape[0])
     spl = UnivariateSpline(t0, x, k=k, s=s)
 
-    return spl(t)
+    if return_object:
+        return spl
+    else:
+        return spl(t)
 
 
 def homogeneous(x):

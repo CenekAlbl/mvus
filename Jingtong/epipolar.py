@@ -114,6 +114,15 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
         return F
 
 
+def computeEssentialMat(x1,x2,K1,K2,error=0.001):
+    pts1 = np.dot(np.linalg.inv(K1),x1)
+    pts2 = np.dot(np.linalg.inv(K2),x2)
+
+    E, mask = cv2.findEssentialMat(pts1[:2].T,pts2[:2].T,np.diag((1,1,1)),threshold=error)
+    return E, mask.reshape(-1,)
+
+
+
 def normalize_2d_points(x):
     '''
     Function:

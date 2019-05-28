@@ -99,7 +99,11 @@ def compute_beta_fundamental(data,param):
         x2 = s2 + beta[i]*ds
         # F = ep.compute_fundamental(s1,x2)
         F, mask = cv2.findFundamentalMat(s1[:2].T,x2[:2].T,method=cv2.FM_8POINT)
-        M[i] = np.append(np.ravel(F),np.array([beta[i]*param['d']]))
+
+        if len(np.ravel(F)) == 9:
+            M[i] = np.append(np.ravel(F),np.array([beta[i]*param['d']]))
+        else:
+            M[i] = np.append(np.ones(9),np.array([beta[i]*param['d']]))
 
     return M
 
