@@ -56,7 +56,7 @@ def play_two_videos(v1,v2,f1,f2,t):
 
 
 if __name__ == "__main__":
-    video = 'C:\\Users\\tong2\\MyStudy\\ETH\\2019FS\\Thesis\\data\\C0028.MP4'
-    img = getFrame(video,50)
-    cv2.imshow('Frame',img)
+    video = 'C:\\Users\\tong2\\MyStudy\\ETH\\2019FS\\Thesis\\data\\first_flight/cam1_flight_1.MP4'
+    img = getFrame(video,[60*248])
+    cv2.imshow('Frame',img[0])
     cv2.waitKey()
