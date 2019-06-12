@@ -5,11 +5,13 @@ import epipolar as ep
 import synchronization
 import scipy.io as scio
 import pickle
+import argparse
 import copy
 import cv2
 import visualization as vis
 from datetime import datetime
 from scipy.optimize import least_squares
+from scipy import interpolate
 
 
 class Scene:
@@ -166,28 +168,24 @@ class Scene:
     
 
     def set_visibility(self):
-
+        '''This function gives the binary visibility (0 or 1) for self.tracks according to self.traj'''
         v = np.zeros((self.numCam,self.traj.shape[1]))
         for i in range(self.numCam):
             inter,idx1,idx2 = np.intersect1d(self.traj[0],self.tracks[i][0],assume_unique=True,return_indices=True)
             v[i,idx1] = 1
         self.visible = v
 
-        # self.numPoint = 0
-        # for i in self.tracks:
-        #     if i[0,-1] > self.numPoint:
-        #         self.numPoint = int(i[0,-1])
-        # self.numPoint+=1
 
-        # self.visible = np.zeros((self.numCam,self.numPoint))
-        # self.jac = np.zeros((self.numPoint*self.numCam*2,self.numCam*11+self.numPoint*3))
-        # for i in range(self.numCam):
-        #     _,idx,_ = np.intersect1d(np.arange(self.numPoint),self.tracks[i][0],assume_unique=True,return_indices=True)
-        #     self.visible[i,idx]=1
-        #     for j in self.tracks[i][0].astype(int):
-        #         self.jac[(self.numPoint*2*i+j, self.numPoint*(2*i+1)+j),i*11:(i+1)*11] = 1
-        #         self.jac[(self.numPoint*2*i+j, self.numPoint*(2*i+1)+j),11*self.numCam+j*3:11*self.numCam+(j+1)*3] = 1
-                
+    def fit_spline(self,idx=[],s=0.01):
+
+        if len(idx):
+            self.spline, _ = interpolate.splprep(self.traj[1:,idx],u=self.traj[0,idx],s=s)
+        else:
+            self.spline, _ = interpolate.splprep(self.traj[1:],u=self.traj[0],s=s)
+
+        self.spline[1] = np.asarray(self.spline[1])
+        self.traj[1:]  = interpolate.splev(self.traj[0],self.spline)
+
 
     def init_traj(self,error=1,F=True,inlier_only=False):
         '''
@@ -331,408 +329,6 @@ class Scene:
                 
         return X_idx
 
-
-    def discard_fn(self):
-        '''
-        Functions that are not needed (for now) are stored here
-        '''
-        def optimize_traj(self):
-            '''
-            This function is no longer used, because polynomial triangulation is applied
-            '''
-
-            def error_fn(model):
-
-                self.traj[1:] = model.reshape(3,-1)
-
-                cam_1, cam_2  = self.cameras[self.sequence[0]], self.cameras[self.sequence[1]]
-                Track = [self.tracks[self.sequence[0]],self.tracks[self.sequence[1]]]
-                X = self.traj
-
-                # error from Camera 1
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[0][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[0][1:,idx2]
-                x_repro = cam_1.projectPoint(X_temp)
-                err_x1,err_y1 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                # error from Camera 2
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[1][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[1][1:,idx2]
-                x_repro = cam_2.projectPoint(X_temp)
-                err_x2,err_y2 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                error = np.concatenate((err_x1,err_y1,err_x2,err_y2))
-
-                # Make sure the error vector has a fixed size
-                if len(err_x1) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x1)))))
-                if len(err_x2) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x2)))))
-
-                return error
-            
-            # before
-            model = np.ravel(self.traj[1:])
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.traj[1:] = res.x.reshape(3,-1)
-            
-            return res
-
-
-        def optimize_two_Rt(self,c2):
-            '''
-            This function assumes that the first camera is the one started first, c2 is the index for the second camera
-
-            Only R and t will be optimized, K and distortion fixed
-            '''
-
-            def error_fn(model):
-
-                self.beta[0,c2] = model[0]
-                self.cameras[c1].vector2Rt(model[1:7])
-                self.cameras[c2].vector2Rt(model[7:13])
-                self.set_tracks()
-
-                cam_1, cam_2  = self.cameras[c1], self.cameras[c2]
-                Track = [self.tracks[c1],self.tracks[c2]]
-                X = np.vstack((self.traj[0], model[13:].reshape(3,-1)))
-
-                # error from Camera 1
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[0][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[0][1:,idx2]
-                x_repro = cam_1.projectPoint(X_temp)
-                err_x1,err_y1 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                # error from Camera 2
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[1][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[1][1:,idx2]
-                x_repro = cam_2.projectPoint(X_temp)
-                err_x2,err_y2 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                error = np.concatenate((err_x1,err_y1,err_x2,err_y2))
-
-                # Make sure the error vector has a fixed size
-                if len(err_x1) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x1)))))
-                if len(err_x2) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x2)))))
-
-                return error
-            
-            # before
-            c1 = 0
-            model = np.array([self.beta[0,c2]])
-            model = np.concatenate((model,self.cameras[c1].Rt2vector(),self.cameras[c2].Rt2vector()))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,c2] = res.x[0]
-            self.cameras[c1].vector2Rt(res.x[1:7])
-            self.cameras[c2].vector2Rt(res.x[7:13])
-            self.set_tracks()
-            self.traj[1:] = res.x[13:].reshape(3,-1)
-            
-            return res
-
-
-        def optimize_two_KRt(self,c2):
-            '''
-            This function assumes that the first camera is the one started first, c2 is the index for the second camera
-
-            K, R, t are optimized
-            '''
-
-            def error_fn(model):
-
-                self.beta[0,c2] = model[0]
-                self.cameras[c1].vector2P_9(model[1:10])
-                self.cameras[c2].vector2P_9(model[10:19])
-                self.set_tracks()
-
-                Track = [self.tracks[c1],self.tracks[c2]]
-                X = np.vstack((self.traj[0], model[19:].reshape(3,-1)))
-
-                # define two cameras
-                cam_1,cam_2 = self.cameras[c1], self.cameras[c2]
-
-                # error from Camera 1
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[0][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[0][1:,idx2]
-                x_repro = cam_1.projectPoint(X_temp)
-                err_x1,err_y1 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                # error from Camera 2
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[1][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[1][1:,idx2]
-                x_repro = cam_2.projectPoint(X_temp)
-                err_x2,err_y2 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                error = np.concatenate((err_x1,err_y1,err_x2,err_y2))
-
-                # Make sure the error vector has a fixed size
-                if len(err_x1) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x1)))))
-                if len(err_x2) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x2)))))
-
-                return error
-            
-            # before
-            c1 = 0
-            model = np.array([self.beta[0,c2]])
-            model = np.concatenate((model,self.cameras[c1].P2vector_9(),self.cameras[c2].P2vector_9()))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,c2] = res.x[0]
-            self.cameras[c1].vector2P_9(res.x[1:10])
-            self.cameras[c2].vector2P_9(res.x[10:19])
-            self.set_tracks()
-            self.traj[1:] = res.x[19:].reshape(3,-1)
-            
-            return res
-
-
-        def optimize_two_KRtd(self,c2):
-            '''
-            This function assumes that the first camera is the one started first, c2 is the index for the second camera
-
-            K, R, t and distortion are all optimized
-            '''
-
-            def error_fn(model):
-
-                self.beta[0,c2] = model[0]
-                self.cameras[c1].vector2P_9(model[1:10])
-                self.cameras[c2].vector2P_9(model[12:21])
-                self.cameras[c1].d = model[10:12]
-                self.cameras[c2].d = model[21:23]
-
-                self.undistort_detections()
-                self.set_tracks()
-
-                Track = [self.tracks[c1],self.tracks[c2]]
-                X = np.vstack((self.traj[0], model[23:].reshape(3,-1)))
-
-                # define two cameras
-                cam_1,cam_2 = self.cameras[c1], self.cameras[c2]
-
-                # error from Camera 1
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[0][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[0][1:,idx2]
-                x_repro = cam_1.projectPoint(X_temp)
-                err_x1,err_y1 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                # error from Camera 2
-                inter,idx1,idx2 = np.intersect1d(X[0],Track[1][0],assume_unique=True,return_indices=True)
-                X_temp = util.homogeneous(X[1:,idx1])
-                x = Track[1][1:,idx2]
-                x_repro = cam_2.projectPoint(X_temp)
-                err_x2,err_y2 = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                error = np.concatenate((err_x1,err_y1,err_x2,err_y2))
-
-                # Make sure the error vector has a fixed size
-                if len(err_x1) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x1)))))
-                if len(err_x2) < len(self.traj[0]):
-                    error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x2)))))
-
-                return error
-            
-            # before
-            c1 = 0
-            model = np.array([self.beta[0,c2]])
-            model = np.concatenate((model,self.cameras[c1].P2vector_9(),self.cameras[c1].d))
-            model = np.concatenate((model,self.cameras[c2].P2vector_9(),self.cameras[c2].d))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,c2] = res.x[0]
-            self.cameras[c1].vector2P_9(res.x[1:10])
-            self.cameras[c1].d = res.x[10:12]
-            self.cameras[c2].vector2P_9(res.x[12:21])
-            self.cameras[c2].d = res.x[21:23]
-
-            self.undistort_detections()
-            self.set_tracks()
-
-            self.traj[1:] = res.x[23:].reshape(3,-1)
-            
-            return res
-
-
-        def optimize_all_Rt(self):
-            
-            def error_fn(model):
-                self.beta[0,1:]  = model[:self.numCam-1]
-                for i in range(self.numCam):
-                    self.cameras[i].vector2Rt(model[self.numCam-1+i*6 : self.numCam-1+(i+1)*6])
-                self.set_tracks()
-
-                Track = self.tracks
-                X = np.vstack((self.traj[0], model[self.numCam-1+self.numCam*6:].reshape(3,-1)))
-
-                error = np.array([])
-                for i in range(self.numCam):
-                    cam_temp = self.cameras[i]
-
-                    inter,idx1,idx2 = np.intersect1d(X[0],Track[i][0],assume_unique=True,return_indices=True)
-                    X_temp = util.homogeneous(X[1:,idx1])
-                    x = Track[i][1:,idx2]
-                    x_repro = cam_temp.projectPoint(X_temp)
-                    err_x,err_y = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                    error = np.concatenate((error,err_x,err_y))
-                    if len(err_x) < len(self.traj[0]):
-                        error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x)))))
-
-                return error
-            
-            # before
-            model = self.beta[0,1:]
-            for i in range(self.numCam):
-                model = np.concatenate((model,self.cameras[i].Rt2vector()))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,1:]  = res.x[:self.numCam-1]
-            for i in range(self.numCam):
-                self.cameras[i].vector2Rt(res.x[self.numCam-1+i*6 : self.numCam-1+(i+1)*6])
-            self.set_tracks()
-            self.traj[1:] = res.x[self.numCam-1+self.numCam*6:].reshape(3,-1)
-
-            return res
-
-
-        def optimize_all_KRt(self):
-            
-            def error_fn(model):
-
-                self.beta[0,1:]  = model[:self.numCam-1]
-                for i in range(self.numCam):
-                    self.cameras[i].vector2P_9(model[self.numCam-1+i*9 : self.numCam-1+(i+1)*9])
-                self.set_tracks()
-
-                Track = self.tracks
-                X = np.vstack((self.traj[0], model[self.numCam-1+self.numCam*9:].reshape(3,-1)))
-
-                error = np.array([])
-                for i in range(self.numCam):
-                    cam_temp = self.cameras[i]
-
-                    inter,idx1,idx2 = np.intersect1d(X[0],Track[i][0],assume_unique=True,return_indices=True)
-                    X_temp = util.homogeneous(X[1:,idx1])
-                    x = Track[i][1:,idx2]
-                    x_repro = cam_temp.projectPoint(X_temp)
-                    err_x,err_y = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                    error = np.concatenate((error,err_x,err_y))
-                    if len(err_x) < len(self.traj[0]):
-                        error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x)))))
-
-                return error
-            
-            # before
-            model = self.beta[0,1:]
-            for i in range(self.numCam):
-                model = np.concatenate((model,self.cameras[i].P2vector_9()))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,1:]  = res.x[:self.numCam-1]
-            for i in range(self.numCam):
-                self.cameras[i].vector2P_9(res.x[self.numCam-1+i*9 : self.numCam-1+(i+1)*9])
-            self.set_tracks()
-            self.traj[1:] = res.x[self.numCam-1+self.numCam*9:].reshape(3,-1)
-
-            return res
-
-
-        def optimize_all_KRtd(self):
-            
-            def error_fn(model):
-
-                self.beta[0,1:]  = model[:self.numCam-1]
-                for i in range(self.numCam):
-                    self.cameras[i].vector2P_9(model[self.numCam-1+i*11 : self.numCam-1+i*11+9])
-                    self.cameras[i].d = model[self.numCam-1+i*11+9 : self.numCam-1+i*11+11]
-                self.undistort_detections()
-                self.set_tracks()
-
-                Track = self.tracks
-                X = np.vstack((self.traj[0], model[self.numCam-1+self.numCam*11:].reshape(3,-1)))
-
-                error = np.array([])
-                for i in range(self.numCam):
-                    cam_temp = self.cameras[i]
-
-                    inter,idx1,idx2 = np.intersect1d(X[0],Track[i][0],assume_unique=True,return_indices=True)
-                    X_temp = util.homogeneous(X[1:,idx1])
-                    x = Track[i][1:,idx2]
-                    x_repro = cam_temp.projectPoint(X_temp)
-                    err_x,err_y = abs(x[0]-x_repro[0]), abs(x[1]-x_repro[1])
-
-                    error = np.concatenate((error,err_x,err_y))
-                    if len(err_x) < len(self.traj[0]):
-                        error = np.concatenate((error,np.zeros(2*(len(self.traj[0])-len(err_x)))))
-
-                return error
-            
-            # before
-            model = self.beta[0,1:]
-            for i in range(self.numCam):
-                model = np.concatenate((model,self.cameras[i].P2vector_9()))
-                model = np.concatenate((model,self.cameras[i].d))
-            model = np.concatenate((model,np.ravel(self.traj[1:])))
-
-            # during
-            fn = lambda x: error_fn(x)
-            res = least_squares(fn,model)
-
-            # after
-            self.beta[0,1:]  = res.x[:self.numCam-1]
-            for i in range(self.numCam):
-                self.cameras[i].vector2P_9(res.x[self.numCam-1+i*11 : self.numCam-1+i*11+9])
-                self.cameras[i].d = res.x[self.numCam-1+i*11+9 : self.numCam-1+i*11+11]
-            self.undistort_detections()
-            self.set_tracks()
-            self.traj[1:] = res.x[self.numCam-1+self.numCam*11:].reshape(3,-1)
-
-            return res
-
                 
 class Camera:
     """ 
@@ -811,6 +407,8 @@ class Camera:
 
         if n==6:
             return np.concatenate((r,self.t))
+        elif n==8:
+            return np.concatenate((r,self.t,self.d))
         elif n==9:
             return np.concatenate((k,r,self.t))
         elif n==11:
@@ -825,6 +423,10 @@ class Camera:
         if n==6:
             self.R = cv2.Rodrigues(vector[:3])[0]
             self.t = vector[3:6]
+        elif n==8:
+            self.R = cv2.Rodrigues(vector[:3])[0]
+            self.t = vector[3:6]
+            self.d = vector[-2:]
         elif n==9:
             self.K = np.diag((1,1,1)).astype(float)
             self.K[0,0], self.K[1,1] = vector[0], vector[0]
@@ -843,82 +445,12 @@ class Camera:
         return self.P
 
 
-    def discard_fn(self):
-        '''
-        Functions that are not needed (for now) are stored here
-        '''
-
-        def P2vector_10(self):
-            k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
-            r = cv2.Rodrigues(self.R)[0]
-            return np.concatenate((k,r.reshape(-1,),self.t))
-
-            # r1,r2,r3 = util.rotation_decompose(self.R)
-            # return np.concatenate((k,np.array([r1,r2,r3]),self.t))
-
-        
-        def P2vector_9(self):
-            k = np.array([np.mean(self.K[0,0]+self.K[1,1]), self.K[0,2], self.K[1,2]])
-            r = cv2.Rodrigues(self.R)[0]
-            return np.concatenate((k,r.reshape(-1,),self.t))
-
-
-        def vector2P_10(self,vector):
-            self.K = np.diag((1,1,1)).astype(float)
-            self.K[0,0], self.K[1,1] = vector[0], vector[1]
-            self.K[:2,-1] = vector[2:4]
-            self.R = cv2.Rodrigues(vector[4:7])[0]
-            self.t = vector[7:]
-
-            self.compose()
-            return self.P
-
-
-        def vector2P_9(self,vector):
-            self.K = np.diag((1,1,1)).astype(float)
-            self.K[0,0], self.K[1,1] = vector[0], vector[0]
-            self.K[:2,-1] = vector[1:3]
-            self.R = cv2.Rodrigues(vector[3:6])[0]
-            self.t = vector[6:]
-
-            self.compose()
-            return self.P
-
-        
-        def Rt2vector(self):
-            r = cv2.Rodrigues(self.R)[0]
-            return np.concatenate((r.reshape(-1,),self.t))
-
-
-        def vector2Rt(self,vector):
-            self.R = cv2.Rodrigues(vector[:3])[0]
-            self.t = vector[3:]
-
-            self.compose()
-            return self.P
-
-
-class trackedObject:
-    """
-    Class that describes individual objects to be tracked
-
-    This class contains information about moving objects in the images, e.g. their 2D tracks, 3D trajectories etc.
-
-    Members
-    -------
-    imageTracks : list of lists of lists of int
-        All detections of given object in all cameras. The object can be tracked in more than one camera and have more than one continuous trajectory in each camera (when the object goes out of the cameras FOV or is occluded). The following should give a third continuous track in the second camera: 
-            imageTracks[1][2]
-        which itself is a list of tuples (frameId,x,y) where frameId is the id of the frame in which the object was detected at image coordinates x,y.
-    """
-
-    def __init__(self,num_cam):
-        self.num_cam = num_cam
-        self.imageTracks = [[] for j in range(num_cam)]
-
-
 def detect_undistort(d,cameras):
-    '''Use Opencv undistpoints'''
+    '''
+    Use Opencv undistpoints
+
+    Input detection has the form [frame_id, x, y]
+    '''
 
     detections = copy.deepcopy(d)
     for i in range(len(detections)):
@@ -946,14 +478,32 @@ def detect_spline_fitting(d,smooth):
 
 def detect_to_track(detections,beta):
 
+    # Track_all = [[] for i in range(len(detections))]
+    # idx_min = 0
+    # for i in range(len(detections)):
+    #     track = copy.deepcopy(detections[i])
+    #     track[0] -= track[0,0]
+
+    #     if i == 0:
+    #         Track_all[i] = track
+    #     else:
+    #         track_idx = track[0] - beta[i]
+    #         track[1] = util.spline_fitting(track[1],np.round(track_idx),track_idx,k=1,s=0)
+    #         track[2] = util.spline_fitting(track[2],np.round(track_idx),track_idx,k=1,s=0)
+    #         track[0] = np.round(track_idx)
+    #         Track_all[i] = track[:,1:-1]
+
+    #         if Track_all[i][0,0] < idx_min:
+    #             idx_min = Track_all[i][0,0]
+    # for i in Track_all:
+    #     i[0] = i[0] - idx_min
+
     Track_all = [[] for i in range(len(detections))]
-    idx_min = 0
     for i in range(len(detections)):
         track = copy.deepcopy(detections[i])
-        track[0] -= track[0,0]
-
         if i == 0:
             Track_all[i] = track
+            idx_min = track[0,0]
         else:
             track_idx = track[0] - beta[i]
             track[1] = util.spline_fitting(track[1],np.round(track_idx),track_idx,k=1,s=0)
@@ -969,31 +519,38 @@ def detect_to_track(detections,beta):
     return Track_all
 
 
-def jac_twoCam(N,K=False):
-
-    jac_X = np.zeros((4*N,3*N))
-    for i in range(N):
-        jac_X[(i,i+N,i+2*N,i+3*N),i*3:(i+1)*3] = 1
-
-    if K:
-        cam_param = 9
+def jac_twoCam(N,n_cam,M=0):
+    '''
+    N: number of points
+    n_cam: number of camera parameters
+    M: number of spline coefficients
+    '''
+    if M:
+        jac_X = np.ones((4*N,M))
     else:
-        cam_param = 6
+        jac_X = np.zeros((4*N,3*N))
+        for i in range(N):
+            jac_X[(i,i+N,i+2*N,i+3*N),i*3:(i+1)*3] = 1
 
-    jac_cam = np.zeros((4*N,2*cam_param))
-    jac_cam[:2*N,:cam_param] = 1
-    jac_cam[2*N:,cam_param:] = 1
+    jac_cam = np.zeros((4*N,2*n_cam))
+    jac_cam[:2*N,:n_cam] = 1
+    jac_cam[2*N:,n_cam:] = 1
 
     return np.hstack((jac_cam,jac_X))
 
 
-def optimze_two(c1,c2,x1,x2,X,include_K=False):
+def optimize_two(c1,c2,x1,x2,traj,spline=[],include_K=False,max_iter=10):
 
     def error_fn(model):
-        cam_param = int((len(model)-x1.shape[1]*3)/2)
-        c1.vector2P(model[:cam_param],n=n_cam)
-        c2.vector2P(model[cam_param:2*cam_param],n=n_cam)
-        X = model[2*cam_param:].reshape(-1,3).T
+        c1.vector2P(model[:n_cam],n=n_cam)
+        c2.vector2P(model[n_cam:2*n_cam],n=n_cam)
+
+        if len(spline):
+            spline[1] = model[2*n_cam:].reshape(3,-1)
+            x,y,z = interpolate.splev(traj[0],spline)
+            X = np.array([x,y,z])
+        else:
+            X = model[2*n_cam:].reshape(-1,3).T
 
         x_c1 = c1.projectPoint(util.homogeneous(X))
         x_c2 = c2.projectPoint(util.homogeneous(X))
@@ -1005,122 +562,175 @@ def optimze_two(c1,c2,x1,x2,X,include_K=False):
         n_cam = 9 
     else: 
         n_cam = 6
-    model = np.concatenate((c1.P2vector(n=n_cam),c2.P2vector(n=n_cam),np.ravel(X.T)))
+
+    if len(spline):
+        model = np.concatenate((c1.P2vector(n=n_cam),c2.P2vector(n=n_cam),np.ravel(spline[1])))
+        A = jac_twoCam(x1.shape[1],n_cam,spline[1].shape[1]*3)
+    else:
+        model = np.concatenate((c1.P2vector(n=n_cam),c2.P2vector(n=n_cam),np.ravel(traj[1:].T)))
+        A = jac_twoCam(x1.shape[1],n_cam)
 
     # During
-    bound_low  = np.ones(len(model))*-np.inf
-    bound_high = np.ones(len(model))*np.inf
-    A = jac_twoCam(x1.shape[1],K=include_K)
-
     fn = lambda x: error_fn(x)
-    res = least_squares(fn,model,bounds=(bound_low,bound_high),jac_sparsity=A)
+    res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=max_iter)
 
     # After
-    cam_param = int((len(model)-x1.shape[1]*3)/2)
-    c1.vector2P(res.x[:cam_param],n=n_cam)
-    c2.vector2P(res.x[cam_param:2*cam_param],n=n_cam)
-    X = res.x[2*cam_param:].reshape(-1,3).T
+    c1.vector2P(res.x[:n_cam],n=n_cam)
+    c2.vector2P(res.x[n_cam:2*n_cam],n=n_cam)
+    if len(spline):
+        spline[1] = res.x[2*n_cam:].reshape(3,-1)
+        x,y,z = interpolate.splev(traj[0],spline)
+        traj[1:] = np.array([x,y,z])
+        return res,[c1,c2,traj,spline]
+    else:
+        traj[1:] = res.x[2*n_cam:].reshape(-1,3).T
+        return res,[c1,c2,traj]
 
-    return res,[c1,c2,X]
 
-
-def jac_allCam(v,n):
+def jac_allCam(v,n_cam,M=0,beta=[]):
     num_cam, num_point = v.shape[0], v.shape[1]
 
-    jac_X = np.zeros((num_point*2,num_point*3))
-    for i in range(num_point):
-        jac_X[(i,i+num_point),i*3:(i+1)*3] = 1
-    
-    jac = np.empty(())
-    for i in range(num_cam):
-        jac_cam_i = np.zeros((num_point*2,num_cam*n))
-        jac_cam_i[:,i*n:(i+1)*n] = 1
+    # 3D points or spline parameters
+    if M:
+        jac_X = np.ones((num_cam*num_point*2,M))
+    else:
+        jac_X_i = np.zeros((num_point*2,num_point*3))
+        for i in range(num_point):
+            jac_X_i[(i,i+num_point),i*3:(i+1)*3] = 1
+        jac_X = np.tile(jac_X_i,(num_cam,1))
 
-        jac_i = np.hstack((jac_cam_i,jac_X))
+    # camera
+    jac_cam = np.zeros((num_cam*num_point*2,num_cam*n_cam))
+    for i in range(num_cam):
+        jac_cam[i*num_point*2:(i+1)*num_point*2, i*n_cam:(i+1)*n_cam] = 1
+
+    # beta
+    if len(beta):
+        assert len(beta)==num_cam, 'The length of beta vector should equal the number of cams'
+
+        jac_beta = np.zeros((num_cam*num_point*2,num_cam))
+        for i in range(1,num_cam):
+            jac_beta[i*num_point*2:(i+1)*num_point*2,i] = 1
+
+        jac = np.concatenate((jac_beta,jac_cam,jac_X),axis=1)
+    else:
+        jac = np.concatenate((jac_cam,jac_X),axis=1)
+
+
+    # remove those that are not visible
+    for i in range(num_cam):
         for j in range(num_point):
             if v[i,j] == 0:
-                jac_i[(j,j+num_point),:] = 0
-
-        if i == 0:
-            jac = jac_i
-        else:
-            jac = np.vstack((jac,jac_i))
+                jac[(i*num_point*2+j,i*num_point*2+num_point+j),:] = 0
 
     return jac
 
 
-def optimize_all(cams,tracks,traj,v,include_K=False):
+def optimize_all(cams,tracks,traj,v,spline,include_K=False,max_iter=10,distortion=False,beta=[]):
 
-    def error_fn(model):
+    def error_fn(model,Tracks):
 
-        error = np.array([])
-        traj[1:] = model[num_Cam*n_cam:].reshape(-1,3).T
+        # Decode camera
         for i in range(num_Cam):
-            cams[i].vector2P(model[i*n_cam:(i+1)*n_cam],n=n_cam)
-            
-            inter,idx1,idx2 = np.intersect1d(traj[0],tracks[i][0],assume_unique=True,return_indices=True)
+            if len(beta):
+                cams[i].vector2P(model[num_Cam+i*n_cam:num_Cam+(i+1)*n_cam],n=n_cam)
+            else:
+                cams[i].vector2P(model[i*n_cam:(i+1)*n_cam],n=n_cam)
+
+        # Decode x and X
+        if len(beta):
+            if distortion:
+                Tracks = detect_undistort(Tracks,cams)
+            Tracks = detect_to_track(Tracks,model[:num_Cam])
+            if len(spline):
+                spline[1] = model[num_Cam+num_Cam*n_cam:].reshape(3,-1)
+                x,y,z = interpolate.splev(traj[0],spline)
+                traj[1:] = np.array([x,y,z])
+            else:
+                traj[1:] = model[num_Cam+num_Cam*n_cam:].reshape(-1,3).T
+        else:
+            if len(spline):
+                spline[1] = model[num_Cam*n_cam:].reshape(3,-1)
+                x,y,z = interpolate.splev(traj[0],spline)
+                traj[1:] = np.array([x,y,z])
+            else:
+                traj[1:] = model[num_Cam*n_cam:].reshape(-1,3).T
+
+        # Compute error
+        error = np.array([])
+        for i in range(num_Cam):
+            inter,idx1,idx2 = np.intersect1d(traj[0],Tracks[i][0],assume_unique=True,return_indices=True)
             X_temp = util.homogeneous(traj[1:,idx1])
-            x = tracks[i][1:,idx2]
+            x = Tracks[i][1:,idx2]
             x_repro = cams[i].projectPoint(X_temp)
 
-            error_temp = np.array([abs(x_repro[0]-x[0]),abs(x_repro[1]-x[1])])
             error_cam_i = np.zeros(num_Point*2)
-            for j in range(len(inter)):
-                error_cam_i[int(idx1[j])],error_cam_i[int(idx1[j])+num_Point] = error_temp[0,j], error_temp[1,j]
+            error_cam_i[idx1],error_cam_i[idx1+num_Point] = abs(x_repro[0]-x[0]),abs(x_repro[1]-x[1])
 
             error = np.concatenate((error,error_cam_i))
         return error
     
     # before
-    if include_K: 
-        n_cam = 9 
-    else: 
-        n_cam = 6
+    n_cam = 6
+    if include_K:  n_cam += 3
+    if distortion: n_cam += 2
     num_Cam, num_Point = len(cams), traj.shape[1]
 
-    model = np.array([])
+    # Set beta
+    if len(beta):
+        assert len(beta)==num_Cam, 'The length of beta vector should equal the number of cams'
+        model = beta
+    else:
+        model = np.array([])
+    
+    # Set cameras
     for i in cams:
         model = np.concatenate((model,i.P2vector(n=n_cam)))
-    model = np.concatenate((model,np.ravel(traj[1:].T)))
+    
+    # Set 3D points or spline and Jacobian
+    if len(spline):
+        model = np.concatenate((model,np.ravel(spline[1])))
+        A = jac_allCam(v,n_cam,spline[1].shape[1]*3,beta=beta)
+    else:
+        model = np.concatenate((model,np.ravel(traj[1:].T)))
+        A = jac_allCam(v,n_cam,beta=beta)
 
     # During
-    A = jac_allCam(v,n_cam)
-    fn = lambda x: error_fn(x)
-    res = least_squares(fn,model,jac_sparsity=A)
+    fn = lambda x: error_fn(x,tracks)
+    res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=max_iter)
 
     # After
-    for i in range(num_Cam):
-        cams[i].vector2P(res.x[i*n_cam:(i+1)*n_cam],n=n_cam)
-    traj[1:] = res.x[num_Cam*n_cam:].reshape(-1,3).T
-
-    return res,[cams,traj]
-
-
-def test_two():
-    pass
-
-
-def test_all():
-    pass
+    if len(beta):
+        beta = res.x[:num_Cam]
+        for i in range(num_Cam):
+            cams[i].vector2P(res.x[num_Cam+i*n_cam:num_Cam+(i+1)*n_cam],n=n_cam)
+        if len(spline):
+            spline[1] = res.x[num_Cam+num_Cam*n_cam:].reshape(3,-1)
+            x,y,z = interpolate.splev(traj[0],spline)
+            traj[1:] = np.array([x,y,z])
+            return res,[beta,cams,traj,spline]
+        else:
+            traj[1:] = res.x[num_Cam+num_Cam*n_cam:].reshape(-1,3).T
+            return res,[beta,cams,traj]
+    else:
+        for i in range(num_Cam):
+            cams[i].vector2P(res.x[i*n_cam:(i+1)*n_cam],n=n_cam)
+        if len(spline):
+            spline[1] = res.x[num_Cam*n_cam:].reshape(3,-1)
+            x,y,z = interpolate.splev(traj[0],spline)
+            traj[1:] = np.array([x,y,z])
+            return res,[cams,traj,spline]
+        else:
+            traj[1:] = res.x[num_Cam*n_cam:].reshape(-1,3).T
+            return res,[cams,traj]
 
 
 if __name__ == "__main__":
 
-    '''
-    Parameters:
-
-    1. detection in int or float
-    2. undistort images or not
-    3. Using spline or not
-    4. triangulate all points or not
-    5. loss function mean or not
-
-    '''
-
     # Load previous scene..
-    # with open('./data/jobs/EF_KRt/optimization_before_E_KRt.pkl', 'rb') as file:
+    # with open('./data/jobs/EF_KRt_3cams/optimization_after_F_Rt.pkl', 'rb') as file:
     #     f1 = pickle.load(file)
-    # with open('./data/jobs/EF_KRt/optimization_after_E_KRt.pkl', 'rb') as file:
+    # with open('./data/jobs/EF_KRt_3cams/optimization_after_E_Rt.pkl', 'rb') as file:
     #     f2 = pickle.load(file)
 
     # New scene
@@ -1150,83 +760,139 @@ if __name__ == "__main__":
 
     # Initialize spline for detections, decide whether using it
     flight.init_spline()
-    use_spline = False
 
     # Compute beta for every pair of cameras
     flight.beta = np.array([[0,-81.74,-31.73],[81.74,0,52.25],[31.73,-52.25,0]])
-    # flight.compute_beta(spline=use_spline,threshold_error=2)
+    # flight.compute_beta(threshold_error=2)
     # print('\n',flight.beta,'\n')
 
     # Sort detections in temporal order
     flight.set_sequence()
 
     # create tracks according to beta
-    flight.set_tracks(spline=use_spline)
+    flight.set_tracks()
+
+    # Set parameters for initial triangulation through external parsing
+    parser = argparse.ArgumentParser(description="Decide whether E or F used and K optimized or not")
+    parser.add_argument('-e','-E',help='use E instead of F',action="store_false")
+    parser.add_argument('-k','-K',help='Disable optimizing calibration matrix',action="store_false")
+    parser.add_argument('-d','-D',help='Disable optimizing radial distortions',action="store_false")
+    parser.add_argument('-b','-B',help='Disable optimizing time shifts',action="store_false")
+    parser.add_argument('-m','-M',help='Set maximal iteration number for optimization, default is 10',default=10)
+    args = vars(parser.parse_args())
+    use_F, include_K, include_d, include_b, max_iter = args['e'], args['k'], args['d'], args['b'], args['m']
+
+    # Set parameters manually
+    use_F = True
+    include_K = True
+    include_d = True
+    include_b = True
+    max_iter = 10
+    use_spline = True
+    smooth_factor = 0.01
+
+    if use_F:
+        E_or_F = 'F'
+        error_epip = 25
+        error_PnP  = 50
+    else:
+        E_or_F = 'E'
+        error_epip = 0.006
+        error_PnP  = 10
+
+    if include_K:
+        K_not = ''
+        K_or = '_K'
+    else:
+        K_not = ' not'
+        K_or = '_'
+
+    print('\nCurrently using '+E_or_F+', K is'+K_not+' optimized')
+    print('Threshold for Epipolar:{}, Threshold for PnP:{}'.format(error_epip,error_PnP))
 
     # Initialize the first 3D trajectory
-    use_F = False
-    include_K = True
-    if use_F:
-        error = 25
-    else:
-        error = 0.006
-    print('\nCurrently using Fundamental matrix:{}, threshold:{}, K is optimized:{}\n'.format(use_F,error,include_K))
-    idx1, idx2 = flight.init_traj(error=error,F=use_F,inlier_only=True)
+    idx1, idx2 = flight.init_traj(error=error_epip,F=use_F,inlier_only=True)
 
+    # Compute spline parameters and smooth the trajectory
+    if use_spline:
+        flight.fit_spline(s=smooth_factor)
+    else:
+        flight.spline = []
 
 
     '''----------------Optimization----------------'''
     start=datetime.now()
 
+    print('\nBefore optimization:')
     flight.error_cam(0)
     flight.error_cam(2)
+    flight_before = copy.deepcopy(flight)
 
-    '''Optimizate two'''
-    res, model = optimze_two(flight.cameras[0],flight.cameras[2],flight.tracks[0][1:,idx1],
-                           flight.tracks[2][1:,idx2],flight.traj[1:],include_K=include_K)
-    flight.cameras[0],flight.cameras[2],flight.traj[1:] = model[0], model[1], model[2]
-
-    print('\nTime: ',datetime.now()-start)
-
-    # Get camera poses by solving PnP
-    flight.get_camera_pose(flight.sequence[2],error=10)
+    '''Optimize two'''
+    res, model = optimize_two(flight.cameras[0],flight.cameras[2],flight.tracks[0][1:,idx1],
+                        flight.tracks[2][1:,idx2],flight.traj,flight.spline,include_K=include_K,max_iter=max_iter)
+    flight.cameras[0],flight.cameras[2],flight.traj = model[0], model[1], model[2]
+    if use_spline:
+        flight.spline = model[3]
 
     # Check reprojection error
+    print('\nAfter optimizating first two cameras:')
     flight.error_cam(0)
-    flight.error_cam(1)
     flight.error_cam(2)
+
+    print('\nTime: {}\n'.format(datetime.now()-start))
+
+    '''Add camera'''
+    flight.get_camera_pose(flight.sequence[2],error=error_PnP)
+    flight.error_cam(1)
 
     # Triangulate more points if possible
     flight.triangulate_traj(0,2)
     flight.triangulate_traj(1,2)
 
+    # Fit spline again if needed
+    if use_spline:
+        flight.fit_spline(s=smooth_factor)
     flight.error_cam(1)
 
     # Define visibility
     flight.set_visibility()
 
-    '''Optimizate all'''
-    flight_before = copy.deepcopy(flight)
+    '''Optimize all'''
+    # Before BA: set parameters
+    if include_b:
+        beta = flight.beta[0]
+        if include_d:
+            Track = flight.detections
+        else:
+            Track = flight.detections_undist
+    else:
+        include_d = False
+        beta = []
+        Track = flight.tracks
 
-    with open('./data/optimization_before_E_KRt.pkl', 'wb') as f:
-        pickle.dump(flight, f)
+    # BA
+    res, model = optimize_all(flight.cameras,Track,flight.traj,flight.visible,flight.spline,include_K=include_K,
+                            max_iter=max_iter,distortion=include_d,beta=beta)
 
-    res, model = optimize_all(flight.cameras,flight.tracks,flight.traj,flight.visible,include_K=include_K)
-    flight.cameras, flight.traj = model[0], model[1]
+    # After BA: interpret results
+    if include_b:
+        flight.beta[0], flight.cameras, flight.traj = model[0], model[1], model[2]
+    else:
+        flight.cameras, flight.traj = model[0], model[1]
+
+    if use_spline:
+        flight.spline = model[-1]
+
+    flight.undistort_detections(apply=True)
+    flight.set_tracks()
 
     # Check reprojection error
+    print('\nAfter optimazing all cameras, beta:{}, d:{}'.format(include_b,include_d))
     flight.error_cam(0)
     flight.error_cam(1)
     flight.error_cam(2)
-    
-    # # Visualize the 3D trajectory
-    # vis.show_trajectory_3D(flight.traj[1:],line=False)
-    # vis.show_trajectory_2D(flight.tracks[0][1:],flight.cameras[0].projectPoint(util.homogeneous(flight.traj[1:])))
-    # vis.show_trajectory_2D(flight.tracks[2][1:],flight.cameras[2].projectPoint(util.homogeneous(flight.traj[1:])))
 
-    with open('./data/optimization_after_E_KRt.pkl', 'wb') as f:
-        pickle.dump(flight, f)
-
-    print('\nTime: ',datetime.now()-start)
+    print('\nTime: {}\n'.format(datetime.now()-start))
 
     print('\nFinished')
