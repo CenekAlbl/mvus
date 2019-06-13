@@ -140,7 +140,12 @@ class Scene:
         if len(arg):
             self.sequence = arg[0]
         else:
-            self.sequence = self.beta[0].argsort()[::-1]
+            # self.sequence = self.beta[0].argsort()[::-1]
+            
+            a = np.array([self.tracks[0][0,0]])
+            for i in range(1,self.numCam):
+                a = np.append(a,self.tracks[i][0,0])
+            self.sequence = a.argsort()
 
 
     def set_tracks(self,auto=True,*beta,spline=False):
@@ -766,11 +771,11 @@ if __name__ == "__main__":
     # flight.compute_beta(threshold_error=2)
     # print('\n',flight.beta,'\n')
 
-    # Sort detections in temporal order
-    flight.set_sequence()
-
     # create tracks according to beta
     flight.set_tracks()
+
+    # Sort detections in temporal order
+    flight.set_sequence()
 
     # Set parameters for initial triangulation through external parsing
     parser = argparse.ArgumentParser(description="Decide whether E or F used and K optimized or not")

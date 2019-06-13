@@ -16,22 +16,26 @@ from scipy import interpolate
 
 '''----------------Previous results----------------'''
 # Load ground truth 
-gt = np.loadtxt('./data/fixposition/fixposition_1_xyz.txt').T
+gt = np.loadtxt('./data/fixposition/fixposition_2_xyz.txt').T
 
 # Load previous computed flight
-with open('./data/fixposition/flight_1.pkl', 'rb') as file:
+with open('./data/fixposition/flight_2.pkl', 'rb') as file:
     flight_pre = pickle.load(file)
 
+# Load previous computed flight with only 3 cameras
+with open('./data/fixposition/flight_2_3cam.pkl', 'rb') as file:
+    flight_pre_b = pickle.load(file)
+
 # Resample trajectories
-traj_1 = flight_pre.traj[1:,642:]
-traj_2 = gt[:,3623:4048]
+traj_1 = flight_pre.traj[1:,413:]
+traj_2 = gt[:,965:1505]
 
 tck,u = interpolate.splprep(traj_1,u=np.arange(traj_1.shape[1]),s=0,k=1)
 x,y,z = interpolate.splev(np.linspace(u[0],u[-1],traj_2.shape[1]),tck)
 traj_3 = np.array([x,y,z])
 
 # Estimate a similarity transformation to align trajectories
-M = transformation.affine_matrix_from_points(traj_3,traj_2,shear=False)
+M = transformation.affine_matrix_from_points(traj_3,traj_2,shear=False,scale=True)
 traj_4 = np.dot(M,util.homogeneous(traj_3))
 traj_4 /= traj_4[-1]
 
@@ -41,8 +45,8 @@ error = np.sqrt((traj_2[0]-traj_4[0])**2 + (traj_2[1]-traj_4[1])**2 + (traj_2[2]
 print('Mean error between transformed reconstruction and GPS data: {:.3f}, unit is meter.'.format(np.mean(error)))
 
 # Visualization
-vis.show_trajectory_3D(traj_1,traj_2,line=False,title='Raw Reconstruction vs GPS (1st flight)')
-vis.show_trajectory_3D(traj_4,traj_2,line=False,title='Reconstruction downsampled and transformed(similarity) vs GPS (1st flight)')
+vis.show_trajectory_3D(traj_1,traj_2,line=False,title='Raw Reconstruction vs GPS (2nd flight)')
+vis.show_trajectory_3D(traj_4,traj_2,line=False,title='Reconstruction downsampled and transformed(similarity) vs GPS (2nd flight)')
 
 
 '''---------------New computation----------------'''
@@ -57,10 +61,10 @@ d1, d2, d3, d4 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion']
 cameras = [common.Camera(K=K1,d=d1), common.Camera(K=K2,d=d2), common.Camera(K=K3,d=d3), common.Camera(K=K4,d=d4)]
 
 # Load detections
-detect_1 = np.loadtxt('./data/fixposition/detections/c1_f1.txt',usecols=(2,0,1)).T
-detect_2 = np.loadtxt('./data/fixposition/detections/c2_f1.txt',usecols=(2,0,1)).T
-detect_3 = np.loadtxt('./data/fixposition/detections/c3_f1.txt',usecols=(2,0,1)).T
-detect_4 = np.loadtxt('./data/fixposition/detections/c4_f1.txt',usecols=(2,0,1)).T
+detect_1 = np.loadtxt('./data/fixposition/detections/c1_f2.txt',usecols=(2,0,1)).T
+detect_2 = np.loadtxt('./data/fixposition/detections/c2_f2.txt',usecols=(2,0,1)).T
+detect_3 = np.loadtxt('./data/fixposition/detections/c3_f2.txt',usecols=(2,0,1)).T
+detect_4 = np.loadtxt('./data/fixposition/detections/c4_f2.txt',usecols=(2,0,1)).T
 
 # Create a scene
 flight = common.Scene()
@@ -71,10 +75,10 @@ flight.addDetection(detect_1, detect_2, detect_3, detect_4)
 flight.undistort_detections(apply=True)
 
 # Compute beta for every pair of cameras
-flight.beta = np.array([[0,-42,-574.4,-76.4],
-                        [42,0,-532.4,-34.4],
-                        [574.4,532.4,0,498],
-                        [76.4,34.4,498,0]])
+flight.beta = np.array([[0,     692,    794.8,      388.6],
+                        [-692   ,0,     102.8,      -303.4],
+                        [-794.8,-102.8, 0,          -406.2],
+                        [-388.6,303.4,  406.2,        0]])
 # flight.compute_beta(threshold_error=2)
 
 # create tracks according to beta
@@ -82,7 +86,7 @@ flight.set_tracks()
 
 # Sort detections in temporal order
 flight.set_sequence()
-flight.set_sequence([0,1,3,2])
+flight.set_sequence([0,3,2,1])
 
 # Set parameters manually
 use_F = True
@@ -95,8 +99,8 @@ smooth_factor = 0.005
 
 if use_F:
     E_or_F = 'F'
-    error_epip = 60
-    error_PnP  = 100
+    error_epip = 30
+    error_PnP  = 10
 else:
     E_or_F = 'E'
     error_epip = 0.01
@@ -116,7 +120,7 @@ else:
 start=datetime.now()
 
 # Record settings
-print('\nCurrently using F for the initial pair, K is optimized, beta and d are optimized, spline applied')
+print('\nCurrently using F for the initial pair, K is optimized, beta and d are optimized, spline not applied')
 print('Threshold for Epipolar:{}, Threshold for PnP:{}'.format(error_epip,error_PnP))
 
 print('\nBefore optimization:')
@@ -264,7 +268,7 @@ flight.error_cam(f4)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 
-# with open('./data/fixposition/flight_1.pkl','wb') as f:
+# with open('./data/fixposition/flight_2.pkl','wb') as f:
 #     pickle.dump(flight, f)
 
 print('Finished')

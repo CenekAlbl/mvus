@@ -108,7 +108,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
 
 
 def show_trajectory_2D(*x,title=None,color=True,line=True,text=False):
-
+    plt.figure(figsize=(12, 10))
     num = len(x)
     for i in range(num):
         plt.subplot(1,num,i+1)
@@ -131,7 +131,7 @@ def show_trajectory_2D(*x,title=None,color=True,line=True,text=False):
 
 
 def show_trajectory_3D(*X,title=None,color=True,line=True):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(12, 10))
     num = len(X)
     for i in range(num):
         ax = fig.add_subplot(1,num,i+1,projection='3d')
