@@ -1,6 +1,8 @@
 import math
 import numpy as np
 from scipy.interpolate import UnivariateSpline
+import transformation
+import ransac
 
 
 def mapminmax(x,ymin,ymax):
@@ -131,6 +133,25 @@ def umeyama(src, dst, estimate_scale):
     T[:dim, :dim] *= scale
 
     return T
+
+
+def sim_tran(src, dst, thres=0.5):
+
+    def model_fn(data,param):
+        x, y = data[:3], data[3:]
+        M = transformation.affine_matrix_from_points(x,y,shear=False)
+        return M.ravel()
+    
+    def error_fn(model,data,param):
+        x, y = data[:3], data[3:]
+        M = model.reshape((4,4))
+        y_t = np.dot(M,homogeneous(x))
+        y_t /= y_t[-1]
+        return np.sqrt((y[0]-y_t[0])**2+(y[1]-y_t[1])**2+(y[2]-y_t[2])**2)
+
+    Data = np.vstack((src,dst))
+    return ransac.vanillaRansac(model_fn,error_fn,Data,10,thres,500)
+
 
 
 if __name__ == "__main__":

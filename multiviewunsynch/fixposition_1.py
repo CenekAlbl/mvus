@@ -22,9 +22,55 @@ gt = np.loadtxt('./data/fixposition/fixposition_1_xyz.txt').T
 with open('./data/fixposition/flight_1.pkl', 'rb') as file:
     flight_pre = pickle.load(file)
 
-# Resample trajectories
+# Load previous computed flight 30
+with open('./data/fixposition/flight_1_30.pkl', 'rb') as file:
+    flight_pre = pickle.load(file)
+
+
+'''----Dense sample----'''
+m = 10
 traj_1 = flight_pre.traj[1:,642:]
-traj_2 = gt[:,3623:4048]
+traj_1_raw = traj_1
+traj_2 = gt[:,3630:4040]
+
+tck,u = interpolate.splprep(traj_1,u=np.arange(traj_1.shape[1]),s=0,k=1)
+idx_1 = np.linspace(u[0],u[-1],traj_1.shape[1]*m)
+x,y,z = interpolate.splev(idx_1,tck)
+traj_1 = np.array([x,y,z])
+
+idx_2 = np.arange(0,6*m*traj_2.shape[1],6*m)
+error_min = 100
+
+for i in range(traj_1.shape[1]-idx_2[-1]-1):
+    idx_3 = idx_1[idx_2+i]
+    x,y,z = interpolate.splev(idx_3,tck)
+    traj_3 = np.array([x,y,z])
+
+    # Estimate a similarity transformation to align trajectories
+    M = transformation.affine_matrix_from_points(traj_3,traj_2,shear=False,scale=True)
+    traj_4 = np.dot(M,util.homogeneous(traj_3))
+    traj_4 /= traj_4[-1]
+
+    # Evaluation
+    scale, shear, angles, translate, perspective = transformation.decompose_matrix(M)
+    error = np.sqrt((traj_2[0]-traj_4[0])**2 + (traj_2[1]-traj_4[1])**2 + (traj_2[2]-traj_4[2])**2)
+    if np.mean(error) < error_min:
+        error_min = np.mean(error)
+        k = i
+        M_best = M
+        traj_4_best = traj_4
+
+print('Mean error between transformed reconstruction and GPS data: {:.5f}, unit is meter.'.format(error_min))
+# vis.show_trajectory_3D(traj_1_raw,traj_2,line=False,title='Raw Reconstruction vs GPS (1st flight)')
+# vis.show_trajectory_3D(traj_4_best,traj_2,line=False,title='Reconstruction downsampled and transformed(similarity) vs GPS (1st flight)')
+
+
+'''----Normal sample----'''
+# Resample trajectories
+# flight_1:     642,(3623,4048)
+# flight_1_30:  649,(3622,4048)
+traj_1 = flight_pre.traj[1:,649:]
+traj_2 = gt[:,3622:4048]
 
 tck,u = interpolate.splprep(traj_1,u=np.arange(traj_1.shape[1]),s=0,k=1)
 x,y,z = interpolate.splev(np.linspace(u[0],u[-1],traj_2.shape[1]),tck)
@@ -38,7 +84,8 @@ traj_4 /= traj_4[-1]
 # Evaluation
 scale, shear, angles, translate, perspective = transformation.decompose_matrix(M)
 error = np.sqrt((traj_2[0]-traj_4[0])**2 + (traj_2[1]-traj_4[1])**2 + (traj_2[2]-traj_4[2])**2)
-print('Mean error between transformed reconstruction and GPS data: {:.3f}, unit is meter.'.format(np.mean(error)))
+error_x,error_y,error_z = np.sqrt((traj_2[0]-traj_4[0])**2), np.sqrt((traj_2[1]-traj_4[1])**2), np.sqrt((traj_2[2]-traj_4[2])**2)
+print('Mean error between transformed reconstruction and GPS data: {:.5f}, unit is meter.'.format(np.mean(error)))
 
 # Visualization
 vis.show_trajectory_3D(traj_1,traj_2,line=False,title='Raw Reconstruction vs GPS (1st flight)')
@@ -57,8 +104,8 @@ d1, d2, d3, d4 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion']
 cameras = [common.Camera(K=K1,d=d1), common.Camera(K=K2,d=d2), common.Camera(K=K3,d=d3), common.Camera(K=K4,d=d4)]
 
 # Load detections
-detect_1 = np.loadtxt('./data/fixposition/detections/c1_f1.txt',usecols=(2,0,1)).T
-detect_2 = np.loadtxt('./data/fixposition/detections/c2_f1.txt',usecols=(2,0,1)).T
+detect_1 = np.loadtxt('./data/fixposition/detections/c1_f1_30.txt',usecols=(2,0,1)).T
+detect_2 = np.loadtxt('./data/fixposition/detections/c2_f1_30.txt',usecols=(2,0,1)).T
 detect_3 = np.loadtxt('./data/fixposition/detections/c3_f1.txt',usecols=(2,0,1)).T
 detect_4 = np.loadtxt('./data/fixposition/detections/c4_f1.txt',usecols=(2,0,1)).T
 
@@ -96,11 +143,11 @@ smooth_factor = 0.005
 if use_F:
     E_or_F = 'F'
     error_epip = 60
-    error_PnP  = 100
+    error_PnP  = 80
 else:
     E_or_F = 'E'
-    error_epip = 0.01
-    error_PnP  = 10
+    error_epip = 0.1
+    error_PnP  = 30
 
 # Initialize the first 3D trajectory
 idx1, idx2 = flight.init_traj(error=error_epip,F=use_F,inlier_only=True)
@@ -116,7 +163,7 @@ else:
 start=datetime.now()
 
 # Record settings
-print('\nCurrently using F for the initial pair, K is optimized, beta and d are optimized, spline applied')
+print('\nCurrently using E for the initial pair, K is optimized, beta and d are optimized, spline not applied')
 print('Threshold for Epipolar:{}, Threshold for PnP:{}'.format(error_epip,error_PnP))
 
 print('\nBefore optimization:')
