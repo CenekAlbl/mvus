@@ -137,6 +137,7 @@ def show_trajectory_3D(*X,title=None,color=True,line=True):
         ax = fig.add_subplot(1,num,i+1,projection='3d')
         
         if color:
+            # ax.scatter3D(X[i][0],X[i][1],X[i][2],c='r')
             ax.scatter3D(X[i][0],X[i][1],X[i][2],c=np.arange(X[i].shape[1])*color)
         else:
             ax.scatter3D(X[i][0],X[i][1],X[i][2])
@@ -147,6 +148,71 @@ def show_trajectory_3D(*X,title=None,color=True,line=True):
         plt.ylabel('Y')
     if title:
         plt.suptitle(title)
+    # plt.axis('off')
+    plt.show()
+
+
+def show_2D_all(*x,title=None,color=True,line=True,text=False):
+    plt.figure(figsize=(12, 10))
+    num = len(x)
+    for i in range(num):
+        # plt.subplot(1,num,i+1)
+
+        c = ['r','b']
+        plt.scatter(x[i][0],x[i][1],c=c[i])
+        # plt.scatter(x[i][0],x[i][1],c=np.arange(x[i].shape[1])*color)
+        if line:
+            plt.plot(x[i][0],x[i][1])
+        if text:
+            for j in range(len(x[i][0])):
+                plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
+
+        # plt.gca().set_xlim([0,1920])
+        # plt.gca().set_ylim([0,1080])
+        # plt.gca().invert_yaxis()
+
+        plt.xlabel('X')
+        plt.ylabel('Y')
+    if title:
+        plt.suptitle(title)
+    plt.show()
+
+
+def show_3D_all(*X,title=None,color=True,line=True):
+    fig = plt.figure(figsize=(20, 15))
+    num = len(X)
+    ax = fig.add_subplot(111,projection='3d')
+
+    for i in range(num):
+        if color:
+            c = ['r','g']
+            m = ['o','x']
+            label = ['RTK ground truth', 'Reconstruction Spline']
+            if i is 0:
+                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker='o',label=label[i])
+            else:
+                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker=m[i],label=label[i])
+                ax.plot(X[i][0],X[i][1],X[i][2],c=c[i])
+
+        else:
+            ax.scatter3D(X[i][0],X[i][1],X[i][2])
+
+        if line:
+            ax.plot(X[i][0],X[i][1],X[i][2])
+        plt.xlabel('X')
+        plt.ylabel('Y')
+    if title:
+        plt.suptitle(title)
+    
+    ax.set_xlabel('East [m]',fontsize=20)
+    ax.set_ylabel('North [m]',fontsize=20)
+    ax.set_zlabel('Up [m]',fontsize=20)
+
+    ax.view_init(elev=30,azim=-50)
+    lgnd = ax.legend(loc=1, prop={'size': 30})
+    for handle in lgnd.legendHandles:
+        handle.set_sizes([100])
+    # plt.axis('off')
     plt.show()
 
 

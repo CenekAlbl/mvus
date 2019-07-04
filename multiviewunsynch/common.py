@@ -847,6 +847,8 @@ if __name__ == "__main__":
 
     print('\nTime: {}\n'.format(datetime.now()-start))
 
+    vis.show_trajectory_3D(flight.traj[1:],color=False)
+
     '''Add camera'''
     flight.get_camera_pose(flight.sequence[2],error=error_PnP)
     flight.error_cam(1)

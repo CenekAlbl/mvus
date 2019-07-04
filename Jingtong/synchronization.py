@@ -5,6 +5,7 @@ import epipolar as ep
 import video
 import ransac
 import cv2
+import argparse
 from datetime import datetime
 import visualization as vis
 from matplotlib import pyplot as plt
@@ -301,7 +302,7 @@ def iter_sync(x1,x2,param,it_max=100,p_min=0,p_max=8,threshold=1,maxiter=500,loR
         print('d={}'.format(param['d']))
 
 
-def search_sync(x1,x2,param,d_min=-10,d_max=10,threshold1=10,threshold2=1,maxiter=500,loRansac=False):
+def search_sync(x1,x2,param,d_min=-10,d_max=10,threshold1=10,threshold2=1,maxiter=300,loRansac=False):
 
     # Brute-force running for different interpolation d
     inliers = 0
@@ -422,7 +423,7 @@ if __name__ == "__main__":
     img2 = Camera["img2"]
 
     # show 3D trajectory
-    vis.show_trajectory_3D(X)
+    # vis.show_trajectory_3D(X)
 
 
     '''Verify beta'''
@@ -453,17 +454,24 @@ if __name__ == "__main__":
     ################ 3. Solver for Beta and F, set d, test different Beta ################
     start=datetime.now()
 
+    # Set parameters for initial triangulation through external parsing
+    parser = argparse.ArgumentParser(description="Performance of solver")
+    parser.add_argument('-d',help='Choose interpolation distance',default=1,type=int)
+    parser.add_argument('-i',help='Iteration for a single d',default=10,type=int)
+    parser.add_argument('-s',help='step of d',default=3,type=int)
+    args = vars(parser.parse_args())
+
     # parameters
-    beta_min = -50
-    beta_max = 50
-    beta_step = 3
-    maxiter = 500
+    beta_min = -54
+    beta_max = 55
+    beta_step = args['s']
+    maxiter = 300
     threshold = 5
     LoRansac = False
-    param = {'d':16, 'k':1, 's':0}
+    param = {'d':args['d'], 'k':1, 's':0}
 
     # Set number of iterations and whether to show individual results in each run
-    it_max = 10
+    it_max = args['i']
     show_single = False
 
     # Start computing...
@@ -484,6 +492,9 @@ if __name__ == "__main__":
             else:
                 s1 = s1[:,-int(beta[i]):]
                 s2 = x2[:,-int(beta[i]):]
+
+            F, mask = cv2.findFundamentalMat(s1[:2].T,s2[:2].T,method=cv2.RANSAC,ransacReprojThreshold=5)
+            mask = mask.reshape(-1,)
             estimate = compute_beta_fundamental_Ransac(s1,s2,param,threshold=threshold,maxiter=maxiter,loRansac=LoRansac)
 
             beta_temp = estimate['model'][-1]
@@ -538,34 +549,33 @@ if __name__ == "__main__":
                    'LoRansac':      LoRansac,
                    'd':             param['d']}
 
-    file = open('data/interpolation_distance_d16_cv.pickle', 'wb')
-    pickle.dump(interp_dist, file)
-    file.close()
+    with open('./data/solver/interpolation_distance_d'+str(args['d'])+'_cv.pkl','wb') as f:
+        pickle.dump(interp_dist, f)
 
     # Plot results
     beta_estimate = np.mean(results_all[np.arange(it_max)*3], axis=0)
     beta_error =    np.mean(results_all[np.arange(it_max)*3+1], axis=0)
     ratio_inliers = np.mean(results_all[np.arange(it_max)*3+2], axis=0)
 
-    fig, ax = plt.subplots(1,3,sharex=True)
-    fig.add_subplot(111, frameon=False)
+    # fig, ax = plt.subplots(1,3,sharex=True)
+    # fig.add_subplot(111, frameon=False)
 
-    ax[0].plot(beta,beta_estimate)
-    ax[1].plot(beta,beta_error)
-    ax[2].plot(beta,ratio_inliers)
-    ax[0].set_title('Estimation of Beta')
-    ax[1].set_title('Error of estimated Beta')
-    ax[2].set_title('Ratio of inliers for each Beta')
-    ax[0].set_ylabel('Estimated Beta')
-    ax[1].set_ylabel('Error')
-    ax[2].set_ylabel('Ratio of inliers')
+    # ax[0].plot(beta,beta_estimate)
+    # ax[1].plot(beta,beta_error)
+    # ax[2].plot(beta,ratio_inliers)
+    # ax[0].set_title('Estimation of Beta')
+    # ax[1].set_title('Error of estimated Beta')
+    # ax[2].set_title('Ratio of inliers for each Beta')
+    # ax[0].set_ylabel('Estimated Beta')
+    # ax[1].set_ylabel('Error')
+    # ax[2].set_ylabel('Ratio of inliers')
 
-    plt.xticks(np.linspace(beta_min,beta_max,11))
-    plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
-    plt.grid(False)
-    plt.xlabel("Ground Truth of Beta")
-    fig.suptitle('Range of beta: {} to {} in step {}, Threshold: {}, MaxIter: {}, Using LoRansac: {}, d: {}, Iteration: {}'.format(beta_min,
-    beta_max,beta_step,threshold,maxiter,LoRansac,param['d'],it_max))
-    plt.show()
+    # plt.xticks(np.linspace(beta_min,beta_max,11))
+    # plt.tick_params(labelcolor='none', top='off', bottom='off', left='off', right='off')
+    # plt.grid(False)
+    # plt.xlabel("Ground Truth of Beta")
+    # fig.suptitle('Range of beta: {} to {} in step {}, Threshold: {}, MaxIter: {}, Using LoRansac: {}, d: {}, Iteration: {}'.format(beta_min,
+    # beta_max,beta_step,threshold,maxiter,LoRansac,param['d'],it_max))
+    # plt.show()
 
     print("Finish!\n")

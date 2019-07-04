@@ -8,6 +8,7 @@ import scipy.io as scio
 import pickle
 import argparse
 import copy
+import matplotlib.pyplot as plt
 import visualization as vis
 from datetime import datetime
 from scipy.optimize import least_squares
@@ -16,22 +17,15 @@ from scipy import interpolate
 '''----------------Previous results----------------'''
 # Load ground truth 
 gt = np.loadtxt('./data/fixposition/fixposition_2_xyz.txt').T
+gps_enu = np.loadtxt('./data/fixposition/flight_2_GPS_enu.txt').T
 
 # Load previous computed flight
-with open('./data/fixposition/flight_2.pkl', 'rb') as file:
+with open('./data/fixposition/flight_2_c4.pkl', 'rb') as file:
     flight_pre = pickle.load(file)
 
-# Load previous computed flight 30
-with open('./data/fixposition/flight_2_30.pkl', 'rb') as file:
+# Load previous computed flight spline
+with open('./data/fixposition/flight_2_c4_spline.pkl', 'rb') as file:
     flight_pre = pickle.load(file)
-
-# Load previous computed flight with only 3 cameras
-with open('./data/fixposition/flight_2_3cam.pkl', 'rb') as file:
-    flight_pre_b = pickle.load(file)
-
-# Load previous computed flight with only 3 cameras 30
-with open('./data/fixposition/flight_2_3cam_30.pkl', 'rb') as file:
-    flight_pre_b = pickle.load(file)
 
 
 '''----Dense sample----'''
@@ -39,6 +33,7 @@ m = 10
 traj_1 = flight_pre.traj[1:,375:]
 traj_1_raw = traj_1
 traj_2 = gt[:,980:1490]
+traj_2 = gps_enu[:,980:1490]
 
 tck,u = interpolate.splprep(traj_1,u=np.arange(traj_1.shape[1]),s=0,k=1)
 idx_1 = np.linspace(u[0],u[-1],traj_1.shape[1]*m)
@@ -61,15 +56,57 @@ for i in range(traj_1.shape[1]-idx_2[-1]-1):
     # Evaluation
     scale, shear, angles, translate, perspective = transformation.decompose_matrix(M)
     error = np.sqrt((traj_2[0]-traj_4[0])**2 + (traj_2[1]-traj_4[1])**2 + (traj_2[2]-traj_4[2])**2)
-    if np.mean(error) < error_min:
-        error_min = np.mean(error)
+    if np.mean(error) < np.mean(error_min):
+        error_min = error
+        error_lowest = abs(traj_2-traj_4[:3])
+        error_ = error
         k = i
         M_best = M
         traj_4_best = traj_4
 
-print('Mean error between transformed reconstruction and GPS data: {:.5f}, unit is meter.'.format(error_min))
+print('Mean error between transformed reconstruction and GPS data: {:.5f}, unit is meter.'.format(np.mean(error_min)))
 # vis.show_trajectory_3D(traj_1_raw,traj_2,line=False,title='Raw Reconstruction vs GPS (1st flight)')
-# vis.show_trajectory_3D(traj_4_best,traj_2,line=False,title='Reconstruction downsampled and transformed(similarity) vs GPS (1st flight)')
+# vis.show_3D_all(traj_2,traj_4_best,line=False)
+# vis.show_2D_all(traj_4[:2],traj_2[:2],line=False,color=False)
+
+
+b = traj_2/4+traj_4_best[:3] /4*3
+error_b = np.sqrt((traj_2[0]-b[0])**2 + (traj_2[1]-b[1])**2 + (traj_2[2]-b[2])**2)
+# vis.show_3D_all(traj_2,b,line=False)
+
+
+'''----Plot----'''
+# with open('./data/fixposition/err_2s.pkl', 'rb') as file:
+#     err_2s = pickle.load(file)
+
+# plt.figure()
+# n_bins = 10
+# bins = np.arange(0,40,5)
+# colors = ['red', 'lime']
+# labels = ['Points', 'Spline']
+
+# statis = np.array([error_,err_2s]) * 100
+# plt.hist(statis.T, bins,density=True, histtype='bar', color=colors, label=labels)
+
+# plt.xticks(bins,fontsize=30)
+# plt.yticks(fontsize=30)
+# plt.legend(loc=1, prop={'size': 30})
+# plt.show()
+
+# fig = plt.figure(figsize=(20, 15))
+# plt.set_cmap('Wistia')
+# ax = fig.add_subplot(111,projection='3d')
+# error_ *= 100
+# sc = ax.scatter3D(traj_4_best[0],traj_4_best[1],traj_4_best[2],c=error_,marker='o',s=100)
+# ax.set_xlabel('East',fontsize=20)
+# ax.set_ylabel('North',fontsize=20)
+# ax.set_zlabel('Up',fontsize=20)
+# ax.view_init(elev=30,azim=-50)
+
+# cbar = plt.colorbar(sc,fraction=0.046, pad=0.04)
+# cbar.ax.tick_params(labelsize=40) 
+# plt.show()
+
 
 
 '''----Normal sample----'''
@@ -79,6 +116,7 @@ print('Mean error between transformed reconstruction and GPS data: {:.5f}, unit 
 idx = flight_pre.traj[0,375:]
 traj_1 = flight_pre.traj[1:,375:]
 traj_2 = gt[:,971:1505]
+traj_2 = gps_enu[:,971:1505]
 
 tck,u = interpolate.splprep(traj_1,u=np.arange(traj_1.shape[1]),s=0,k=1)
 x,y,z = interpolate.splev(np.linspace(u[0],u[-1],traj_2.shape[1]),tck)
@@ -109,6 +147,17 @@ intrin_4 = scio.loadmat('./data/calibration/fixposition/cam4/calibration.mat')
 
 K1, K2, K3, K4 = intrin_1['intrinsic'], intrin_2['intrinsic'], intrin_3['intrinsic'], intrin_4['intrinsic']
 d1, d2, d3, d4 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion'][0], intrin_3['radial_distortion'][0], intrin_4['radial_distortion'][0]
+
+K4 = np.array([[1500,0,960],[0,1500,540],[0,0,1]],dtype='float')
+
+# Guess of camera intrinsic
+print('\tUncalibrated Cameras!!')
+K1 = np.array([[1700,0,960],[0,1700,540],[0,0,1]],dtype='float')
+K2 = np.array([[1600,0,960],[0,1600,540],[0,0,1]],dtype='float')
+K3 = np.array([[1350,0,960],[0,1350,540],[0,0,1]],dtype='float')
+K4 = np.array([[1300,0,960],[0,1300,540],[0,0,1]],dtype='float')
+d1, d2, d3, d4 = np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float')
+
 cameras = [common.Camera(K=K1,d=d1), common.Camera(K=K2,d=d2), common.Camera(K=K3,d=d3), common.Camera(K=K4,d=d4)]
 
 # Load detections
@@ -126,7 +175,7 @@ flight.addDetection(detect_1, detect_2, detect_3, detect_4)
 flight.undistort_detections(apply=True)
 
 # Compute beta for every pair of cameras
-flight.beta = np.array([[0,     692,    794.8,      388.6],
+flight.beta = np.array([[0,     714,    794.8,      384],
                         [-692   ,0,     102.8,      -303.4],
                         [-794.8,-102.8, 0,          -406.2],
                         [-388.6,303.4,  406.2,        0]])
@@ -145,12 +194,12 @@ include_K = True
 include_d = True
 include_b = True
 max_iter = 15
-use_spline = False
-smooth_factor = 0.005
+use_spline = True
+smooth_factor = 0.005        # 0.01
 
 if use_F:
     E_or_F = 'F'
-    error_epip = 30
+    error_epip = 10         # 10
     error_PnP  = 30
 else:
     E_or_F = 'E'
