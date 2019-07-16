@@ -25,7 +25,7 @@ with open('./data/fixposition/flight_2_c4.pkl', 'rb') as file:
 
 # Load previous computed flight spline
 with open('./data/fixposition/flight_2_c4_spline.pkl', 'rb') as file:
-    flight_pre = pickle.load(file)
+    flight_pre_s = pickle.load(file)
 
 
 '''----Dense sample----'''
@@ -151,12 +151,12 @@ d1, d2, d3, d4 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion']
 K4 = np.array([[1500,0,960],[0,1500,540],[0,0,1]],dtype='float')
 
 # Guess of camera intrinsic
-print('\tUncalibrated Cameras!!')
-K1 = np.array([[1700,0,960],[0,1700,540],[0,0,1]],dtype='float')
-K2 = np.array([[1600,0,960],[0,1600,540],[0,0,1]],dtype='float')
-K3 = np.array([[1350,0,960],[0,1350,540],[0,0,1]],dtype='float')
-K4 = np.array([[1300,0,960],[0,1300,540],[0,0,1]],dtype='float')
-d1, d2, d3, d4 = np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float')
+# print('\nUncalibrated Cameras!!')
+# K1 = np.array([[1700,0,960],[0,1700,540],[0,0,1]],dtype='float')
+# K2 = np.array([[1600,0,960],[0,1600,540],[0,0,1]],dtype='float')
+# K3 = np.array([[1350,0,960],[0,1350,540],[0,0,1]],dtype='float')
+# K4 = np.array([[1300,0,960],[0,1300,540],[0,0,1]],dtype='float')
+# d1, d2, d3, d4 = np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float'),np.array([0,0],dtype='float')
 
 cameras = [common.Camera(K=K1,d=d1), common.Camera(K=K2,d=d2), common.Camera(K=K3,d=d3), common.Camera(K=K4,d=d4)]
 
@@ -165,6 +165,14 @@ detect_1 = np.loadtxt('./data/fixposition/detections/c1_f2_30.txt',usecols=(2,0,
 detect_2 = np.loadtxt('./data/fixposition/detections/c2_f2_30.txt',usecols=(2,0,1)).T
 detect_3 = np.loadtxt('./data/fixposition/detections/c3_f2.txt',usecols=(2,0,1)).T
 detect_4 = np.loadtxt('./data/fixposition/detections/c4_f2.txt',usecols=(2,0,1)).T
+
+# Add noise
+sigma = 0
+detect_1[1:] = detect_1[1:] + np.random.randn(2,detect_1.shape[1]) * sigma
+detect_2[1:] = detect_2[1:] + np.random.randn(2,detect_2.shape[1]) * sigma
+detect_3[1:] = detect_3[1:] + np.random.randn(2,detect_3.shape[1]) * sigma
+detect_4[1:] = detect_4[1:] + np.random.randn(2,detect_4.shape[1]) * sigma
+print('\nNoise added to raw detections: {}'.format(sigma))
 
 # Create a scene
 flight = common.Scene()

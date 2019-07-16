@@ -592,12 +592,39 @@ def optimize_two(c1,c2,x1,x2,traj,spline=[],include_K=False,max_iter=10):
         return res,[c1,c2,traj]
 
 
-def jac_allCam(v,n_cam,M=0,beta=[]):
+def jac_allCam(v,n_cam,beta=[],M=[],N=[]):
+
+    '''
+    M: control point indices
+    N: trajectory point indices
+    '''
+
     num_cam, num_point = v.shape[0], v.shape[1]
 
     # 3D points or spline parameters
-    if M:
-        jac_X = np.ones((num_cam*num_point*2,M))
+    if len(M):
+        assert len(N)==num_point,'The length of frame indices should equal the number of points'
+        jac_X = np.zeros((num_cam*num_point*2,len(M)*3))
+
+        for j in range(num_point):
+            c = sum(M<N[j])
+
+            if c==0:
+                dep = np.array([0,1])
+            elif c==len(M):
+                dep = np.array([len(M)-2,len(M)-1])
+            else:
+                dep = np.array([c-1,c,c+1])
+                
+            for i in range(num_cam):
+                jac_X[i*num_point*2+j,dep] = 1
+                jac_X[i*num_point*2+j,dep+len(M)] = 1
+                jac_X[i*num_point*2+j,dep+len(M)*2] = 1
+
+                jac_X[i*num_point*2+num_point+j,dep] = 1
+                jac_X[i*num_point*2+num_point+j,dep+len(M)] = 1
+                jac_X[i*num_point*2+num_point+j,dep+len(M)*2] = 1
+        
     else:
         jac_X_i = np.zeros((num_point*2,num_point*3))
         for i in range(num_point):
@@ -695,7 +722,7 @@ def optimize_all(cams,tracks,traj,v,spline,include_K=False,max_iter=10,distortio
     # Set 3D points or spline and Jacobian
     if len(spline):
         model = np.concatenate((model,np.ravel(spline[1])))
-        A = jac_allCam(v,n_cam,spline[1].shape[1]*3,beta=beta)
+        A = jac_allCam(v,n_cam,beta=beta,M=spline[0][2:-2],N=traj[0])
     else:
         model = np.concatenate((model,np.ravel(traj[1:].T)))
         A = jac_allCam(v,n_cam,beta=beta)

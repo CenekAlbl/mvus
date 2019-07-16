@@ -166,7 +166,7 @@ detect_3 = np.loadtxt('./data/fixposition/detections/c3_f1.txt',usecols=(2,0,1))
 detect_4 = np.loadtxt('./data/fixposition/detections/c4_f1.txt',usecols=(2,0,1)).T
 
 # Add noise
-sigma = 5
+sigma = 0
 detect_1[1:] = detect_1[1:] + np.random.randn(2,detect_1.shape[1]) * sigma
 detect_2[1:] = detect_2[1:] + np.random.randn(2,detect_2.shape[1]) * sigma
 detect_3[1:] = detect_3[1:] + np.random.randn(2,detect_3.shape[1]) * sigma
@@ -204,7 +204,7 @@ include_d = True
 include_b = True
 max_iter = 15
 use_spline = True
-smooth_factor = 0.01        # 0.005
+smooth_factor = 0.005        # 0.005
 
 if use_F:
     E_or_F = 'F'
