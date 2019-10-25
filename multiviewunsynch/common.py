@@ -36,6 +36,7 @@ class Scene:
         """
         self.cameras = []
         self.detections = []
+        self.detections_raw = []
         self.tracks = []
         self.numCam = 0
         self.beta = None
@@ -74,6 +75,13 @@ class Scene:
         for i in detection:
             assert i.shape[0]==3, "Detection must in form of (x,y,frameId)*N"
             self.detections.append(i)
+
+
+    def addDetectionRaw(self,*detection_raw):
+
+        for i in detection_raw:
+            assert i.shape[0]==3, "Detection must in form of (x,y,frameId)*N"
+            self.detections_raw.append(i)
 
     
     def compute_beta(self,d_min=-6,d_max=6,threshold_1=10,threshold_2=2,threshold_error=3,spline=False):
@@ -292,7 +300,7 @@ class Scene:
         print('Number of inliers for PnP: {}'.format(inliers.shape[0]))
 
     
-    def error_cam(self,id_cam):
+    def error_cam(self,id_cam,thres=0):
         '''
         This function computes the reprojection error for a single camera, such that only visible 3D points will be reprojected
         '''
@@ -304,7 +312,13 @@ class Scene:
         x_cal = self.cameras[id_cam].projectPoint(X)
         error = ep.reprojection_error(x,x_cal)
         print("Mean reprojection error for camera {} is: ".format(id_cam), np.mean(error))
-        return error
+
+        # Optional: remove large errors directly
+        if thres:
+            self.traj = np.delete(self.traj,idx1[error>thres],axis=1)
+            self.error_cam(id_cam)
+        else:
+            return error
 
 
     def triangulate_traj(self,cam1,cam2,overwrite=False):
@@ -644,8 +658,15 @@ def jac_allCam(v,n_cam,beta=[],M=[],N=[]):
         for i in range(1,num_cam):
             jac_beta[i*num_point*2:(i+1)*num_point*2,i] = 1
 
+        jac_beta = jac_beta.astype(np.int8)
+        jac_cam  = jac_cam.astype(np.int8)
+        jac_X    = jac_X.astype(np.int8)
+
         jac = np.concatenate((jac_beta,jac_cam,jac_X),axis=1)
     else:
+        jac_cam  = jac_cam.astype(np.int8)
+        jac_X    = jac_X.astype(np.int8)
+
         jac = np.concatenate((jac_cam,jac_X),axis=1)
 
 

@@ -119,8 +119,8 @@ def show_trajectory_2D(*x,title=None,color=True,line=True,text=False):
             for j in range(len(x[i][0])):
                 plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
 
-        plt.gca().set_xlim([0,1920])
-        plt.gca().set_ylim([0,1080])
+        # plt.gca().set_xlim([0,1920])
+        # plt.gca().set_ylim([0,1080])
 
         plt.gca().invert_yaxis()
         plt.xlabel('X')
