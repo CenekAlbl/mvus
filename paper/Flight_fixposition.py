@@ -75,7 +75,7 @@ flight.set_tracks()
 
 # Sort detections in temporal order
 flight.set_sequence()
-flight.set_sequence([0,1,2,3,4,5])
+flight.set_sequence([0,3,2,1,4,5])
 
 # Set parameters manually
 use_F = True
@@ -83,6 +83,7 @@ include_K = True
 include_d = True
 include_b = True
 max_iter = 10
+outlier_thres = 0
 use_spline = False
 smooth_factor = 0.01      # 0.005
 
@@ -132,8 +133,8 @@ if use_spline:
 
 # Check reprojection error
 print('\nAfter optimizating first two cameras:')
-flight.error_cam(f1)
-flight.error_cam(f2)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 
@@ -149,9 +150,9 @@ flight.triangulate_traj(f2,f3)
 if use_spline:
     flight.fit_spline(s=smooth_factor)
 
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
 
 # Define visibility
 flight.set_visibility()
@@ -215,10 +216,10 @@ flight.triangulate_traj(f3,f4)
 if use_spline:
     flight.fit_spline(s=smooth_factor)
 
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
 
 # Define visibility
 flight.set_visibility()
@@ -284,11 +285,11 @@ flight.triangulate_traj(f4,f5)
 if use_spline:
     flight.fit_spline(s=smooth_factor)
 
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
-flight.error_cam(f5)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
+flight.error_cam(f5,thres=outlier_thres)
 
 # Define visibility
 flight.set_visibility()
@@ -356,12 +357,12 @@ flight.triangulate_traj(f5,f6)
 if use_spline:
     flight.fit_spline(s=smooth_factor)
 
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
-flight.error_cam(f5)
-flight.error_cam(f6)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
+flight.error_cam(f5,thres=outlier_thres)
+flight.error_cam(f6,thres=outlier_thres)
 
 # Define visibility
 flight.set_visibility()

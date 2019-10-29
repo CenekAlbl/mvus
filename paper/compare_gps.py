@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import cv2
 import matplotlib.pyplot as plt
+from datetime import datetime
 from scipy.interpolate import splprep, splev
 import util
 import visualization as vis
@@ -51,15 +52,20 @@ if __name__ == "__main__":
     # Set matching parameters
     ratio = 6
     step = 0.1
-    k = 747
+    k = 781
     error_min = np.inf
-    num_GPS = int(traj_cont.shape[1] / ratio) - 5
+    num_GPS = int(traj_cont.shape[1] / ratio) - 20
 
     gps_part = gps_ori[:,k:k+num_GPS]
     tck, u = splprep(traj_cont[1:],u=traj_cont[0],s=0)
     idx = np.arange(int(u[0]),int(u[0])+num_GPS*6)
 
+    # Show the initial part from GPS und check if it corresponds to the recontruction
+    vis.show_trajectory_3D(traj_cont[1:],gps_part)
+
     # Using Ransac to estimate transformation parameters in each small step
+    start = datetime.now()
+
     while idx[-1] < traj_cont[0,-1]:
         s = splev(idx[::ratio],tck)
         traj_down = np.array([s[0],s[1],s[2]])
@@ -94,6 +100,7 @@ if __name__ == "__main__":
     error = np.sqrt((gps_part[0]-traj_tran[0])**2 + (gps_part[1]-traj_tran[1])**2 + (gps_part[2]-traj_tran[2])**2)
 
     # Show results
+    print('\nTime: {}\n'.format(datetime.now()-start))
     print('The mean error (distance) of the PART is {:.3f} meter'.format(np.mean(error)))
     vis.show_trajectory_3D(traj_tran,gps_part)
 

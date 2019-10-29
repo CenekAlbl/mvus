@@ -300,7 +300,7 @@ class Scene:
         print('Number of inliers for PnP: {}'.format(inliers.shape[0]))
 
     
-    def error_cam(self,id_cam,thres=0):
+    def error_cam(self,id_cam,thres=0,dist=True):
         '''
         This function computes the reprojection error for a single camera, such that only visible 3D points will be reprojected
         '''
@@ -308,9 +308,13 @@ class Scene:
         inter,idx1,idx2 = np.intersect1d(self.traj[0],self.tracks[id_cam][0],assume_unique=True,return_indices=True)
         X = util.homogeneous(self.traj[1:,idx1])
         x = util.homogeneous(self.tracks[id_cam][1:,idx2])
-        
         x_cal = self.cameras[id_cam].projectPoint(X)
-        error = ep.reprojection_error(x,x_cal)
+
+        if dist:
+            error = ep.reprojection_error(x,x_cal)
+        else:
+            error = np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
+        
         print("Mean reprojection error for camera {} is: ".format(id_cam), np.mean(error))
 
         # Optional: remove large errors directly
@@ -432,6 +436,9 @@ class Camera:
             return np.concatenate((k,r,self.t))
         elif n==11:
             return np.concatenate((k,r,self.t,self.d))
+        elif n==12:
+            k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
+            return np.concatenate((k,r,self.t,self.d))
 
 
     def vector2P(self,vector,n=6):
@@ -459,9 +466,27 @@ class Camera:
             self.R = cv2.Rodrigues(vector[3:6])[0]
             self.t = vector[6:9]
             self.d = vector[-2:]
+        elif n==12:
+            self.K = np.diag((1,1,1)).astype(float)
+            self.K[0,0], self.K[1,1] = vector[0], vector[1]
+            self.K[:2,-1] = vector[2:4]
+            self.R = cv2.Rodrigues(vector[4:7])[0]
+            self.t = vector[7:10]
+            self.d = vector[-2:]
 
         self.compose()
         return self.P
+    
+
+    def info(self):
+        print('\n P:')
+        print(self.P)
+        print('\n K:')
+        print(self.K)
+        print('\n R:')
+        print(self.R)
+        print('\n t:')
+        print(self.t)
 
 
 def detect_undistort(d,cameras):
@@ -741,6 +766,7 @@ def optimize_all(cams,tracks,traj,v,spline,include_K=False,max_iter=10,distortio
         model = np.concatenate((model,i.P2vector(n=n_cam)))
     
     # Set 3D points or spline and Jacobian
+    print('\nComputing the sparsity structure of the Jacobian matrix...\n')
     if len(spline):
         model = np.concatenate((model,np.ravel(spline[1])))
         A = jac_allCam(v,n_cam,beta=beta,M=spline[0][2:-2],N=traj[0])
@@ -749,6 +775,8 @@ def optimize_all(cams,tracks,traj,v,spline,include_K=False,max_iter=10,distortio
         A = jac_allCam(v,n_cam,beta=beta)
 
     # During
+    print('Doing BA with {} cameras...\n'.format(num_Cam))
+    error_before = error_fn(model,tracks)
     fn = lambda x: error_fn(x,tracks)
     res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=max_iter)
 
