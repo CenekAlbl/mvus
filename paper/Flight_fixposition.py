@@ -75,7 +75,7 @@ flight.set_tracks()
 
 # Sort detections in temporal order
 flight.set_sequence()
-flight.set_sequence([0,3,2,1,4,5])
+flight.set_sequence([0,1,2,3,4,5])
 
 # Set parameters manually
 use_F = True
@@ -83,7 +83,7 @@ include_K = True
 include_d = True
 include_b = True
 max_iter = 10
-outlier_thres = 0
+outlier_thres = 30
 use_spline = False
 smooth_factor = 0.01      # 0.005
 
@@ -197,9 +197,9 @@ flight.set_tracks()
 
 # Check reprojection error
 print('\nAfter optimazing 3 cameras, beta:{}, d:{}'.format(include_b,include_d))
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 
@@ -264,10 +264,10 @@ flight.set_tracks()
 
 # Check reprojection error
 print('\nAfter optimazing 4 cameras, beta:{}, d:{}'.format(include_b,include_d))
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 
@@ -334,11 +334,11 @@ flight.set_tracks()
 
 # Check reprojection error
 print('\nAfter optimazing 5 cameras, beta:{}, d:{}'.format(include_b,include_d))
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
-flight.error_cam(f5)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
+flight.error_cam(f5,thres=outlier_thres)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 
@@ -407,12 +407,12 @@ flight.set_tracks()
 
 # Check reprojection error
 print('\nAfter optimazing 6 cameras, beta:{}, d:{}'.format(include_b,include_d))
-flight.error_cam(f1)
-flight.error_cam(f2)
-flight.error_cam(f3)
-flight.error_cam(f4)
-flight.error_cam(f5)
-flight.error_cam(f6)
+flight.error_cam(f1,thres=outlier_thres)
+flight.error_cam(f2,thres=outlier_thres)
+flight.error_cam(f3,thres=outlier_thres)
+flight.error_cam(f4,thres=outlier_thres)
+flight.error_cam(f5,thres=outlier_thres)
+flight.error_cam(f6,thres=outlier_thres)
 
 print('\nTime: {}\n'.format(datetime.now()-start))
 

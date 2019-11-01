@@ -34,7 +34,7 @@ def error_M(model,data,param=None):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    with open('./data/paper/fixposition/trajectory/flight_5cam_1.pkl', 'rb') as file:
+    with open('./data/paper/fixposition/trajectory/flight_6cam_12.pkl', 'rb') as file:
         flight = pickle.load(file)
     traj = flight.traj
 
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     # Set matching parameters
     ratio = 6
     step = 0.1
-    k = 781
+    k = 757
     error_min = np.inf
     num_GPS = int(traj_cont.shape[1] / ratio) - 20
 

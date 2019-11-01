@@ -352,7 +352,403 @@ class Scene:
                 
         return X_idx
 
-                
+
+class Scene_global_timeline(Scene):
+    '''
+    A updated version of the class Scene, in which a global timeline is defined
+    '''
+
+    def __init__(self):
+        super().__init__()
+        self.alpha = None
+        self.detections_global = []
+
+
+    def init_alpha(self,prior=[]):
+        '''Initialize alpha for each camera based on the ratio of fps'''
+
+        if len(prior):
+            assert len(prior) == self.numCam, 'Number of input must be the same as the number of cameras'
+            self.alpha = prior
+        else:
+            self.alpha = np.ones(self.numCam)
+            fps_ref = self.cameras[self.sequence[0]].fps
+            for i in range(self.numCam):
+                self.alpha[i] = fps_ref / self.cameras[i].fps
+
+
+    def detection_to_global(self, *cam):
+        '''
+        Convert frame indices of raw detections into the global timeline.
+
+        Input is an iterable that specifies which detection(s) to compute.
+
+        If no input, all detections will be converted.
+        '''
+
+        assert len(self.alpha)==self.numCam and len(self.beta)==self.numCam, 'The Number of alpha and beta is wrong'
+
+        if len(cam):
+            for i in cam:
+                detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                self.detections_global[i] = detect_global
+        else:
+            self.detections_global = []
+            for i in range(self.numCam):
+                detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                self.detections_global.append(detect_global)
+
+                # alpha, beta, detect = self.alpha[i], self.beta[i], self.detections[i]
+                # detect[0] = alpha * detect[0] + beta
+                # self.detections_global.append(detect)
+
+
+    def find_intervals(self,x,gap=5):
+        '''
+        Given indices of detections, return a matrix that contains the start and the end of each
+        continues part.
+        
+        Input indices must be in ascending order. 
+        
+        The gap defines the maximal interruption, with which it's still considered as continues. 
+        '''
+
+        assert len(x.shape)==1, 'Input must be a 1D-array'
+
+        interval = np.array([[x[0]],[np.nan]])
+        for i in range(1,len(x)):
+            assert x[i]-x[i-1]>0, 'Input must be in ascending order'
+            if x[i]-x[i-1] > gap:
+                interval[1,-1] = x[i-1]
+                interval = np.append(interval,[[x[i]],[np.nan]],axis=1)
+        interval[1,-1] = x[-1]
+        return interval
+
+
+    def sampling(self,x,interval):
+        '''
+        Sample points from the input which are inside the given intervals
+        '''
+
+        if len(x.shape)==1:
+            timestamp = x
+        elif len(x.shape)==2:
+            assert x.shape[0]==3, 'Input should be 1D array or 2D array with 3 rows'
+            timestamp = x[0]
+
+        idx_ts = np.array([], dtype=int)
+        for i in range(len(timestamp)):
+            for j in range(interval.shape[1]):
+                if timestamp[i] >= interval[0,j] and timestamp[i] <= interval[1,j]:
+                    idx_ts = np.append(idx_ts, i)
+                    break
+
+        if len(x.shape)==1:
+            return x[idx_ts], idx_ts
+        elif len(x.shape)==2:
+            return x[:,idx_ts], idx_ts
+
+
+    def match_overlap(self,x,y):
+        '''
+        Given two inputs in the same timeline (global), return the parts of them which are temporally overlapped
+
+        Important: it's assumed that x has a higher frequency (fps)
+        '''
+
+        interval = self.find_intervals(y[0])
+        x_s, _ = self.sampling(x, interval)
+
+        tck, u = interpolate.splprep(y[1:],u=y[0],s=0,k=3)
+        y_s = np.asarray(interpolate.splev(x_s[0],tck))
+        y_s = np.vstack((x_s[0],y_s))
+
+        assert (x_s[0] == y_s[0]).all(), 'Both outputs should have the same timestamps'
+
+        return x_s, y_s
+
+
+    def init_traj(self,error=10,inlier_only=False):
+        '''
+        Select the first two cams in the sequence, compute fundamental matrix, triangulate points
+        '''
+
+        t1, t2 = self.sequence[0], self.sequence[1]
+        if self.cameras[t1].fps < self.cameras[t2].fps:
+            t1, t2 = t2, t1
+        K1, K2 = self.cameras[t1].K, self.cameras[t2].K
+
+        # Find correspondences
+        d1, d2 = self.match_overlap(self.detections_global[t1], self.detections_global[t2])
+        
+        # Compute fundamental matrix
+        F,inlier = ep.computeFundamentalMat(d1[1:],d2[1:],error=error)
+        E = np.dot(np.dot(K2.T,F),K1)
+
+        if not inlier_only:
+            inlier = np.ones(len(inlier))
+        x1, x2 = util.homogeneous(d1[1:,inlier==1]), util.homogeneous(d2[1:,inlier==1])
+
+        # Find corrected corresponding points for optimal triangulation
+        N = d1[1:,inlier==1].shape[1]
+        pts1=d1[1:,inlier==1].T.reshape(1,-1,2)
+        pts2=d2[1:,inlier==1].T.reshape(1,-1,2)
+        m1,m2 = cv2.correctMatches(F,pts1,pts2)
+        x1,x2 = util.homogeneous(np.reshape(m1,(-1,2)).T), util.homogeneous(np.reshape(m2,(-1,2)).T)
+
+        # Triangulte points
+        X, P = ep.triangulate_from_E(E,K1,K2,x1,x2)
+        self.traj = np.vstack((d1[0][inlier==1],X[:-1]))
+
+        # Assign the camera matrix for these two cameras
+        self.cameras[t1].P = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
+        self.cameras[t2].P = np.dot(K2,P)
+        self.cameras[t1].decompose()
+        self.cameras[t2].decompose()
+
+
+    def traj_to_spline(self,smooth_factor=0):
+        '''
+        Convert discrete 3D trajectory into spline representation
+
+        Outputs are spline parameters and intervals
+        '''
+
+        interval = self.find_intervals(self.traj[0])
+        tck, u = interpolate.splprep(self.traj[1:],u=self.traj[0],s=smooth_factor,k=3)
+        self.spline = [tck, interval]
+
+        return self.spline
+
+
+    def spline_to_traj(self,sampling_rate=1):
+        '''
+        Convert discrete 3D trajectory into spline representation
+
+        Outputs are spline parameters and intervals
+        '''
+        
+        tck, interval = self.spline[0], self.spline[1]
+
+        timestamp = np.array([])
+        for i in range(interval.shape[1]):
+            timestamp = np.concatenate((timestamp, np.arange(interval[0,i], interval[1,i], sampling_rate)))
+
+        traj = np.asarray(interpolate.splev(timestamp, tck))
+        self.traj = np.vstack((timestamp,traj))
+
+        return self.traj
+
+
+    def error_cam(self,cam_id,mode='dist'):
+        '''
+        Calculate the reprojection errors for a given camera
+
+        Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'BA'
+        '''
+
+        tck, interval = self.spline[0], self.spline[1]
+        self.detection_to_global(cam_id)
+
+        detect_2D, idx = self.sampling(self.detections_global[cam_id], interval)
+        point_3D = np.asarray(interpolate.splev(detect_2D[0], tck))
+
+        X = util.homogeneous(point_3D)
+        x = detect_2D[1:]
+        x_cal = self.cameras[cam_id].projectPoint(X)
+
+        if mode == 'dist':
+            return ep.reprojection_error(x, x_cal)
+        elif mode == 'xy_1D':
+            return np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
+        elif mode == 'xy_2D':
+            return np.vstack((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
+        elif mode == 'BA':
+            error_x = np.zeros_like(self.detections[cam_id][0])
+            error_y = np.zeros_like(self.detections[cam_id][0])
+            error_x[idx] = abs(x_cal[0]-x[0])
+            error_y[idx] = abs(x_cal[1]-x[1])
+            return np.concatenate((error_x, error_y))
+
+    
+    def compute_visibility(self):
+        '''
+        Decide for each raw detection if it is visible from current 3D spline
+        '''
+
+        self.visible = []
+        interval = self.spline[1]
+        self.detection_to_global()
+
+        for i in range(self.numCam):
+            visible = np.zeros_like(self.detections[i][0])
+            _, idx = self.sampling(self.detections_global[i], interval)
+            visible[idx] = 1
+            self.visible.append(visible)
+
+
+    def BA(self, numCam):
+        '''
+        '''
+
+        def error_BA(x):
+            '''
+            Input is the model (parameters that need to be optimized)
+            '''
+
+            # Assign parameters to the class attributes
+            sections = [numCam, numCam*2, numCam*2+numCam*12]
+            p = np.split(x, sections)
+            self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = p[0], p[1]
+
+            cams = np.split(p[2],numCam)
+            for i in range(numCam):
+                self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
+            
+            spline_temp = p[3].reshape(3,-1)
+            self.spline[0][1][0], self.spline[0][1][1], self.spline[0][1][2] = spline_temp[0], spline_temp[1], spline_temp[2]
+
+            # Compute errors
+            error = np.array([])
+            for i in range(numCam):
+                error_each = self.error_cam(self.sequence[i], mode='BA')
+                error = np.concatenate((error, error_each))
+
+            return error
+
+
+        def jac_BA(near=3):
+            '''
+            Inputs are the model (parameters that need to be optimized) and the knot vector of 3D spline
+            '''
+
+            knot = self.spline[0][0][2:-2]
+            assert len(knot)==len(self.spline[0][1][0]), 'The Number of knots is wrong'
+
+            num_param = len(model)
+            self.compute_visibility()
+
+            jac = np.zeros_like(model)
+            for i in range(numCam):
+                cam_id = self.sequence[i]
+                num_detect = self.detections[cam_id].shape[1]
+
+                # consider only reprojection in x direction, which is the same in y direction
+                jac_cam = np.zeros((num_detect, num_param))
+
+                # alpha and beta
+                jac_cam[:,[i,i+numCam]] = 1
+
+                # camera parameters
+                start = 2*numCam+i*12
+                jac_cam[:,start:start+12] = 1
+
+                # spline parameters
+                for j in range(num_detect):
+                    if self.visible[cam_id][j]:
+                        timestamp = self.detections_global[cam_id][0,j]
+                        knot_idx = np.argsort(abs(knot-timestamp))[:near]
+                        knot_idx = np.concatenate((knot_idx, knot_idx+len(knot), knot_idx+2*len(knot)))
+                        jac_cam[j,2*numCam+12*numCam+knot_idx] = 1
+                    else:
+                        jac_cam[j,:] = 0
+
+                jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
+
+            # fix the first camera
+            jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
+
+            return jac[1:]
+
+
+        start = datetime.now()
+        
+        # Define Parameters that will be optimized
+        model_alpha = self.alpha[self.sequence[:numCam]]
+        model_beta = self.beta[self.sequence[:numCam]]
+
+        model_cam = np.array([])
+        for i in self.sequence[:numCam]:
+            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(n=12)))
+
+        model_spline = np.ravel(self.spline[0][1])
+        model = np.concatenate((model_alpha, model_beta, model_cam, model_spline))
+
+        # Set the Jacobian matrix
+        print('\nComputing the sparse structure of the Jacobian matrix...\n')
+        A = jac_BA()
+
+        # Compute non-linear optimization
+        print('Doing BA with {} cameras...\n'.format(numCam))
+        fn = lambda x: error_BA(x)
+        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=10)
+
+        # Assign the optimized model to the scene
+        sections = [numCam, numCam*2, numCam*2+numCam*12]
+        p = np.split(res.x, sections)
+        self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = p[0], p[1]
+
+        cams = np.split(p[2],numCam)
+        for i in range(numCam):
+            self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
+        
+        spline_temp = p[3].reshape(3,-1)
+        self.spline[0][1][0], self.spline[0][1][1], self.spline[0][1][2] = spline_temp[0], spline_temp[1], spline_temp[2]
+
+        # Update global timestamps for each serie of detections
+        self.detection_to_global()
+
+        print('\nBA finished in: {}\n'.format(datetime.now()-start))
+
+        return res
+
+
+    def remove_outliers(self, *cam, thres=30):
+        '''
+        Not done yet!
+        '''
+
+        for i in cam:
+            error_all = self.error_cam(i,mode='BA')
+            error_xy = np.split(error_all,2)
+            error = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
+
+
+    def get_camera_pose(self, cam_id, error=8, verbose=0):
+        '''
+        Get the absolute of a camera by solving the PnP problem.
+
+        Take care with DISTORSION model!
+        '''
+        
+        tck, interval = self.spline[0], self.spline[1]
+        self.detection_to_global(cam_id)
+
+        detect_2D, idx = self.sampling(self.detections_global[cam_id], interval)
+        point_3D = np.asarray(interpolate.splev(detect_2D[0], tck))
+
+        X = util.homogeneous(point_3D)
+        x = util.homogeneous(detect_2D[1:])
+
+        # PnP solution from OpenCV
+        N = X.shape[1]
+        objectPoints = np.ascontiguousarray(X[:3].T).reshape((N,1,3))
+        imagePoints  = np.ascontiguousarray(x[:2].T).reshape((N,1,2))
+        distCoeffs = np.append(self.cameras[cam_id].d, [0, 0, 0])
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
+
+        self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
+        self.cameras[cam_id].t = tvec.reshape(-1,)
+        self.cameras[cam_id].compose()
+
+        if verbose:
+            print('{} out of {} points are inliers'.format(inliers.shape[0], X.shape[1]))
+            
+
+    def triangulate(self, *cam):
+        pass
+           
+        
 class Camera:
     """ 
     Class that describes a single camera in the scene
@@ -381,6 +777,7 @@ class Camera:
         self.t = kwargs.get('t')
         self.d = kwargs.get('d')
         self.c = kwargs.get('c')
+        self.fps = kwargs.get('fps')
 
 
     def projectPoint(self,X):
@@ -752,6 +1149,7 @@ def optimize_all(cams,tracks,traj,v,spline,include_K=False,max_iter=10,distortio
     n_cam = 6
     if include_K:  n_cam += 3
     if distortion: n_cam += 2
+    n_cam = 12
     num_Cam, num_Point = len(cams), traj.shape[1]
 
     # Set beta
