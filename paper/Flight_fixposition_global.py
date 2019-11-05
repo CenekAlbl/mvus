@@ -35,23 +35,21 @@ cameras = [common.Camera(K=K1,d=d1,fps=fps1), common.Camera(K=K2,d=d2,fps=fps2),
            common.Camera(K=K4,d=d4,fps=fps4), common.Camera(K=K5,d=d5,fps=fps5), common.Camera(K=K6,d=d6,fps=fps6)]
 
 # Load detections
-detect_1 = np.loadtxt('./data/paper/fixposition/detection/outp_mate10_1.txt',usecols=(2,0,1)).T
-detect_2 = np.loadtxt('./data/paper/fixposition/detection/outp_sonyg1.txt',usecols=(2,0,1)).T
-detect_3 = np.loadtxt('./data/paper/fixposition/detection/outp_sonyalpha5001.txt',usecols=(2,0,1)).T
-detect_4 = np.loadtxt('./data/paper/fixposition/detection/outp_mate7_1.txt',usecols=(2,0,1)).T
-detect_5 = np.loadtxt('./data/paper/fixposition/detection/outp_gopro1.txt',usecols=(2,0,1)).T
-detect_6 = np.loadtxt('./data/paper/fixposition/detection/outp_sony5n1.txt',usecols=(2,0,1)).T
+rows = 100000
+detect_1 = np.loadtxt('./data/paper/fixposition/detection/outp_mate10_1.txt',usecols=(2,0,1))[:rows].T
+detect_2 = np.loadtxt('./data/paper/fixposition/detection/outp_sonyg1.txt',usecols=(2,0,1))[:rows].T
+detect_3 = np.loadtxt('./data/paper/fixposition/detection/outp_sonyalpha5001.txt',usecols=(2,0,1))[:rows].T
+detect_4 = np.loadtxt('./data/paper/fixposition/detection/outp_mate7_1.txt',usecols=(2,0,1))[:rows].T
+detect_5 = np.loadtxt('./data/paper/fixposition/detection/outp_gopro1.txt',usecols=(2,0,1))[:rows].T
+detect_6 = np.loadtxt('./data/paper/fixposition/detection/outp_sony5n1.txt',usecols=(2,0,1))[:rows].T
 
 # Create a scene
 flight = common.Scene_global_timeline()
 flight.addCamera(*cameras)
 flight.addDetection(detect_1, detect_2, detect_3, detect_4, detect_5, detect_6)
 
-# Correct radial distortion, can be set to false
-flight.undistort_detections()
-
-# Define the order of cameras, the first one will be the reference
-flight.set_sequence([0,1,2,3,4,5])
+# Define the order of cameras, the FIRST one will be the reference
+flight.set_sequence([0,4,2,1,5,3])
 
 # Add prior alpha and beta for each cameras
 flight.init_alpha()
@@ -64,22 +62,42 @@ flight.detection_to_global()
 flight.init_traj(error=30, inlier_only=False)
 
 # Convert discrete trajectory to spline representation
-flight.traj_to_spline(smooth_factor=0)
+flight.traj_to_spline()
 
-# Error of the first two cameras
-error_0 = flight.error_cam(flight.sequence[0])
-error_1 = flight.error_cam(flight.sequence[1])
 
-# Backup befor BA
-flight_b = copy.deepcopy(flight)
 
-# Bundle adjustment
+'''---------------Incremental reconstruction----------------'''
+start = datetime.now()
+np.set_printoptions(precision=4)
+
 cam_temp = 2
-res = flight.BA(cam_temp)
+while True:
+    print('\n----------------- Bundle Adjustment with {} cameras -----------------'.format(cam_temp))
+    print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
-# Add the next camera and get its pose
-flight.get_camera_pose(flight.sequence[cam_temp], verbose=1)
+    # Bundle adjustment
+    res = flight.BA(cam_temp)
 
-# Triangulate new points and update the 3D spline
+    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
+    if cam_temp == flight.numCam:
+        print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
+        break
 
+    # Add the next camera and get its pose
+    flight.get_camera_pose(flight.sequence[cam_temp])
+
+    # Triangulate new points and update the 3D spline
+    flight.triangulate(flight.sequence[cam_temp], flight.sequence[:cam_temp])
+
+    print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
+    cam_temp += 1
+
+# Visualize the 3D trajectory
+flight.spline_to_traj(sampling_rate=1)
+vis.show_trajectory_3D(flight.traj[1:],line=False)
+
+# with open('./data/paper/fixposition/trajectory/flight_spline_2.pkl','wb') as f:
+#     pickle.dump(flight, f)
+
+print('Finish !')

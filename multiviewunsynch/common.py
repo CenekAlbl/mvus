@@ -381,6 +381,8 @@ class Scene_global_timeline(Scene):
         '''
         Convert frame indices of raw detections into the global timeline.
 
+        DISTORTION is considered.
+
         Input is an iterable that specifies which detection(s) to compute.
 
         If no input, all detections will be converted.
@@ -388,19 +390,28 @@ class Scene_global_timeline(Scene):
 
         assert len(self.alpha)==self.numCam and len(self.beta)==self.numCam, 'The Number of alpha and beta is wrong'
 
+        # if len(cam):
+        #     for i in cam:
+        #         detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+        #         self.detections_global[i] = detect_global
+        # else:
+        #     self.detections_global = []
+        #     for i in range(self.numCam):
+        #         detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+        #         self.detections_global.append(detect_global)
+
         if len(cam):
             for i in cam:
-                detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                detect_temp = detect_undistort([self.detections[i]], [self.cameras[i]])
+                self.detections_undist[i] = detect_temp[0]
+                detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
                 self.detections_global[i] = detect_global
         else:
+            self.detections_undist = detect_undistort(self.detections, self.cameras)
             self.detections_global = []
             for i in range(self.numCam):
-                detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
                 self.detections_global.append(detect_global)
-
-                # alpha, beta, detect = self.alpha[i], self.beta[i], self.detections[i]
-                # detect[0] = alpha * detect[0] + beta
-                # self.detections_global.append(detect)
 
 
     def find_intervals(self,x,gap=5):
@@ -433,15 +444,13 @@ class Scene_global_timeline(Scene):
         if len(x.shape)==1:
             timestamp = x
         elif len(x.shape)==2:
-            assert x.shape[0]==3, 'Input should be 1D array or 2D array with 3 rows'
+            assert x.shape[0]==3 or x.shape[0]==4, 'Input should be 1D array or 2D array with 3 or 4 rows'
             timestamp = x[0]
-
-        idx_ts = np.array([], dtype=int)
-        for i in range(len(timestamp)):
-            for j in range(interval.shape[1]):
-                if timestamp[i] >= interval[0,j] and timestamp[i] <= interval[1,j]:
-                    idx_ts = np.append(idx_ts, i)
-                    break
+  
+        t_bool = np.zeros_like(timestamp, dtype=bool)
+        for i in interval.T:
+            t_bool = t_bool | np.logical_xor(timestamp-i[0] > 0, timestamp-i[1] > 0)
+        idx_ts = np.where(t_bool)[0]
 
         if len(x.shape)==1:
             return x[idx_ts], idx_ts
@@ -453,7 +462,7 @@ class Scene_global_timeline(Scene):
         '''
         Given two inputs in the same timeline (global), return the parts of them which are temporally overlapped
 
-        Important: it's assumed that x has a higher frequency (fps)
+        Important: it's assumed that x has a higher frequency (fps) so that points are interpolated in y
         '''
 
         interval = self.find_intervals(y[0])
@@ -474,12 +483,13 @@ class Scene_global_timeline(Scene):
         '''
 
         t1, t2 = self.sequence[0], self.sequence[1]
-        if self.cameras[t1].fps < self.cameras[t2].fps:
-            t1, t2 = t2, t1
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
         # Find correspondences
-        d1, d2 = self.match_overlap(self.detections_global[t1], self.detections_global[t2])
+        if self.cameras[t1].fps > self.cameras[t2].fps:
+            d1, d2 = self.match_overlap(self.detections_global[t1], self.detections_global[t2])
+        else:
+            d2, d1 = self.match_overlap(self.detections_global[t2], self.detections_global[t1])
         
         # Compute fundamental matrix
         F,inlier = ep.computeFundamentalMat(d1[1:],d2[1:],error=error)
@@ -507,7 +517,7 @@ class Scene_global_timeline(Scene):
         self.cameras[t2].decompose()
 
 
-    def traj_to_spline(self,smooth_factor=0):
+    def traj_to_spline(self,smooth_factor=0.01):
         '''
         Convert discrete 3D trajectory into spline representation
 
@@ -521,18 +531,24 @@ class Scene_global_timeline(Scene):
         return self.spline
 
 
-    def spline_to_traj(self,sampling_rate=1):
+    def spline_to_traj(self,sampling_rate=1,t=None):
         '''
-        Convert discrete 3D trajectory into spline representation
+        Convert 3D spline into discrete 3D points
 
-        Outputs are spline parameters and intervals
+        Points are sampled either with a constant sampling rate or at the given timestamps t
+
+        Outputs are 3D points
         '''
         
         tck, interval = self.spline[0], self.spline[1]
 
-        timestamp = np.array([])
-        for i in range(interval.shape[1]):
-            timestamp = np.concatenate((timestamp, np.arange(interval[0,i], interval[1,i], sampling_rate)))
+        if t is not None:
+            assert len(t.shape)==1, 'Input timestamps must be a 1D array'
+            timestamp = t
+        else:
+            timestamp = np.array([])
+            for i in range(interval.shape[1]):
+                timestamp = np.concatenate((timestamp, np.arange(interval[0,i], interval[1,i], sampling_rate)))
 
         traj = np.asarray(interpolate.splev(timestamp, tck))
         self.traj = np.vstack((timestamp,traj))
@@ -544,7 +560,7 @@ class Scene_global_timeline(Scene):
         '''
         Calculate the reprojection errors for a given camera
 
-        Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'BA'
+        Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'each'
         '''
 
         tck, interval = self.spline[0], self.spline[1]
@@ -563,7 +579,7 @@ class Scene_global_timeline(Scene):
             return np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
         elif mode == 'xy_2D':
             return np.vstack((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
-        elif mode == 'BA':
+        elif mode == 'each':
             error_x = np.zeros_like(self.detections[cam_id][0])
             error_y = np.zeros_like(self.detections[cam_id][0])
             error_x[idx] = abs(x_cal[0]-x[0])
@@ -587,7 +603,7 @@ class Scene_global_timeline(Scene):
             self.visible.append(visible)
 
 
-    def BA(self, numCam):
+    def BA(self, numCam, max_iter=10):
         '''
         '''
 
@@ -611,7 +627,7 @@ class Scene_global_timeline(Scene):
             # Compute errors
             error = np.array([])
             for i in range(numCam):
-                error_each = self.error_cam(self.sequence[i], mode='BA')
+                error_each = self.error_cam(self.sequence[i], mode='each')
                 error = np.concatenate((error, error_each))
 
             return error
@@ -681,7 +697,7 @@ class Scene_global_timeline(Scene):
         # Compute non-linear optimization
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
-        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=10)
+        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=max_iter)
 
         # Assign the optimized model to the scene
         sections = [numCam, numCam*2, numCam*2+numCam*12]
@@ -698,18 +714,18 @@ class Scene_global_timeline(Scene):
         # Update global timestamps for each serie of detections
         self.detection_to_global()
 
-        print('\nBA finished in: {}\n'.format(datetime.now()-start))
+        print('BA finished in: {}'.format(datetime.now()-start))
 
         return res
 
 
-    def remove_outliers(self, *cam, thres=30):
+    def remove_outliers(self, *cams, thres=30):
         '''
         Not done yet!
         '''
 
-        for i in cam:
-            error_all = self.error_cam(i,mode='BA')
+        for i in cams:
+            error_all = self.error_cam(i,mode='each')
             error_xy = np.split(error_all,2)
             error = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
 
@@ -742,12 +758,63 @@ class Scene_global_timeline(Scene):
         self.cameras[cam_id].compose()
 
         if verbose:
-            print('{} out of {} points are inliers'.format(inliers.shape[0], X.shape[1]))
+            print('{} out of {} points are inliers for PnP'.format(inliers.shape[0], X.shape[1]))
             
 
-    def triangulate(self, *cam):
-        pass
-           
+    def triangulate(self, cam_id, cams, refit=True, verbose=0):
+        '''
+        Triangulate new points to the existing 3D spline and optionally refit it
+
+        cam_id is the new camera
+        
+        cams must be an iterable that contains cameras that have been processed to build the 3D spline
+        '''
+
+        assert self.cameras[cam_id].P is not None, 'The camera pose must be computed first'
+        tck, interval = self.spline[0], self.spline[1]
+        self.detection_to_global(cam_id)
+
+        # Find detections from this camera that haven't been triangulated yet
+        _, idx_ex = self.sampling(self.detections_global[cam_id], interval)
+        num_detect = self.detections_global[cam_id].shape[1]
+        idx_new = np.setdiff1d(np.arange(num_detect), idx_ex)
+        detect_new = self.detections_global[cam_id][:, idx_new]
+
+        # Matching these detections with detections from previous cameras and triangulate them
+        X_new = np.empty([4,0])
+        for i in cams:
+            self.detection_to_global(i)
+            detect_ex = self.detections_global[i]
+
+            # Detections of previous cameras are interpolated, no matter the fps
+            try:
+                x1, x2 = self.match_overlap(detect_new, detect_ex)
+            except:
+                continue
+            else:
+                P1, P2 = self.cameras[cam_id].P, self.cameras[i].P
+                X_i = ep.triangulate_matlab(x1[1:], x2[1:], P1, P2)
+                X_i = np.vstack((x1[0], X_i[:-1]))
+                X_new = np.hstack((X_new, X_i))
+
+                if verbose:
+                    print('{} points are triangulated into the 3D spline'.format(X_i.shape[1]))
+
+        _, idx_empty = self.sampling(X_new, interval)
+        assert len(idx_empty)==0, 'Points should not be triangulated into the existing part of the 3D spline'
+
+        # Add these points to the discrete 3D trajectory
+        self.spline_to_traj(sampling_rate=0.02)
+        self.traj = np.hstack((self.traj, X_new))
+        _, idx = np.unique(self.traj[0], return_index=True)
+        self.traj = self.traj[:, idx]
+
+        # refit the 3D spline if wanted
+        if refit:
+            self.traj_to_spline()
+
+        return X_new
+        
         
 class Camera:
     """ 
@@ -781,6 +848,8 @@ class Camera:
 
 
     def projectPoint(self,X):
+
+        assert self.P is not None, 'The projection matrix P has not been calculated yet'
         x = np.dot(self.P,X)
         x /= x[2]
         return x
