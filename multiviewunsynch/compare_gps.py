@@ -6,6 +6,7 @@ import cv2
 import matplotlib.pyplot as plt
 from datetime import datetime
 from scipy.interpolate import splprep, splev
+from scipy.optimize import least_squares
 import util
 import visualization as vis
 import transformation
@@ -31,6 +32,41 @@ def error_M(model,data,param=None):
     return np.sqrt((gps[0]-tran[0])**2 + (gps[1]-tran[1])**2 + (gps[2]-tran[2])**2)
 
 
+def optimize(alpha, beta, flight, gps):
+
+    def error_fn(model,output=False):
+        alpha, beta = model[0], model[1]
+        t_gps = alpha * np.arange(gps.shape[1]) + beta
+        _, idx = flight.sampling(t_gps, flight.spline[1])
+        gps_part = gps[:,idx]
+        t_part = t_gps[idx]
+        traj = flight.spline_to_traj(t=t_part)
+
+        data = np.vstack((traj[1:],gps_part))
+        error = np.zeros(gps.shape[1],dtype=float)
+
+        # result = ransac.vanillaRansac(estimate_M,error_M,data,3,2,100)
+        # error[idx] = error_M(result['model'],data)
+
+        M = transformation.affine_matrix_from_points(traj[1:],gps_part,shear=False,scale=True)
+        error[idx] = error_M(M.ravel(),data)
+        
+        if output:
+            return traj, gps_part, M, error
+        else:
+            return error
+
+
+    model = np.array([alpha, beta])
+
+    fn = lambda x: error_fn(x)
+    ls = least_squares(fn,model)
+
+    traj, gps_part, M, error = error_fn(np.array([ls.x[0],ls.x[1]]),output=True)
+
+    return ls, [traj, gps_part, M, error]
+
+
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
@@ -42,75 +78,21 @@ if __name__ == "__main__":
 
     # Set parameters
     f_gps = 5
-    f_spline = 29.727612
+    f_spline = 30
     alpha = f_spline / f_gps
     beta = -1360
     error_min = np.inf
 
-    # Using Ransac to estimate transformation parameters in each small step
-    start = datetime.now()
-
-    beta_list = np.arange(beta-10,beta+10,0.1)
-    for beta in beta_list:
-        t_gps = alpha * np.arange(gps_ori.shape[1]) + beta
-        _, idx = flight.sampling(t_gps, flight.spline[1])
-        gps_part = gps_ori[:,idx]
-        t_part = t_gps[idx]
-        traj = flight.spline_to_traj(t=t_part)
-
-        # Ransac
-        data = np.vstack((traj[1:],gps_part))
-        result = ransac.vanillaRansac(estimate_M,error_M,data,3,2,100)
-
-        # Get errors after Ransac
-        error = error_M(result['model'],data)
-
-        # Check if this step is the best so far
-        if np.mean(error) < error_min:
-            error_min = np.mean(error)
-            error_ransac = error
-            beta_ransac = beta
-            M_ransac = result['model'].reshape(4,4)
-            result_ransac = result
-            traj_ransac = traj
-            gps_ransac = gps_part
-    print('\nTotal time: {}\n'.format(datetime.now()-start))
+    # Optimization
+    ls, result = optimize(alpha,beta,flight,gps_ori)
 
     # Apply the estimated transformation and show results
-    traj_tran = np.dot(M_ransac,util.homogeneous(traj_ransac[1:]))
+    alpha, beta = ls.x[0], ls.x[1]
+    traj, gps_part, M, error = result[0], result[1], result[2], result[3],
+
+    traj_tran = np.dot(M,util.homogeneous(traj[1:]))
     traj_tran /= traj_tran[-1]
-    print('The mean error (distance) is {:.3f} meter'.format(np.mean(error_ransac)))
-    vis.show_trajectory_3D(traj_tran, gps_ransac, line=False)
-
-    # # Show results
-    # print('\nTime: {}\n'.format(datetime.now()-start))
-    # print('The mean error (distance) of the PART is {:.3f} meter'.format(np.mean(error)))
-    # vis.show_trajectory_3D(traj_tran,gps_part)
-
-    # #  Apply the estimated transformation to the entire reconstruction
-    # idx_gps = (traj[0]-idx_ransac[0])/6 +k
-    # idx_gps = np.unique(idx_gps.astype(int))
-    # traj_tran_all = np.dot(M_ransac,util.homogeneous(traj[1:]))
-    # traj_tran_all /= traj_tran_all[-1]
-
-    # idx_sample = (idx_gps - k)*6 + idx_ransac[0]
-    # tck, u = splprep(traj[1:],u=traj[0],s=0)
-    # s = splev(idx_sample,tck)
-    # traj_sample = np.array([s[0],s[1],s[2]])
-    # traj_tran_sample = np.dot(M_ransac,util.homogeneous(traj_sample))
-    # traj_tran_sample /= traj_tran_sample[-1]
-    # error_all = np.sqrt((gps_ori[0,idx_gps]-traj_tran_sample[0])**2 + (gps_ori[1,idx_gps]-traj_tran_sample[1])**2 + (gps_ori[2,idx_gps]-traj_tran_sample[2])**2)
-    # print('The mean error (distance of the ENTIRE is {:.3f} meter'.format(np.mean(error_all)))
-
-    # fig = plt.figure(figsize=(20, 15))
-    # ax = fig.add_subplot(111,projection='3d')
-    # ax.scatter3D(traj_tran_all[0],traj_tran_all[1],traj_tran_all[2],c='r',s=100)
-    # ax.scatter3D(gps_ori[0,idx_gps],gps_ori[1,idx_gps],gps_ori[2,idx_gps],c='b',s=100)
-    # ax.set_xlabel('East',fontsize=20)
-    # ax.set_ylabel('North',fontsize=20)
-    # ax.set_zlabel('Up',fontsize=20)
-    # plt.show()
-    # vis.show_trajectory_3D(traj_tran_all,gps_ori[:,idx_gps],line=False,color=False)
-
+    print('The mean error (distance) is {:.3f} meter\n'.format(np.mean(error)))
+    vis.show_trajectory_3D(traj_tran, gps_part, line=False)
 
     print('Finish!')
