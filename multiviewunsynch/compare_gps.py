@@ -37,7 +37,10 @@ def optimize(alpha, beta, flight, gps):
     def error_fn(model,output=False):
         alpha, beta = model[0], model[1]
         t_gps = alpha * np.arange(gps.shape[1]) + beta
-        _, idx = flight.sampling(t_gps, flight.spline[1])
+        try:
+            _, idx = flight.sampling(t_gps, flight.spline[1])
+        except:
+            _, idx = flight.sampling(t_gps, flight.spline['int'])
         gps_part = gps[:,idx]
         t_part = t_gps[idx]
         traj = flight.spline_to_traj(t=t_part)
@@ -70,7 +73,7 @@ def optimize(alpha, beta, flight, gps):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    with open('./data/paper/fixposition/trajectory/flight_spline_2.pkl', 'rb') as file:
+    with open('./data/paper/fixposition/trajectory/flight_multi_5cam.pkl', 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data

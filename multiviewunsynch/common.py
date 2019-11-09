@@ -353,7 +353,7 @@ class Scene:
         return X_idx
 
 
-class Scene_global_timeline(Scene):
+class Scene_multi_spline(Scene):
     '''
     A updated version of the class Scene, in which a global timeline is defined
     '''
@@ -362,6 +362,7 @@ class Scene_global_timeline(Scene):
         super().__init__()
         self.alpha = None
         self.detections_global = []
+        self.spline = {'tck':None, 'int':None}
 
 
     def init_alpha(self,prior=[]):
@@ -377,11 +378,9 @@ class Scene_global_timeline(Scene):
                 self.alpha[i] = fps_ref / self.cameras[i].fps
 
 
-    def detection_to_global(self, *cam):
+    def detection_to_global(self, *cam, distortion=True):
         '''
         Convert frame indices of raw detections into the global timeline.
-
-        DISTORTION is considered.
 
         Input is an iterable that specifies which detection(s) to compute.
 
@@ -390,31 +389,51 @@ class Scene_global_timeline(Scene):
 
         assert len(self.alpha)==self.numCam and len(self.beta)==self.numCam, 'The Number of alpha and beta is wrong'
 
-        # if len(cam):
-        #     for i in cam:
-        #         detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
-        #         self.detections_global[i] = detect_global
-        # else:
-        #     self.detections_global = []
-        #     for i in range(self.numCam):
-        #         detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
-        #         self.detections_global.append(detect_global)
-
-        if len(cam):
-            for i in cam:
-                detect_temp = detect_undistort([self.detections[i]], [self.cameras[i]])
-                self.detections_undist[i] = detect_temp[0]
-                detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
-                self.detections_global[i] = detect_global
+        if not distortion:
+            if len(cam):
+                for i in cam:
+                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                    self.detections_global[i] = detect_global
+            else:
+                self.detections_global = []
+                for i in range(self.numCam):
+                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                    self.detections_global.append(detect_global)
         else:
-            self.detections_undist = detect_undistort(self.detections, self.cameras)
-            self.detections_global = []
-            for i in range(self.numCam):
-                detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
-                self.detections_global.append(detect_global)
+            if len(cam):
+                for i in cam:
+                    detect_temp = detect_undistort([self.detections[i]], [self.cameras[i]])
+                    self.detections_undist[i] = detect_temp[0]
+                    detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
+                    self.detections_global[i] = detect_global
+            else:
+                self.detections_undist = detect_undistort(self.detections, self.cameras)
+                self.detections_global = []
+                for i in range(self.numCam):
+                    detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
+                    self.detections_global.append(detect_global)
 
 
-    def find_intervals(self,x,gap=5):
+    def cut_detection(self,second=1):
+        '''
+        Truncate the starting and end part of each continuous part of the detections
+        '''
+
+        for i in range(self.numCam):
+            detect = self.detections[i]
+            interval = self.find_intervals(detect[0])
+            cut = int(self.cameras[i].fps * second)
+
+            interval_long = interval[:,interval[1]-interval[0]>cut*2]
+            interval_long[0] += cut
+            interval_long[1] -= cut
+
+            assert (interval_long[1]-interval_long[0]>=0).all()
+
+            self.detections[i], _ = self.sampling(detect,interval_long)
+
+    
+    def find_intervals(self,x,gap=5,idx=False):
         '''
         Given indices of detections, return a matrix that contains the start and the end of each
         continues part.
@@ -424,38 +443,55 @@ class Scene_global_timeline(Scene):
         The gap defines the maximal interruption, with which it's still considered as continues. 
         '''
 
-        assert len(x.shape)==1, 'Input must be a 1D-array'
+        assert len(x.shape)==1 and (x[1:]>x[:-1]).all(), 'Input must be an ascending 1D-array'
 
-        interval = np.array([[x[0]],[np.nan]])
-        for i in range(1,len(x)):
-            assert x[i]-x[i-1]>0, 'Input must be in ascending order'
-            if x[i]-x[i-1] > gap:
-                interval[1,-1] = x[i-1]
-                interval = np.append(interval,[[x[i]],[np.nan]],axis=1)
-        interval[1,-1] = x[-1]
-        return interval
+        # Compute start and end
+        x_s, x_e = np.append(-np.inf,x), np.append(x,np.inf)
+        start = x_s[1:] - x_s[:-1] >= gap
+        end = x_e[:-1] - x_e[1:] <= -gap
+        interval = np.array([x[start],x[end]])
+        int_idx = np.array([np.where(start)[0],np.where(end)[0]])
+
+        # Remove single points
+        mask = interval[1]>interval[0]
+        interval = interval[:,mask]
+        int_idx = int_idx[:,mask]
+
+        assert (interval[0,1:]>interval[1,:-1]).all()
+
+        if idx:
+            return interval, int_idx
+        else:
+            return interval
 
 
-    def sampling(self,x,interval):
+    def sampling(self,x,interval,belong=False):
         '''
         Sample points from the input which are inside the given intervals
         '''
 
+        # Define timestamps
         if len(x.shape)==1:
             timestamp = x
         elif len(x.shape)==2:
             assert x.shape[0]==3 or x.shape[0]==4, 'Input should be 1D array or 2D array with 3 or 4 rows'
             timestamp = x[0]
-  
-        t_bool = np.zeros_like(timestamp, dtype=bool)
-        for i in interval.T:
-            t_bool = t_bool | np.logical_xor(timestamp-i[0] > 0, timestamp-i[1] > 0)
-        idx_ts = np.where(t_bool)[0]
+
+        # Sample points from each interval
+        idx_ts = np.zeros_like(timestamp, dtype=int)
+        for i in range(interval.shape[1]):
+            mask = np.logical_xor(timestamp-interval[0,i] >= 0, timestamp-interval[1,i] >= 0)
+            idx_ts[mask] = i+1
+
+        if not belong:
+            idx_ts = idx_ts.astype(bool)
 
         if len(x.shape)==1:
-            return x[idx_ts], idx_ts
+            return x[idx_ts.astype(bool)], idx_ts
         elif len(x.shape)==2:
-            return x[:,idx_ts], idx_ts
+            return x[:,idx_ts.astype(bool)], idx_ts
+        else:
+            raise Exception('The shape of input is wrong')
 
 
     def match_overlap(self,x,y):
@@ -517,17 +553,22 @@ class Scene_global_timeline(Scene):
         self.cameras[t2].decompose()
 
 
-    def traj_to_spline(self,smooth_factor=0.01):
+    def traj_to_spline(self,smooth_factor=0.001):
         '''
         Convert discrete 3D trajectory into spline representation
 
-        Outputs are spline parameters and intervals
+        A single spline is built for each interval
         '''
 
-        interval = self.find_intervals(self.traj[0])
-        tck, u = interpolate.splprep(self.traj[1:],u=self.traj[0],s=smooth_factor,k=3)
-        self.spline = [tck, interval]
+        timestamp = self.traj[0]
+        interval, idx = self.find_intervals(timestamp,idx=True)
+        tck = [None] * interval.shape[1]
 
+        for i in range(interval.shape[1]):
+            part = self.traj[:,idx[0,i]:idx[1,i]+1]
+            tck[i], u = interpolate.splprep(part[1:],u=part[0],s=smooth_factor,k=3)
+            
+        self.spline['tck'], self.spline['int'] = tck, interval
         return self.spline
 
 
@@ -540,18 +581,21 @@ class Scene_global_timeline(Scene):
         Outputs are 3D points
         '''
         
-        tck, interval = self.spline[0], self.spline[1]
+        tck, interval = self.spline['tck'], self.spline['int']
+        self.traj = np.empty([4,0])
 
         if t is not None:
             assert len(t.shape)==1, 'Input timestamps must be a 1D array'
             timestamp = t
         else:
-            timestamp = np.array([])
-            for i in range(interval.shape[1]):
-                timestamp = np.concatenate((timestamp, np.arange(interval[0,i], interval[1,i], sampling_rate)))
+            timestamp = np.arange(interval[0,0], interval[1,-1], sampling_rate)
 
-        traj = np.asarray(interpolate.splev(timestamp, tck))
-        self.traj = np.vstack((timestamp,traj))
+        for i in range(interval.shape[1]):
+            t_part = timestamp[np.logical_and(timestamp>=interval[0,i], timestamp<=interval[1,i])]
+            traj_part = np.asarray(interpolate.splev(t_part, tck[i]))
+            self.traj = np.hstack((self.traj, np.vstack((t_part,traj_part))))
+
+        assert (self.traj[0,1:] > self.traj[0,:-1]).all()
 
         return self.traj
 
@@ -563,14 +607,20 @@ class Scene_global_timeline(Scene):
         Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'each'
         '''
 
-        tck, interval = self.spline[0], self.spline[1]
+        tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id)
 
-        detect_2D, idx = self.sampling(self.detections_global[cam_id], interval)
-        point_3D = np.asarray(interpolate.splev(detect_2D[0], tck))
+        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
+        detect = np.empty([3,0])
+        point_3D = np.empty([3,0])
+        for i in range(interval.shape[1]):
+            detect_part = self.detections_global[cam_id][:,idx==i+1]
+            if detect_part.size:
+                detect = np.hstack((detect,detect_part))
+                point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
 
         X = util.homogeneous(point_3D)
-        x = detect_2D[1:]
+        x = detect[1:]
         x_cal = self.cameras[cam_id].projectPoint(X)
 
         if mode == 'dist':
@@ -582,8 +632,8 @@ class Scene_global_timeline(Scene):
         elif mode == 'each':
             error_x = np.zeros_like(self.detections[cam_id][0])
             error_y = np.zeros_like(self.detections[cam_id][0])
-            error_x[idx] = abs(x_cal[0]-x[0])
-            error_y[idx] = abs(x_cal[1]-x[1])
+            error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
+            error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             return np.concatenate((error_x, error_y))
 
     
@@ -593,18 +643,19 @@ class Scene_global_timeline(Scene):
         '''
 
         self.visible = []
-        interval = self.spline[1]
+        interval = self.spline['int']
         self.detection_to_global()
 
-        for i in range(self.numCam):
-            visible = np.zeros_like(self.detections[i][0])
-            _, idx = self.sampling(self.detections_global[i], interval)
-            visible[idx] = 1
+        for cam_id in range(self.numCam):
+            _, visible = self.sampling(self.detections_global[cam_id], interval, belong=True)
             self.visible.append(visible)
 
 
     def BA(self, numCam, max_iter=10):
         '''
+        Bundle Adjustment with multiple splines
+
+        The camera order is assumed to be the same as self.sequence
         '''
 
         def error_BA(x):
@@ -614,16 +665,18 @@ class Scene_global_timeline(Scene):
 
             # Assign parameters to the class attributes
             sections = [numCam, numCam*2, numCam*2+numCam*12]
-            p = np.split(x, sections)
-            self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = p[0], p[1]
+            model_parts = np.split(x, sections)
+            self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
 
-            cams = np.split(p[2],numCam)
+            cams = np.split(model_parts[2],numCam)
             for i in range(numCam):
                 self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
             
-            spline_temp = p[3].reshape(3,-1)
-            self.spline[0][1][0], self.spline[0][1][1], self.spline[0][1][2] = spline_temp[0], spline_temp[1], spline_temp[2]
-
+            spline_parts = np.split(model_parts[3],idx_spline[0,1:])
+            for i in range(len(spline_parts)):
+                spline_i = spline_parts[i].reshape(3,-1)
+                self.spline['tck'][i][1] = [spline_i[0],spline_i[1],spline_i[2]]
+            
             # Compute errors
             error = np.array([])
             for i in range(numCam):
@@ -634,17 +687,11 @@ class Scene_global_timeline(Scene):
 
 
         def jac_BA(near=3):
-            '''
-            Inputs are the model (parameters that need to be optimized) and the knot vector of 3D spline
-            '''
-
-            knot = self.spline[0][0][2:-2]
-            assert len(knot)==len(self.spline[0][1][0]), 'The Number of knots is wrong'
 
             num_param = len(model)
             self.compute_visibility()
 
-            jac = np.zeros_like(model)
+            jac = np.empty([0,num_param])
             for i in range(numCam):
                 cam_id = self.sequence[i]
                 num_detect = self.detections[cam_id].shape[1]
@@ -661,11 +708,16 @@ class Scene_global_timeline(Scene):
 
                 # spline parameters
                 for j in range(num_detect):
-                    if self.visible[cam_id][j]:
+                    spline_id = self.visible[cam_id][j]
+
+                    # Find the corresponding spline for each detecion
+                    if spline_id:
+                        spline_id -= 1
+                        knot = self.spline['tck'][spline_id][0][2:-2]
                         timestamp = self.detections_global[cam_id][0,j]
                         knot_idx = np.argsort(abs(knot-timestamp))[:near]
                         knot_idx = np.concatenate((knot_idx, knot_idx+len(knot), knot_idx+2*len(knot)))
-                        jac_cam[j,2*numCam+12*numCam+knot_idx] = 1
+                        jac_cam[j,idx_spline_sum[0,spline_id]+knot_idx] = 1
                     else:
                         jac_cam[j,:] = 0
 
@@ -674,11 +726,12 @@ class Scene_global_timeline(Scene):
             # fix the first camera
             jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
 
-            return jac[1:]
+            return jac
 
 
-        start = datetime.now()
+        starttime = datetime.now()
         
+        '''Before BA'''
         # Define Parameters that will be optimized
         model_alpha = self.alpha[self.sequence[:numCam]]
         model_beta = self.beta[self.sequence[:numCam]]
@@ -687,34 +740,52 @@ class Scene_global_timeline(Scene):
         for i in self.sequence[:numCam]:
             model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(n=12)))
 
-        model_spline = np.ravel(self.spline[0][1])
-        model = np.concatenate((model_alpha, model_beta, model_cam, model_spline))
+        # Reorganized splines into 1D and record indices of each spline
+        num_spline = len(self.spline['tck'])
+        idx_spline = np.zeros((2,num_spline),dtype=int)
+        start = 0
+        model_spline = np.array([])
+        for i in range(num_spline):
+            model_spline_i = np.ravel(self.spline['tck'][i][1])
+            model_spline = np.concatenate((model_spline, model_spline_i))
+
+            end = start + len(model_spline_i)
+            idx_spline[:,i] = [start,end]
+            start = end
+
+        model_other = np.concatenate((model_alpha, model_beta, model_cam))
+        idx_spline_sum = idx_spline + len(model_other)
+        model = np.concatenate((model_other, model_spline))
+        assert idx_spline_sum[-1,-1] == len(model), 'Wrong with spline indices'
 
         # Set the Jacobian matrix
         print('\nComputing the sparse structure of the Jacobian matrix...\n')
         A = jac_BA()
 
-        # Compute non-linear optimization
+        '''Compute BA'''
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
         res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',max_nfev=max_iter)
 
-        # Assign the optimized model to the scene
+        '''After BA'''
+        # Assign the optimized model to alpha, beta, cam, and spline
         sections = [numCam, numCam*2, numCam*2+numCam*12]
-        p = np.split(res.x, sections)
-        self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = p[0], p[1]
+        model_parts = np.split(res.x, sections)
+        self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
 
-        cams = np.split(p[2],numCam)
+        cams = np.split(model_parts[2],numCam)
         for i in range(numCam):
             self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
         
-        spline_temp = p[3].reshape(3,-1)
-        self.spline[0][1][0], self.spline[0][1][1], self.spline[0][1][2] = spline_temp[0], spline_temp[1], spline_temp[2]
+        spline_parts = np.split(model_parts[3],idx_spline[0,1:])
+        for i in range(len(spline_parts)):
+            spline_i = spline_parts[i].reshape(3,-1)
+            self.spline['tck'][i][1] = [spline_i[0],spline_i[1],spline_i[2]]
 
         # Update global timestamps for each serie of detections
         self.detection_to_global()
 
-        print('BA finished in: {}'.format(datetime.now()-start))
+        print('BA finished in: {}'.format(datetime.now()-starttime))
 
         return res
 
@@ -732,24 +803,27 @@ class Scene_global_timeline(Scene):
 
     def get_camera_pose(self, cam_id, error=8, verbose=0):
         '''
-        Get the absolute of a camera by solving the PnP problem.
+        Get the absolute pose of a camera by solving the PnP problem.
 
         Take care with DISTORSION model!
         '''
         
-        tck, interval = self.spline[0], self.spline[1]
+        tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id)
 
-        detect_2D, idx = self.sampling(self.detections_global[cam_id], interval)
-        point_3D = np.asarray(interpolate.splev(detect_2D[0], tck))
-
-        X = util.homogeneous(point_3D)
-        x = util.homogeneous(detect_2D[1:])
+        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
+        detect = np.empty([3,0])
+        point_3D = np.empty([3,0])
+        for i in range(interval.shape[1]):
+            detect_part = self.detections_global[cam_id][:,idx==i+1]
+            if detect_part.size:
+                detect = np.hstack((detect,detect_part))
+                point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
 
         # PnP solution from OpenCV
-        N = X.shape[1]
-        objectPoints = np.ascontiguousarray(X[:3].T).reshape((N,1,3))
-        imagePoints  = np.ascontiguousarray(x[:2].T).reshape((N,1,2))
+        N = point_3D.shape[1]
+        objectPoints = np.ascontiguousarray(point_3D.T).reshape((N,1,3))
+        imagePoints  = np.ascontiguousarray(detect[1:].T).reshape((N,1,2))
         distCoeffs = np.append(self.cameras[cam_id].d, [0, 0, 0])
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
 
@@ -758,10 +832,10 @@ class Scene_global_timeline(Scene):
         self.cameras[cam_id].compose()
 
         if verbose:
-            print('{} out of {} points are inliers for PnP'.format(inliers.shape[0], X.shape[1]))
+            print('{} out of {} points are inliers for PnP'.format(inliers.shape[0], N))
             
 
-    def triangulate(self, cam_id, cams, refit=True, verbose=0):
+    def triangulate(self, cam_id, cams, factor_t2s=0.001, factor_s2t=0.02, refit=True, verbose=0):
         '''
         Triangulate new points to the existing 3D spline and optionally refit it
 
@@ -771,14 +845,12 @@ class Scene_global_timeline(Scene):
         '''
 
         assert self.cameras[cam_id].P is not None, 'The camera pose must be computed first'
-        tck, interval = self.spline[0], self.spline[1]
+        tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id)
 
         # Find detections from this camera that haven't been triangulated yet
         _, idx_ex = self.sampling(self.detections_global[cam_id], interval)
-        num_detect = self.detections_global[cam_id].shape[1]
-        idx_new = np.setdiff1d(np.arange(num_detect), idx_ex)
-        detect_new = self.detections_global[cam_id][:, idx_new]
+        detect_new = self.detections_global[cam_id][:, np.logical_not(idx_ex)]
 
         # Matching these detections with detections from previous cameras and triangulate them
         X_new = np.empty([4,0])
@@ -801,17 +873,17 @@ class Scene_global_timeline(Scene):
                     print('{} points are triangulated into the 3D spline'.format(X_i.shape[1]))
 
         _, idx_empty = self.sampling(X_new, interval)
-        assert len(idx_empty)==0, 'Points should not be triangulated into the existing part of the 3D spline'
+        assert sum(idx_empty)==0, 'Points should not be triangulated into the existing part of the 3D spline'
 
         # Add these points to the discrete 3D trajectory
-        self.spline_to_traj(sampling_rate=0.02)
+        self.spline_to_traj(sampling_rate=factor_s2t)
         self.traj = np.hstack((self.traj, X_new))
         _, idx = np.unique(self.traj[0], return_index=True)
         self.traj = self.traj[:, idx]
 
         # refit the 3D spline if wanted
         if refit:
-            self.traj_to_spline()
+            self.traj_to_spline(smooth_factor=factor_t2s)
 
         return X_new
         
@@ -987,26 +1059,6 @@ def detect_spline_fitting(d,smooth):
 
 
 def detect_to_track(detections,beta):
-
-    # Track_all = [[] for i in range(len(detections))]
-    # idx_min = 0
-    # for i in range(len(detections)):
-    #     track = copy.deepcopy(detections[i])
-    #     track[0] -= track[0,0]
-
-    #     if i == 0:
-    #         Track_all[i] = track
-    #     else:
-    #         track_idx = track[0] - beta[i]
-    #         track[1] = util.spline_fitting(track[1],np.round(track_idx),track_idx,k=1,s=0)
-    #         track[2] = util.spline_fitting(track[2],np.round(track_idx),track_idx,k=1,s=0)
-    #         track[0] = np.round(track_idx)
-    #         Track_all[i] = track[:,1:-1]
-
-    #         if Track_all[i][0,0] < idx_min:
-    #             idx_min = Track_all[i][0,0]
-    # for i in Track_all:
-    #     i[0] = i[0] - idx_min
 
     Track_all = [[] for i in range(len(detections))]
     for i in range(len(detections)):
