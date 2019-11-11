@@ -192,7 +192,7 @@ def show_3D_all(*X,title=None,color=True,line=True):
                 ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker='o',label=label[i])
             else:
                 ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker=m[i],label=label[i])
-                ax.plot(X[i][0],X[i][1],X[i][2],c=c[i])
+                # ax.plot(X[i][0],X[i][1],X[i][2],c=c[i])
 
         else:
             ax.scatter3D(X[i][0],X[i][1],X[i][2])
@@ -232,6 +232,46 @@ def show_spline(*spline,title=None):
 
     if title:
         plt.suptitle(title)
+    plt.show()
+
+
+def error_hist(error,bins=None,title=None,label=None):
+
+    assert len(error.shape)==1, 'Input must be a 1D array'
+
+    if not bins:    bins = np.arange(0,70,5)
+    if not title:   title = 'Error histogram [cm]'
+    if not label:   label = 'Spline'
+
+    plt.figure(figsize=(20, 15))
+    plt.hist(error.T*100, bins, histtype='bar', color='b',label=label)
+    plt.xticks(bins,fontsize=30)
+    plt.yticks(fontsize=30)
+    plt.legend(loc=1, prop={'size': 30})
+    plt.title(title, fontsize=25)
+    plt.show()
+
+
+def error_traj(traj,error,title=None,colormap='Wistia',size=100):
+
+    assert len(error.shape)==1, 'Input must be a 1D array'
+    assert traj.shape[0]==3, 'Input must be a 3D array'
+    assert len(error)==traj.shape[1], 'Error must have the same shape as the trajectory'
+
+    if not title:   title = 'Error over the trajectory [cm]'
+
+    fig = plt.figure(figsize=(20, 15))
+    plt.set_cmap(colormap)
+    ax = fig.add_subplot(111,projection='3d')
+    sc = ax.scatter3D(traj[0],traj[1],traj[2],c=error*100,marker='o',s=size)
+    ax.set_xlabel('East',fontsize=20)
+    ax.set_ylabel('North',fontsize=20)
+    ax.set_zlabel('Up',fontsize=20)
+    ax.view_init(elev=30,azim=-50)
+
+    cbar = plt.colorbar(sc,fraction=0.046, pad=0.04)
+    cbar.ax.tick_params(labelsize=40)
+    plt.title(title, fontsize=25)
     plt.show()
 
 

@@ -25,6 +25,8 @@ cut_second = 0.5
 sequence = [0,4,2,1,5,3]
 smooth_factor = 0.0005
 sampling_rate = 0.02
+tri_thres = 20
+setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
 
 # Load camara intrinsic and radial distortions
 intrin_1 = scio.loadmat('./data/paper/fixposition/calibration/calib_mate10.mat')
@@ -52,6 +54,7 @@ detect_6 = np.loadtxt('./data/paper/fixposition/detection/outp_sony5n1.txt',usec
 
 # Create a scene
 flight = common.Scene_multi_spline()
+flight.setting = setting
 flight.addCamera(*cameras)
 flight.addDetection(detect_1, detect_2, detect_3, detect_4, detect_5, detect_6)
 
@@ -98,7 +101,7 @@ while True:
     flight.get_camera_pose(flight.sequence[cam_temp])
 
     # Triangulate new points and update the 3D spline
-    flight.triangulate(flight.sequence[cam_temp], flight.sequence[:cam_temp], factor_t2s=smooth_factor, factor_s2t=sampling_rate)
+    flight.triangulate(flight.sequence[cam_temp], flight.sequence[:cam_temp], thres=tri_thres, factor_t2s=smooth_factor, factor_s2t=sampling_rate)
 
     print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
     cam_temp += 1

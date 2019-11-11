@@ -17,15 +17,9 @@ from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
 
-
-with open('./data/paper/fixposition/trajectory/flight_spline_1.pkl', 'rb') as file:
+data_file = ''
+with open(data_file, 'rb') as file:
     flight = pickle.load(file)
-
-with open('./data/paper/fixposition/trajectory/flight_spline_2.pkl', 'rb') as file:
-    flight_2 = pickle.load(file)
-
-
-vis.show_trajectory_3D(flight.traj[1:], flight_2.traj[1:], line=False)
 
 
 print('Finish!')

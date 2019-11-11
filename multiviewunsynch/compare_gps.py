@@ -73,12 +73,15 @@ def optimize(alpha, beta, flight, gps):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    with open('./data/paper/fixposition/trajectory/flight_multi_5cam.pkl', 'rb') as file:
+    data_path = './data/paper/fixposition/trajectory/flight_multi_6_all.pkl'
+    with open(data_path, 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data
     gps_ori = np.loadtxt('./data/paper/fixposition/GT_position/GT_ENU.txt').T
 
+
+    '''-----------------Transformation estimation-----------------'''
     # Set parameters
     f_gps = 5
     f_spline = 30
@@ -91,11 +94,25 @@ if __name__ == "__main__":
 
     # Apply the estimated transformation and show results
     alpha, beta = ls.x[0], ls.x[1]
-    traj, gps_part, M, error = result[0], result[1], result[2], result[3],
+    traj, gps_part, M = result[0], result[1], result[2]
 
     traj_tran = np.dot(M,util.homogeneous(traj[1:]))
     traj_tran /= traj_tran[-1]
-    print('The mean error (distance) is {:.3f} meter\n'.format(np.mean(error)))
+    error = np.sqrt(np.sum((gps_part-traj_tran[:3])**2,axis=0))
+    print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(error)))
     vis.show_trajectory_3D(traj_tran, gps_part, line=False)
+
+
+    '''-----------------Visualization-----------------'''
+    # Error histogram
+    vis.error_hist(error)
+
+    # Error over the trajectory
+    vis.error_traj(traj_tran[:3],error)
+
+    # save the comparison result
+    flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3]}
+    with open(data_path,'wb') as f:
+        pickle.dump(flight, f) 
 
     print('Finish!')
