@@ -12,6 +12,8 @@ import visualization as vis
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 
 class Scene:
@@ -365,6 +367,7 @@ class Scene_multi_spline(Scene):
         self.alpha = None
         self.detections_global = []
         self.spline = {'tck':None, 'int':None}
+        self.cam_model = 12
 
 
     def init_alpha(self,prior=[]):
@@ -404,22 +407,23 @@ class Scene_multi_spline(Scene):
         else:
             if len(cam):
                 for i in cam:
-                    detect_temp = detect_undistort([self.detections[i]], [self.cameras[i]])
-                    self.detections_undist[i] = detect_temp[0]
-                    detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
-                    self.detections_global[i] = detect_global
+                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i]
+                    detect = self.cameras[i].undist_point(self.detections[i][1:])
+                    self.detections_global[i] = np.vstack((timestamp,detect))
             else:
-                self.detections_undist = detect_undistort(self.detections, self.cameras)
                 self.detections_global = []
                 for i in range(self.numCam):
-                    detect_global = np.vstack((self.alpha[i] * self.detections_undist[i][0] + self.beta[i], self.detections_undist[i][1:]))
-                    self.detections_global.append(detect_global)
+                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i]
+                    detect = self.cameras[i].undist_point(self.detections[i][1:])
+                    self.detections_global.append(np.vstack((timestamp,detect)))
 
 
     def cut_detection(self,second=1):
         '''
         Truncate the starting and end part of each continuous part of the detections
         '''
+
+        if not second: return
 
         for i in range(self.numCam):
             detect = self.detections[i]
@@ -544,9 +548,13 @@ class Scene_multi_spline(Scene):
         m1,m2 = cv2.correctMatches(F,pts1,pts2)
         x1,x2 = util.homogeneous(np.reshape(m1,(-1,2)).T), util.homogeneous(np.reshape(m2,(-1,2)).T)
 
+        mask = np.logical_not(np.isnan(x1[0]))
+        x1 = x1[:,mask]
+        x2 = x2[:,mask]
+
         # Triangulte points
         X, P = ep.triangulate_from_E(E,K1,K2,x1,x2)
-        self.traj = np.vstack((d1[0][inlier==1],X[:-1]))
+        self.traj = np.vstack((d1[0][inlier==1][mask],X[:-1]))
 
         # Assign the camera matrix for these two cameras
         self.cameras[t1].P = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
@@ -597,7 +605,10 @@ class Scene_multi_spline(Scene):
 
         for i in range(interval.shape[1]):
             t_part = timestamp[np.logical_and(timestamp>=interval[0,i], timestamp<=interval[1,i])]
-            traj_part = np.asarray(interpolate.splev(t_part, tck[i]))
+            try:
+                traj_part = np.asarray(interpolate.splev(t_part, tck[i]))
+            except:
+                continue
             self.traj = np.hstack((self.traj, np.vstack((t_part,traj_part))))
 
         assert (self.traj[0,1:] > self.traj[0,:-1]).all()
@@ -669,13 +680,13 @@ class Scene_multi_spline(Scene):
             '''
 
             # Assign parameters to the class attributes
-            sections = [numCam, numCam*2, numCam*2+numCam*12]
+            sections = [numCam, numCam*2, numCam*2+numCam*self.cam_model]
             model_parts = np.split(x, sections)
             self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
 
             cams = np.split(model_parts[2],numCam)
             for i in range(numCam):
-                self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
+                self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
             
             spline_parts = np.split(model_parts[3],idx_spline[0,1:])
             for i in range(len(spline_parts)):
@@ -708,8 +719,8 @@ class Scene_multi_spline(Scene):
                 jac_cam[:,[i,i+numCam]] = 1
 
                 # camera parameters
-                start = 2*numCam+i*12
-                jac_cam[:,start:start+12] = 1
+                start = 2*numCam+i*self.cam_model
+                jac_cam[:,start:start+self.cam_model] = 1
 
                 # spline parameters
                 for j in range(num_detect):
@@ -743,7 +754,7 @@ class Scene_multi_spline(Scene):
 
         model_cam = np.array([])
         for i in self.sequence[:numCam]:
-            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(n=12)))
+            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(n=self.cam_model)))
 
         # Reorganized splines into 1D and record indices of each spline
         num_spline = len(self.spline['tck'])
@@ -774,13 +785,13 @@ class Scene_multi_spline(Scene):
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline
-        sections = [numCam, numCam*2, numCam*2+numCam*12]
+        sections = [numCam, numCam*2, numCam*2+numCam*self.cam_model]
         model_parts = np.split(res.x, sections)
         self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
 
         cams = np.split(model_parts[2],numCam)
         for i in range(numCam):
-            self.cameras[self.sequence[i]].vector2P(cams[i], n=12) 
+            self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
         
         spline_parts = np.split(model_parts[3],idx_spline[0,1:])
         for i in range(len(spline_parts)):
@@ -829,7 +840,11 @@ class Scene_multi_spline(Scene):
         N = point_3D.shape[1]
         objectPoints = np.ascontiguousarray(point_3D.T).reshape((N,1,3))
         imagePoints  = np.ascontiguousarray(detect[1:].T).reshape((N,1,2))
-        distCoeffs = np.append(self.cameras[cam_id].d, [0, 0, 0])
+        cam_dist = self.cameras[cam_id].d
+        if len(cam_dist)==2:
+            distCoeffs = np.append(cam_dist, [0, 0, 0])
+        elif len(cam_dist)==3:
+            distCoeffs = np.array([cam_dist[0], cam_dist[1], 0, 0, cam_dist[2]])
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
 
         self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
@@ -903,6 +918,39 @@ class Scene_multi_spline(Scene):
 
         return X_new
         
+
+    def plot_reprojection(self,interval,match=True):
+        '''
+        Given temporal sections of the trajectory, plot the 2D reprojection of these sections for
+        each possible camera
+        '''
+
+        assert interval.shape[0]==2
+
+        for i in range(self.numCam):
+            detect_i, _ = self.sampling(self.detections_global[i],interval)
+            traj = self.spline_to_traj(t=detect_i[0])
+            
+            if traj.size:
+                if match:
+                    xy,x_ind,y_ind = np.intersect1d(detect_i[0],traj[0],assume_unique=True,return_indices=True)
+                    detect_i = detect_i[:,x_ind]
+                    traj = traj[:,y_ind]
+
+                try:
+                    repro = self.cameras[i].projectPoint(traj[1:])
+                except:
+                    continue
+                
+                plt.figure(figsize=(12, 10))
+                plt.scatter(detect_i[1],detect_i[2],c='red')
+                plt.scatter(repro[0],repro[1],c='blue')
+                plt.xlabel('X')
+                plt.ylabel('Y')
+                plt.suptitle('Camera {}: undistorted detection (red) vs reporjection (blue)'.format(i))
+
+        plt.show()
+
 
 class Scene_single_spline(Scene):
     '''
@@ -1417,6 +1465,10 @@ class Camera:
         self.c = kwargs.get('c')
         self.fps = kwargs.get('fps')
 
+        if kwargs.get('tan') is None:
+            self.tan = np.array([0,0],dtype=float)
+        else:
+            self.tan = kwargs.get('tan')
 
     def projectPoint(self,X):
 
@@ -1477,7 +1529,10 @@ class Camera:
             return np.concatenate((k,r,self.t,self.d))
         elif n==12:
             k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
-            return np.concatenate((k,r,self.t,self.d))
+            return np.concatenate((k,r,self.t,self.d[:2]))
+        elif n==13:
+            k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
+            return np.concatenate((k,r,self.t,self.d[:3]))
 
 
     def vector2P(self,vector,n=6):
@@ -1511,11 +1566,41 @@ class Camera:
             self.K[:2,-1] = vector[2:4]
             self.R = cv2.Rodrigues(vector[4:7])[0]
             self.t = vector[7:10]
-            self.d = vector[-2:]
+            self.d = vector[10:12]
+        elif n==13:
+            self.K = np.diag((1,1,1)).astype(float)
+            self.K[0,0], self.K[1,1] = vector[0], vector[1]
+            self.K[:2,-1] = vector[2:4]
+            self.R = cv2.Rodrigues(vector[4:7])[0]
+            self.t = vector[7:10]
+            self.d = vector[10:13]
 
         self.compose()
         return self.P
     
+
+    def undist_point(self,points):
+        
+        assert points.shape[0]==2, 'Input must be a 2D array'
+
+        num = points.shape[1]
+
+        if len(self.d)==2:
+            distCoeff = np.concatenate((self.d,self.tan))
+        elif len(self.d)==3:
+            if self.d[-1] == 0:
+                distCoeff = np.concatenate((self.d,self.tan))
+            else:
+                distCoeff = np.array([self.d[0], self.d[1], self.tan[0], self.tan[1], self.d[2]])
+        else:
+            raise Exception('Wrong distortion coefficients')
+
+        src = np.ascontiguousarray(points.T).reshape((num,1,2))
+        dst = cv2.undistortPoints(src, self.K, distCoeff)
+        dst_unnorm = np.dot(self.K, util.homogeneous(dst.reshape((num,2)).T))
+
+        return dst_unnorm[:2]
+
 
     def info(self):
         print('\n P:')
@@ -1541,12 +1626,6 @@ def detect_undistort(d,cameras):
             dst = cv2.undistortPoints(src,cameras[i].K,np.concatenate((cameras[i].d,np.array([0,0]))))
             dst_unnorm = np.dot(cameras[i].K, util.homogeneous(dst.reshape((detections[i].shape[1],2)).T))
             detections[i][1:] = dst_unnorm[:2]
-
-    # for i in range(len(detections)):
-    #         src = np.ascontiguousarray(detections[i][1:].T).reshape((detections[i].shape[1],1,2))
-    #         dst = cv2.undistortPoints(src,cameras[i].K,np.concatenate((cameras[i].d,np.array([0,0]))))
-    #         dst_unnorm = np.dot(cameras[i].K, util.homogeneous(dst.reshape((detections[i].shape[1],2)).T))
-    #         detections[i][1:] = dst_unnorm[:2]
 
     return detections
 

@@ -22,27 +22,48 @@ from scipy import interpolate
 rows = 100000
 error_F = 30
 cut_second = 0.5
-sequence = [0,4,2,1,5,3]
-smooth_factor = 0.0005
+cam_model = 6
+sequence = [0,4,2,1,5,3]       #[0,2,3,4,1,5]
+smooth_factor = 0.001
 sampling_rate = 0.02
 tri_thres = 20
-setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
+setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
 
-# Load camara intrinsic and radial distortions
-intrin_1 = scio.loadmat('./data/paper/fixposition/calibration/calib_mate10.mat')
-intrin_2 = scio.loadmat('./data/paper/fixposition/calibration/calib_sonyg.mat')
-intrin_3 = scio.loadmat('./data/paper/fixposition/calibration/calib_sony_alpha5100.mat')
-intrin_4 = scio.loadmat('./data/paper/fixposition/calibration/calib_mate7.mat')
-intrin_5 = scio.loadmat('./data/paper/fixposition/calibration/calib_gopro3.mat')
-intrin_6 = scio.loadmat('./data/paper/fixposition/calibration/calib_sony_a5n.mat')
-
-K1, K2, K3, K4, K5, K6 = intrin_1['intrinsic'], intrin_2['intrinsic'], intrin_3['intrinsic'], intrin_4['intrinsic'], intrin_5['intrinsic'], intrin_6['intrinsic']
-d1, d2, d3, d4, d5, d6 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion'][0], intrin_3['radial_distortion'][0], intrin_4['radial_distortion'][0], intrin_5['radial_distortion'][0], intrin_6['radial_distortion'][0]
-
+# Load FPS of each camera
 fps1, fps2, fps3, fps4, fps5, fps6 = 29.727612, 50, 29.970030, 30.020690, 59.940060, 25
 
-cameras = [common.Camera(K=K1,d=d1,fps=fps1), common.Camera(K=K2,d=d2,fps=fps2), common.Camera(K=K3,d=d3,fps=fps3), \
-           common.Camera(K=K4,d=d4,fps=fps4), common.Camera(K=K5,d=d5,fps=fps5), common.Camera(K=K6,d=d6,fps=fps6)]
+# # Load camara intrinsic and radial distortions
+# intrin_1 = scio.loadmat('./data/paper/fixposition/calibration/calib_mate10.mat')
+# intrin_2 = scio.loadmat('./data/paper/fixposition/calibration/calib_sonyg.mat')
+# intrin_3 = scio.loadmat('./data/paper/fixposition/calibration/calib_sony_alpha5100.mat')
+# intrin_4 = scio.loadmat('./data/paper/fixposition/calibration/calib_mate7.mat')
+# intrin_5 = scio.loadmat('./data/paper/fixposition/calibration/calib_gopro3.mat')
+# intrin_6 = scio.loadmat('./data/paper/fixposition/calibration/calib_sony_a5n.mat')
+
+# K1, K2, K3, K4, K5, K6 = intrin_1['intrinsic'], intrin_2['intrinsic'], intrin_3['intrinsic'], intrin_4['intrinsic'], intrin_5['intrinsic'], intrin_6['intrinsic']
+# d1, d2, d3, d4, d5, d6 = intrin_1['radial_distortion'][0], intrin_2['radial_distortion'][0], intrin_3['radial_distortion'][0], intrin_4['radial_distortion'][0], intrin_5['radial_distortion'][0], intrin_6['radial_distortion'][0]
+# d1, d2, d3, d4, d5, d6 = np.append(d1,0), np.append(d2,0), np.append(d3,0), np.append(d4,0), np.append(d5,0), np.append(d6,0)
+
+# cameras = [common.Camera(K=K1,d=d1,fps=fps1), common.Camera(K=K2,d=d2,fps=fps2), common.Camera(K=K3,d=d3,fps=fps3), \
+#            common.Camera(K=K4,d=d4,fps=fps4), common.Camera(K=K5,d=d5,fps=fps5), common.Camera(K=K6,d=d6,fps=fps6)]
+# gopro = np.load('./data/paper/fixposition/calibration/gopro.npz')
+# cameras[4].d = gopro.f.dist[0,[0,1,4]]
+# cameras[4].tan = gopro.f.dist[0,[2,3]]
+
+# Calibration from Opencv
+c1 = np.load('./data/paper/fixposition/calibration/mate10.npz')
+c2 = np.load('./data/paper/fixposition/calibration/sonyG.npz')
+c3 = np.load('./data/paper/fixposition/calibration/sony_alpha_5100.npz')
+c4 = np.load('./data/paper/fixposition/calibration/mate7.npz')
+c5 = np.load('./data/paper/fixposition/calibration/gopro.npz')
+c6 = np.load('./data/paper/fixposition/calibration/sony_alpha_5n.npz')
+
+cameras = [common.Camera(K=c1.f.mtx,d=c1.f.dist[0,[0,1,4]],fps=fps1,tan=c1.f.dist[0,[2,3]]),
+           common.Camera(K=c2.f.mtx,d=c2.f.dist[0,[0,1,4]],fps=fps2,tan=c2.f.dist[0,[2,3]]),
+           common.Camera(K=c3.f.mtx,d=c3.f.dist[0,[0,1,4]],fps=fps3,tan=c3.f.dist[0,[2,3]]),
+           common.Camera(K=c4.f.mtx,d=c4.f.dist[0,[0,1,4]],fps=fps4,tan=c4.f.dist[0,[2,3]]),
+           common.Camera(K=c5.f.mtx,d=c5.f.dist[0,[0,1,4]],fps=fps5,tan=c5.f.dist[0,[2,3]]),
+           common.Camera(K=c6.f.mtx,d=c6.f.dist[0,[0,1,4]],fps=fps6,tan=c6.f.dist[0,[2,3]])]
 
 # Load detections
 detect_1 = np.loadtxt('./data/paper/fixposition/detection/outp_mate10_1.txt',usecols=(2,0,1))[:rows].T
@@ -56,6 +77,7 @@ detect_6 = np.loadtxt('./data/paper/fixposition/detection/outp_sony5n1.txt',usec
 flight = common.Scene_multi_spline()
 flight.setting = setting
 flight.addCamera(*cameras)
+flight.cam_model = cam_model
 flight.addDetection(detect_1, detect_2, detect_3, detect_4, detect_5, detect_6)
 
 # Truncate detections

@@ -252,7 +252,7 @@ def error_hist(error,bins=None,title=None,label=None):
     plt.show()
 
 
-def error_traj(traj,error,title=None,colormap='Wistia',size=100):
+def error_traj(traj,error,title=None,colormap='Wistia',size=100, text=None):
 
     assert len(error.shape)==1, 'Input must be a 1D array'
     assert traj.shape[0]==3, 'Input must be a 3D array'
@@ -264,6 +264,15 @@ def error_traj(traj,error,title=None,colormap='Wistia',size=100):
     plt.set_cmap(colormap)
     ax = fig.add_subplot(111,projection='3d')
     sc = ax.scatter3D(traj[0],traj[1],traj[2],c=error*100,marker='o',s=size)
+
+    # Plot the timestamp of points that have large errors
+    if text is not None:
+        assert len(text)==len(error), 'Wrong number of timestamps'
+        text = text.astype(int)
+        for i in range(len(text)):
+            if error[i]>0.5:
+                ax.text(traj[0,i], traj[1,i], traj[2,i], str(text[i]), fontsize=5)
+
     ax.set_xlabel('East',fontsize=20)
     ax.set_ylabel('North',fontsize=20)
     ax.set_zlabel('Up',fontsize=20)

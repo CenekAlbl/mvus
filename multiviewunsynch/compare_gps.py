@@ -100,15 +100,21 @@ if __name__ == "__main__":
     traj_tran /= traj_tran[-1]
     error = np.sqrt(np.sum((gps_part-traj_tran[:3])**2,axis=0))
     print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(error)))
-    vis.show_trajectory_3D(traj_tran, gps_part, line=False)
 
 
     '''-----------------Visualization-----------------'''
+    # Compare the trajectories
+    vis.show_trajectory_3D(traj_tran, gps_part, line=False)
+
     # Error histogram
     vis.error_hist(error)
 
     # Error over the trajectory
-    vis.error_traj(traj_tran[:3],error)
+    vis.error_traj(traj_tran[:3],error,text=traj[0])
+
+    # Reprojection to 2D
+    interval = np.array([[0],[149000]])
+    flight.plot_reprojection(interval,match=False)
 
     # save the comparison result
     flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3]}
