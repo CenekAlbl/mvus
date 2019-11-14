@@ -740,7 +740,7 @@ class Scene_multi_spline(Scene):
                 jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
 
             # fix the first camera
-            jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
+            # jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
 
             return jac
 
@@ -806,7 +806,7 @@ class Scene_multi_spline(Scene):
         return res
 
 
-    def remove_outliers(self, *cams, thres=30):
+    def remove_outliers(self, cams, thres=30):
         '''
         Not done yet!
         '''
@@ -815,6 +815,9 @@ class Scene_multi_spline(Scene):
             error_all = self.error_cam(i,mode='each')
             error_xy = np.split(error_all,2)
             error = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
+
+            self.detections[i] = self.detections[i][:,error<thres]
+            self.detection_to_global(i)
 
 
     def get_camera_pose(self, cam_id, error=8, verbose=0):

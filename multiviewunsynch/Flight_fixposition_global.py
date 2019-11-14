@@ -26,8 +26,10 @@ cam_model = 6
 sequence = [0,4,2,1,5,3]       #[0,2,3,4,1,5]
 smooth_factor = 0.001
 sampling_rate = 0.02
-tri_thres = 20
-setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
+outlier_thres = 10
+tri_thres = 15
+setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
+           'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres, 'outlier_thres':outlier_thres}
 
 # Load FPS of each camera
 fps1, fps2, fps3, fps4, fps5, fps6 = 29.727612, 50, 29.970030, 30.020690, 59.940060, 25
@@ -114,6 +116,13 @@ while True:
     res = flight.BA(cam_temp)
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
+    flight.remove_outliers(flight.sequence[:cam_temp],thres=outlier_thres)
+
+    res = flight.BA(cam_temp)
+
+    print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
 
     if cam_temp == len(sequence):
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
