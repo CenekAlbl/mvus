@@ -21,13 +21,16 @@ import cProfile
 # Setting parameters
 rows = 100000
 error_F = 30
+error_PnP = 30
 cut_second = 0.5
 cam_model = 12
 sequence = [0,1,3,5,2,4]
 smooth_factor = 0.001
 sampling_rate = 0.05
-tri_thres = 20
-setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
+outlier_thres = 30
+tri_thres = 30
+setting = {'rows':rows, 'error_F':error_F, 'error_PnP':error_PnP, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
+           'smooth':smooth_factor, 'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
 
 # Load camara intrinsic and radial distortions
 K1 = np.loadtxt('./data/paper/MS/calibration/cam_0.txt')
@@ -93,12 +96,18 @@ while True:
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
+    flight.remove_outliers(flight.sequence[:cam_temp],thres=outlier_thres)
+
+    res = flight.BA(cam_temp)
+
+    print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
     if cam_temp == len(sequence):
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
         break
 
     # Add the next camera and get its pose
-    flight.get_camera_pose(flight.sequence[cam_temp])
+    flight.get_camera_pose(flight.sequence[cam_temp],error=error_PnP)
 
     # Triangulate new points and update the 3D spline
     flight.triangulate(flight.sequence[cam_temp], flight.sequence[:cam_temp], thres=tri_thres, factor_t2s=smooth_factor, factor_s2t=sampling_rate)

@@ -811,13 +811,14 @@ class Scene_multi_spline(Scene):
         Not done yet!
         '''
 
-        for i in cams:
-            error_all = self.error_cam(i,mode='each')
-            error_xy = np.split(error_all,2)
-            error = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
+        if thres:
+            for i in cams:
+                error_all = self.error_cam(i,mode='each')
+                error_xy = np.split(error_all,2)
+                error = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
 
-            self.detections[i] = self.detections[i][:,error<thres]
-            self.detection_to_global(i)
+                self.detections[i] = self.detections[i][:,error<thres]
+                self.detection_to_global(i)
 
 
     def get_camera_pose(self, cam_id, error=8, verbose=0):
