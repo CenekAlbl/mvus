@@ -383,10 +383,8 @@ class Scene_multi_spline(Scene):
                 self.alpha[i] = fps_ref / self.cameras[i].fps
 
     def beta_rs(self,i):
-        #if len(cam):
-        #for i in cam:
-        #beta_rs = self.alpha[i] * self.cameras[i].rs  * ( self.detections[i][2]/self.cameras[i].ydim)
-        beta_rs =  self.cameras[i].rs  * ( self.detections[i][2]/self.cameras[i].ydim)
+        beta_rs = self.alpha[i] * self.cameras[i].rs  * ( self.detections[i][2]/self.cameras[i].ydim)
+        #beta_rs =  self.cameras[i].rs  * ( self.detections[i][2]/self.cameras[i].ydim)
         #else:
         #    for i in range(self.numCam):
         #        beta_rs =  self.cameras[i].rs  * ( self.detections[i][2]/self.cameras[i].ydim)
