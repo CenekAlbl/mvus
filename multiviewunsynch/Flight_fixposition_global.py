@@ -22,11 +22,11 @@ from scipy import interpolate
 rows = 100000
 error_F = 30
 cut_second = 0.5
-cam_model = 6
+cam_model = 13
 sequence = [0,4,2,1,5,3]       #[0,2,3,4,1,5]
 smooth_factor = 0.001
 sampling_rate = 0.02
-outlier_thres = 10
+outlier_thres = 5
 tri_thres = 15
 setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
            'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres, 'outlier_thres':outlier_thres}

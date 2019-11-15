@@ -20,17 +20,17 @@ from scipy import interpolate, sparse
 '''---------------New computation----------------'''
 # Setting parameters
 rows = 100000
-error_F = 30
-error_PnP = 8
-cut_second = 0.2
+error_F = 10
+error_PnP = 30
+cut_second = 0
 cam_model = 12
-sequence = [0,1,3,2]
-smooth_factor = 0.001
+sequence = [0,3,2,1]
+smooth_factor = 0.0005
 sampling_rate = 0.02
-outlier_thres = 20
-tri_thres = 30
-setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence, 'smooth':smooth_factor,
-           'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
+outlier_thres = 50
+tri_thres = 50
+setting = {'rows':rows, 'error_F':error_F, 'error_PnP':error_PnP, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
+           'smooth':smooth_factor, 'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
 
 # Load FPS of each camera
 fps1, fps2, fps3, fps4 = 29.970030, 29.838692, 25, 25
@@ -49,10 +49,10 @@ cameras = [common.Camera(K=K1,d=d1,fps=fps1), common.Camera(K=K2,d=d2,fps=fps2),
            common.Camera(K=K4,d=d4,fps=fps4)]
 
 # Load detections
-detect_1 = np.loadtxt('./data/paper/thesis/detection/c1_f1.txt',usecols=(2,0,1))[:rows].T
-detect_2 = np.loadtxt('./data/paper/thesis/detection/c2_f1.txt',usecols=(2,0,1))[:rows].T
-detect_3 = np.loadtxt('./data/paper/thesis/detection/c3_f1.txt',usecols=(2,0,1))[:rows].T
-detect_4 = np.loadtxt('./data/paper/thesis/detection/c4_f1.txt',usecols=(2,0,1))[:rows].T
+detect_1 = np.loadtxt('./data/paper/thesis/detection/c1_f2.txt',usecols=(2,0,1))[:rows].T
+detect_2 = np.loadtxt('./data/paper/thesis/detection/c2_f2.txt',usecols=(2,0,1))[:rows].T
+detect_3 = np.loadtxt('./data/paper/thesis/detection/c3_f2.txt',usecols=(2,0,1))[:rows].T
+detect_4 = np.loadtxt('./data/paper/thesis/detection/c4_f2.txt',usecols=(2,0,1))[:rows].T
 
 # Create a scene
 flight = common.Scene_multi_spline()
@@ -69,7 +69,7 @@ flight.set_sequence(sequence)
 
 # Add prior alpha and beta for each cameras
 flight.init_alpha()
-flight.beta = np.array([0.0, 20.97, 578.88, 80.1])
+flight.beta = np.array([0.0, -714, -794.8, -384])
 
 # Convert raw detections into the global timeline
 flight.detection_to_global()

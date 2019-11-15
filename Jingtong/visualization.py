@@ -252,7 +252,7 @@ def error_hist(error,bins=None,title=None,label=None):
     plt.show()
 
 
-def error_traj(traj,error,title=None,colormap='Wistia',size=100, text=None):
+def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=None):
 
     assert len(error.shape)==1, 'Input must be a 1D array'
     assert traj.shape[0]==3, 'Input must be a 3D array'
@@ -270,7 +270,7 @@ def error_traj(traj,error,title=None,colormap='Wistia',size=100, text=None):
         assert len(text)==len(error), 'Wrong number of timestamps'
         text = text.astype(int)
         for i in range(len(text)):
-            if error[i]>0.5:
+            if error[i]>thres:
                 ax.text(traj[0,i], traj[1,i], traj[2,i], str(text[i]), fontsize=5)
 
     ax.set_xlabel('East',fontsize=20)
