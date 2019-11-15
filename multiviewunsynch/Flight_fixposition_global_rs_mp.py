@@ -26,10 +26,12 @@ cam_model = 6
 sequence = [0,4,2,1,5,3]       #[0,2,3,4,1,5]
 smooth_factor = 0.001
 sampling_rate = 0.02
-tri_thres = 20
-rs_crt = True
+rs_crt = False
 sparse = True
-setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence, 'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres}
+outlier_thres = 6
+tri_thres = 15
+setting = {'rows':rows, 'error_F':error_F, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
+           'smooth':smooth_factor, 'sampling':sampling_rate, 'tri_thres':tri_thres, 'outlier_thres':outlier_thres}
 
 # Load FPS of each camera
 fps1, fps2, fps3, fps4, fps5, fps6 = 29.727612, 50, 29.970030, 30.020690, 59.940060, 25
@@ -82,7 +84,7 @@ cameras = [common.Camera(K=c1.f.mtx,d=c1.f.dist[0,[0,1,4]],fps=fps1,rs=rs_init,y
 detect_1 = np.loadtxt('data2/detections/outp_mate10_1.txt',usecols=(2,0,1))[:rows].T
 detect_2 = np.loadtxt('data2/detections/outp_sonyg1.txt',usecols=(2,0,1))[:rows].T
 detect_3 = np.loadtxt('data2/detections/outp_sonyalpha5001.txt',usecols=(2,0,1))[:rows].T
-detect_4 = np.loadtxt('data2/detections/outp_mate7_1.txt',usecols=(2,0,1))[:rows].T
+detect_4 = np.loadtxt('data2/detections/outp_mate7_cleaned.txt',usecols=(2,0,1))[:rows].T
 detect_5 = np.loadtxt('data2/detections/outp_gopro1.txt',usecols=(2,0,1))[:rows].T
 detect_6 = np.loadtxt('data2/detections/outp_sony5n1.txt',usecols=(2,0,1))[:rows].T
 
@@ -109,7 +111,7 @@ flight.set_sequence(sequence)
 # Add prior alpha and beta for each cameras
 flight.init_alpha()
 flight.beta = np.array([0, 465.2250, -406.2928, -452.2184, 546.9844, 248.3173])
-flight.beta_rs = np.array([0,0,0,0,0,0])
+#flight.beta_rs = np.array([0,0,0,0,0,0])
 
 # Convert raw detections into the global timeline
 flight.detection_to_global()
@@ -135,6 +137,12 @@ while True:
     res = flight.BA(cam_temp,rs_crt=rs_crt)
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
+    flight.remove_outliers(flight.sequence[:cam_temp],thres=outlier_thres)
+
+    res = flight.BA(cam_temp,rs_crt=rs_crt)
+
+    print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     if cam_temp == len(sequence):
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
