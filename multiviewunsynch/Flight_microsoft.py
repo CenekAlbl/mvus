@@ -24,11 +24,12 @@ error_F = 30
 error_PnP = 30
 cut_second = 0.5
 cam_model = 12
-sequence = [0,1,3,5,2,4]
-smooth_factor = 0.001
+sequence = [2,4]
+smooth_factor = 0.01
 sampling_rate = 0.05
-outlier_thres = 30
-tri_thres = 30
+outlier_thres = 20
+tri_thres = 20
+rs = False
 setting = {'rows':rows, 'error_F':error_F, 'error_PnP':error_PnP, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
            'smooth':smooth_factor, 'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
 
@@ -60,6 +61,12 @@ flight.setting = setting
 flight.addCamera(*cameras)
 flight.cam_model = cam_model
 flight.addDetection(detect_1, detect_2, detect_3, detect_4, detect_5, detect_6)
+
+# Initialize rolling shutter
+flight.rs = np.zeros(flight.numCam, dtype=float) + rs * 1
+
+# Add camera size
+flight.cam_size = [np.array([2704,1164]), np.array([2704,1110]), np.array([2704,1122]), np.array([2704,1141]), np.array([2704,1195]), np.array([2704,1164])]
 
 # Truncate detections
 flight.cut_detection(second=cut_second)
@@ -101,6 +108,12 @@ while True:
     res = flight.BA(cam_temp)
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
+    flight.spline_to_traj()
+    vis.show_trajectory_3D(flight.traj[1:])
+
+    # with open('./data/paper/MS/trajectory/flight_temp.pkl','wb') as f:
+    #     pickle.dump(flight, f)
 
     if cam_temp == len(sequence):
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))

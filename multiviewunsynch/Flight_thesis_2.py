@@ -23,12 +23,13 @@ rows = 100000
 error_F = 10
 error_PnP = 30
 cut_second = 0
-cam_model = 12
-sequence = [0,3,2,1]
-smooth_factor = 0.0005
+cam_model = 6
+sequence = [0,3,2]
+smooth_factor = 0.001
 sampling_rate = 0.02
 outlier_thres = 50
 tri_thres = 50
+rs = True
 setting = {'rows':rows, 'error_F':error_F, 'error_PnP':error_PnP, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
            'smooth':smooth_factor, 'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
 
@@ -61,6 +62,12 @@ flight.addCamera(*cameras)
 flight.cam_model = cam_model
 flight.addDetection(detect_1, detect_2, detect_3, detect_4)
 
+# Initialize rolling shutter
+flight.rs = np.zeros(flight.numCam, dtype=float) + rs * 1
+
+# Add camera size
+flight.cam_size = [np.array([1920,1080]), np.array([1920,1080]), np.array([1920,1080]), np.array([1920,1080])]
+
 # Truncate detections
 flight.cut_detection(second=cut_second)
 
@@ -92,13 +99,13 @@ while True:
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     # Bundle adjustment
-    res = flight.BA(cam_temp)
+    res = flight.BA(cam_temp, rs=rs)
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=outlier_thres)
 
-    res = flight.BA(cam_temp)
+    res = flight.BA(cam_temp, rs=rs)
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 

@@ -368,6 +368,8 @@ class Scene_multi_spline(Scene):
         self.detections_global = []
         self.spline = {'tck':None, 'int':None}
         self.cam_model = 12
+        self.rs = []
+        self.cam_size = []
 
 
     def init_alpha(self,prior=[]):
@@ -397,23 +399,23 @@ class Scene_multi_spline(Scene):
         if not distortion:
             if len(cam):
                 for i in cam:
-                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1], self.detections[i][1:]))
                     self.detections_global[i] = detect_global
             else:
                 self.detections_global = []
                 for i in range(self.numCam):
-                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i], self.detections[i][1:]))
+                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1], self.detections[i][1:]))
                     self.detections_global.append(detect_global)
         else:
             if len(cam):
                 for i in cam:
-                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i]
+                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1]
                     detect = self.cameras[i].undist_point(self.detections[i][1:])
                     self.detections_global[i] = np.vstack((timestamp,detect))
             else:
                 self.detections_global = []
                 for i in range(self.numCam):
-                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i]
+                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1]
                     detect = self.cameras[i].undist_point(self.detections[i][1:])
                     self.detections_global.append(np.vstack((timestamp,detect)))
 
@@ -667,7 +669,7 @@ class Scene_multi_spline(Scene):
             self.visible.append(visible)
 
 
-    def BA(self, numCam, max_iter=10):
+    def BA(self, numCam, max_iter=10, rs=False):
         '''
         Bundle Adjustment with multiple splines
 
@@ -680,15 +682,15 @@ class Scene_multi_spline(Scene):
             '''
 
             # Assign parameters to the class attributes
-            sections = [numCam, numCam*2, numCam*2+numCam*self.cam_model]
+            sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*self.cam_model]
             model_parts = np.split(x, sections)
-            self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
+            self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]], self.rs[self.sequence[:numCam]] = model_parts[0], model_parts[1], model_parts[2]
 
-            cams = np.split(model_parts[2],numCam)
+            cams = np.split(model_parts[3],numCam)
             for i in range(numCam):
                 self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
             
-            spline_parts = np.split(model_parts[3],idx_spline[0,1:])
+            spline_parts = np.split(model_parts[4],idx_spline[0,1:])
             for i in range(len(spline_parts)):
                 spline_i = spline_parts[i].reshape(3,-1)
                 self.spline['tck'][i][1] = [spline_i[0],spline_i[1],spline_i[2]]
@@ -718,8 +720,14 @@ class Scene_multi_spline(Scene):
                 # alpha and beta
                 jac_cam[:,[i,i+numCam]] = 1
 
+                # rolling shutter
+                if rs:
+                    jac_cam[:,i+numCam*2] = 1
+                else:
+                    jac_cam[:,i+numCam*2] = 0
+
                 # camera parameters
-                start = 2*numCam+i*self.cam_model
+                start = 3*numCam+i*self.cam_model
                 jac_cam[:,start:start+self.cam_model] = 1
 
                 # spline parameters
@@ -751,6 +759,7 @@ class Scene_multi_spline(Scene):
         # Define Parameters that will be optimized
         model_alpha = self.alpha[self.sequence[:numCam]]
         model_beta = self.beta[self.sequence[:numCam]]
+        model_rs = self.rs[self.sequence[:numCam]]
 
         model_cam = np.array([])
         for i in self.sequence[:numCam]:
@@ -769,13 +778,12 @@ class Scene_multi_spline(Scene):
             idx_spline[:,i] = [start,end]
             start = end
 
-        model_other = np.concatenate((model_alpha, model_beta, model_cam))
+        model_other = np.concatenate((model_alpha, model_beta, model_rs, model_cam))
         idx_spline_sum = idx_spline + len(model_other)
         model = np.concatenate((model_other, model_spline))
         assert idx_spline_sum[-1,-1] == len(model), 'Wrong with spline indices'
 
         # Set the Jacobian matrix
-        print('\nComputing the sparse structure of the Jacobian matrix...\n')
         A = jac_BA()
 
         '''Compute BA'''
@@ -785,23 +793,21 @@ class Scene_multi_spline(Scene):
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline
-        sections = [numCam, numCam*2, numCam*2+numCam*self.cam_model]
+        sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*self.cam_model]
         model_parts = np.split(res.x, sections)
-        self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]] = model_parts[0], model_parts[1]
+        self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]], self.rs[self.sequence[:numCam]] = model_parts[0], model_parts[1], model_parts[2]
 
-        cams = np.split(model_parts[2],numCam)
+        cams = np.split(model_parts[3],numCam)
         for i in range(numCam):
             self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
         
-        spline_parts = np.split(model_parts[3],idx_spline[0,1:])
+        spline_parts = np.split(model_parts[4],idx_spline[0,1:])
         for i in range(len(spline_parts)):
             spline_i = spline_parts[i].reshape(3,-1)
             self.spline['tck'][i][1] = [spline_i[0],spline_i[1],spline_i[2]]
 
         # Update global timestamps for each serie of detections
         self.detection_to_global()
-
-        print('BA finished in: {}'.format(datetime.now()-starttime))
 
         return res
 
@@ -819,6 +825,8 @@ class Scene_multi_spline(Scene):
 
                 self.detections[i] = self.detections[i][:,error<thres]
                 self.detection_to_global(i)
+
+                print('{} out of {} detections are removed for camera {}'.format(sum(error>=thres),sum(error!=0),i))
 
 
     def get_camera_pose(self, cam_id, error=8, verbose=0):
@@ -923,7 +931,7 @@ class Scene_multi_spline(Scene):
         return X_new
         
 
-    def plot_reprojection(self,interval,match=True):
+    def plot_reprojection(self,interval=np.array([[-np.inf],[np.inf]]),match=True):
         '''
         Given temporal sections of the trajectory, plot the 2D reprojection of these sections for
         each possible camera

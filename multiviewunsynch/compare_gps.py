@@ -73,20 +73,22 @@ def optimize(alpha, beta, flight, gps):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    data_path = './data/paper/thesis/trajectory/flight2_3.pkl'
+    data_path = './data/paper/fixposition/trajectory/flight_rs_false.pkl'
     with open(data_path, 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data
-    gps_ori = np.loadtxt('./data/paper/thesis/ground_truth/flight_2_GPS_enu.txt').T
+    gps_ori = np.loadtxt('./data/paper/fixposition/GT_position/GT_ENU.txt').T
 
+    # error = np.sqrt(np.sum((flight.gps['gps']-flight.gps['traj'])**2,axis=0))
+    # vis.error_traj(flight.gps['traj'], error,size=50,colormap='Wistia')
 
     '''-----------------Transformation estimation-----------------'''
     # Set parameters
     f_gps = 5
-    f_spline = 29.970030        # fixposition: 29.727612    thesis1: 29.970030      thesis2: 29.970030
+    f_spline = 29.727612      # fixposition: 29.727612    thesis1: 29.970030      thesis2: 29.970030
     alpha = f_spline / f_gps
-    beta = -4750              # fixposition: -1290        thesis1: -19700         thesis2: -4720
+    beta = -1290         # fixposition: -1290        thesis1: -19700         thesis2: -4720
     error_min = np.inf
 
     # Optimization
@@ -122,14 +124,14 @@ if __name__ == "__main__":
     vis.error_hist(error)
 
     # Error over the trajectory
-    vis.error_traj(traj_tran[:3], error, thres=1, text=traj[0])
+    vis.error_traj(traj_tran[:3], error)
 
     # Reprojection to 2D
     interval = np.array([[0],[149000]])
     flight.plot_reprojection(interval,match=True)
 
     # save the comparison result
-    flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3]}
+    flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3], 'timestamp':traj[0], 'M':M}
     with open(data_path,'wb') as f:
         pickle.dump(flight, f) 
 

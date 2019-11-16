@@ -273,14 +273,14 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
             if error[i]>thres:
                 ax.text(traj[0,i], traj[1,i], traj[2,i], str(text[i]), fontsize=5)
 
-    ax.set_xlabel('East',fontsize=20)
-    ax.set_ylabel('North',fontsize=20)
-    ax.set_zlabel('Up',fontsize=20)
+    ax.set_xlabel('East',fontsize=40,linespacing=100)
+    ax.set_ylabel('North',fontsize=40,linespacing=3.2)
+    ax.set_zlabel('Up',fontsize=40,linespacing=3.2)
     ax.view_init(elev=30,azim=-50)
 
     cbar = plt.colorbar(sc,fraction=0.046, pad=0.04)
     cbar.ax.tick_params(labelsize=40)
-    plt.title(title, fontsize=25)
+    plt.title(title, fontsize=50)
     plt.show()
 
 
