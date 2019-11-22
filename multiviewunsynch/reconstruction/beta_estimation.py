@@ -5,7 +5,6 @@ import numpy as np
 from datetime import datetime
 import cv2
 from scipy.interpolate import splprep,splev
-import synchronization as syn
 
 
 def find_intervals(x):

@@ -1,13 +1,12 @@
 import pickle
 import numpy as np
 import scipy.linalg
-import epipolar as ep
-import video
-import ransac
+import reconstruction.epipolar as ep
+from tools import ransac, video
 import cv2
 import argparse
 from datetime import datetime
-import visualization as vis
+import tools.visualization as vis
 from matplotlib import pyplot as plt
 from scipy.interpolate import UnivariateSpline
 

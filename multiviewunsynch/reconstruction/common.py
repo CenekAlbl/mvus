@@ -1,14 +1,8 @@
 # Classes that are common to the entire project
 import numpy as np
-import util
-import epipolar as ep
-import synchronization
-import scipy.io as scio
-import pickle
-import argparse
-import copy
+from tools import util
+import reconstruction.epipolar as ep
 import cv2
-import visualization as vis
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
