@@ -15,6 +15,7 @@ from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
 import cProfile
+import json
 
 
 '''---------------New computation----------------'''
@@ -32,6 +33,9 @@ tri_thres = 20
 rs = False
 setting = {'rows':rows, 'error_F':error_F, 'error_PnP':error_PnP, 'cut_second':cut_second, 'cam_model':cam_model, 'sequence':sequence,
            'smooth':smooth_factor, 'sampling':sampling_rate, 'outlier_thres':outlier_thres, 'tri_thres':tri_thres}
+
+with open('./hehe.json','r') as f:
+    hh = json.load(f)
 
 # Load camara intrinsic and radial distortions
 K1 = np.loadtxt('./data/paper/MS/calibration/cam_0.txt')
@@ -56,7 +60,7 @@ detect_5 = np.loadtxt('./data/paper/MS/detection/out_cam07.txt',usecols=(2,0,1))
 detect_6 = np.loadtxt('./data/paper/MS/detection/out_cam08.txt',usecols=(2,0,1))[:rows].T
 
 # Create a scene
-flight = common.Scene_multi_spline()
+flight = common.Scene()
 flight.setting = setting
 flight.addCamera(*cameras)
 flight.cam_model = cam_model

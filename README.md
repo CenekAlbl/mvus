@@ -1,17 +1,17 @@
 # MultiViewUnsynch
 
+## For developing
 Tracking and trajectory reconstruction of moving objects using multiple unsynchronized cameras 
 
 Folder and file structure:
 
 ./multiviewunsynch - main directory for the project, contains modules, please keep functionality in separate modules based on topic, i.e.
-./multiviewunsynch/geometry.py should contain functions that handle geometrical operations, e.g. rotation representation conversions etc.
-If you have a misc function that you don't know where to put it, put it in:
-./multiviewunsynch/utils.py
 
 ./thirdparty - this is where you put code that is not ours
 
-./test - here will be unit tests for our functions
+./deprecated - previous codes that are not used anymore. This folder only temporarily keeps these codes and should be as clean as possible. For any on-going scripts, please keep them in a separate personal branch.
+
+./imput_template.json - template file for loading input data. NOT FINISH YET.
 
 GUIDELINES:
 
