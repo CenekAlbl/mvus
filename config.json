@@ -24,19 +24,19 @@
 
     "settings":
     {
-        "use_all_detections": true,
-        "use_num_detections": 3000,
+        "num_detections": 100000,
+        "opt_calib": false,
+        "undist_points": true,
+        "rolling_shutter": false,
+        "init_rs": 1,
+        "cut_detection_second": 0.5,
+        "camera_sequence": [],
         "thres_Fmatix": 30,
         "thres_PnP": 30,
-        "cut_detection_second": 0.5,
-        "camera_model": 12,
-        "camera_sequence": "auto",
-        "smooth_factor": 0.001,
-        "sampling_rate": 0.02,
         "thres_outlier": 10,
         "thres_triangulation": 20,
-        "rolling_shutter": false,
-        "init_rs": 0
+        "smooth_factor": 0.001,
+        "sampling_rate": 0.02
     }
 
 }

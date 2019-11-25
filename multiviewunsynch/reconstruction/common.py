@@ -3,6 +3,7 @@ import numpy as np
 from tools import util
 import reconstruction.epipolar as ep
 import cv2
+import json
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
@@ -32,8 +33,6 @@ class Scene:
         """
         self.numCam = 0
         self.cameras = []
-        self.cam_model = 12
-        self.cam_size = []
         self.detections = []
         self.detections_raw = []
         self.detections_global = []
@@ -42,8 +41,8 @@ class Scene:
         self.traj = []
         self.sequence = []
         self.visible = []
-        self.setting = None
-        self.gps = None
+        self.settings = []
+        self.gps = []
         self.spline = {'tck':[], 'int':[]}
         self.rs = []
         
@@ -60,7 +59,6 @@ class Scene:
         for i in camera:
             assert type(i) is Camera, "camera is not an instance of Camera"
             self.cameras.append(i)
-            self.numCam += 1
 
 
     def addDetection(self,*detection):
@@ -77,7 +75,7 @@ class Scene:
             self.detections.append(i)
 
 
-    def init_alpha(self,prior=[]):
+    def init_alpha(self,*prior):
         '''Initialize alpha for each camera based on the ratio of fps'''
 
         if len(prior):
@@ -90,7 +88,7 @@ class Scene:
                 self.alpha[i] = fps_ref / self.cameras[i].fps
 
 
-    def detection_to_global(self, *cam, distortion=True):
+    def detection_to_global(self,*cam):
         '''
         Convert frame indices of raw detections into the global timeline.
 
@@ -101,28 +99,16 @@ class Scene:
 
         assert len(self.alpha)==self.numCam and len(self.beta)==self.numCam, 'The Number of alpha and beta is wrong'
 
-        if not distortion:
-            if len(cam):
-                for i in cam:
-                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1], self.detections[i][1:]))
-                    self.detections_global[i] = detect_global
-            else:
-                self.detections_global = []
-                for i in range(self.numCam):
-                    detect_global = np.vstack((self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1], self.detections[i][1:]))
-                    self.detections_global.append(detect_global)
+        if len(cam):
+            cams = cam
         else:
-            if len(cam):
-                for i in cam:
-                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1]
-                    detect = self.cameras[i].undist_point(self.detections[i][1:])
-                    self.detections_global[i] = np.vstack((timestamp,detect))
-            else:
-                self.detections_global = []
-                for i in range(self.numCam):
-                    timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cam_size[i][1]
-                    detect = self.cameras[i].undist_point(self.detections[i][1:])
-                    self.detections_global.append(np.vstack((timestamp,detect)))
+            cams = range(self.numCam)
+            self.detections_global = [[] for i in cams]
+
+        for i in cams:
+            timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cameras[i].resolution[1]
+            detect = self.cameras[i].undist_point(self.detections[i][1:]) if self.settings['undist_points'] else self.detections[i][1:]
+            self.detections_global[i] = np.vstack((timestamp, detect))
 
 
     def cut_detection(self,second=1):
@@ -387,13 +373,13 @@ class Scene:
             '''
 
             # Assign parameters to the class attributes
-            sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*self.cam_model]
+            sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*num_camParam]
             model_parts = np.split(x, sections)
             self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]], self.rs[self.sequence[:numCam]] = model_parts[0], model_parts[1], model_parts[2]
 
             cams = np.split(model_parts[3],numCam)
             for i in range(numCam):
-                self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
+                self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib']) 
             
             spline_parts = np.split(model_parts[4],idx_spline[0,1:])
             for i in range(len(spline_parts)):
@@ -432,8 +418,8 @@ class Scene:
                     jac_cam[:,i+numCam*2] = 0
 
                 # camera parameters
-                start = 3*numCam+i*self.cam_model
-                jac_cam[:,start:start+self.cam_model] = 1
+                start = 3*numCam+i*num_camParam
+                jac_cam[:,start:start+num_camParam] = 1
 
                 # spline parameters
                 for j in range(num_detect):
@@ -467,8 +453,9 @@ class Scene:
         model_rs = self.rs[self.sequence[:numCam]]
 
         model_cam = np.array([])
+        num_camParam = 15 if self.settings['opt_calib'] else 6
         for i in self.sequence[:numCam]:
-            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(n=self.cam_model)))
+            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(calib=self.settings['opt_calib'])))
 
         # Reorganized splines into 1D and record indices of each spline
         num_spline = len(self.spline['tck'])
@@ -498,13 +485,13 @@ class Scene:
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline
-        sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*self.cam_model]
+        sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*num_camParam]
         model_parts = np.split(res.x, sections)
         self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]], self.rs[self.sequence[:numCam]] = model_parts[0], model_parts[1], model_parts[2]
 
         cams = np.split(model_parts[3],numCam)
         for i in range(numCam):
-            self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
+            self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib']) 
         
         spline_parts = np.split(model_parts[4],idx_spline[0,1:])
         for i in range(len(spline_parts)):
@@ -517,7 +504,7 @@ class Scene:
         return res
 
 
-    def remove_outliers(self, cams, thres=30):
+    def remove_outliers(self, cams, thres=30, verbose=False):
         '''
         Not done yet!
         '''
@@ -531,7 +518,8 @@ class Scene:
                 self.detections[i] = self.detections[i][:,error<thres]
                 self.detection_to_global(i)
 
-                print('{} out of {} detections are removed for camera {}'.format(sum(error>=thres),sum(error!=0),i))
+                if verbose:
+                    print('{} out of {} detections are removed for camera {}'.format(sum(error>=thres),sum(error!=0),i))
 
 
     def get_camera_pose(self, cam_id, error=8, verbose=0):
@@ -557,11 +545,7 @@ class Scene:
         N = point_3D.shape[1]
         objectPoints = np.ascontiguousarray(point_3D.T).reshape((N,1,3))
         imagePoints  = np.ascontiguousarray(detect[1:].T).reshape((N,1,2))
-        cam_dist = self.cameras[cam_id].d
-        if len(cam_dist)==2:
-            distCoeffs = np.append(cam_dist, [0, 0, 0])
-        elif len(cam_dist)==3:
-            distCoeffs = np.array([cam_dist[0], cam_dist[1], 0, 0, cam_dist[2]])
+        distCoeffs = self.cameras[cam_id].d
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
 
         self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
@@ -698,11 +682,8 @@ class Camera:
         self.d = kwargs.get('d')
         self.c = kwargs.get('c')
         self.fps = kwargs.get('fps')
+        self.resolution = kwargs.get('resolution')
 
-        if kwargs.get('tan') is None:
-            self.tan = np.array([0,0],dtype=float)
-        else:
-            self.tan = kwargs.get('tan')
 
     def projectPoint(self,X):
 
@@ -745,69 +726,35 @@ class Camera:
             return self.c
 
 
-    def P2vector(self,n=6):
+    def P2vector(self, calib=False):
         '''
         Convert camera parameters into a vector
         '''
 
-        k = np.array([(self.K[0,0]+self.K[1,1])/2, self.K[0,2], self.K[1,2]])
+        k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
         r = cv2.Rodrigues(self.R)[0].reshape(-1,)
 
-        if n==6:
+        if calib:
+            return np.concatenate((k, r, self.t, self.d))
+        else:
             return np.concatenate((r,self.t))
-        elif n==8:
-            return np.concatenate((r,self.t,self.d))
-        elif n==9:
-            return np.concatenate((k,r,self.t))
-        elif n==11:
-            return np.concatenate((k,r,self.t,self.d))
-        elif n==12:
-            k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
-            return np.concatenate((k,r,self.t,self.d[:2]))
-        elif n==13:
-            k = np.array([self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]])
-            return np.concatenate((k,r,self.t,self.d[:3]))
 
 
-    def vector2P(self,vector,n=6):
+    def vector2P(self, vector, calib=False):
         '''
         Convert a vector into camera parameters
         '''
 
-        if n==6:
-            self.R = cv2.Rodrigues(vector[:3])[0]
-            self.t = vector[3:6]
-        elif n==8:
-            self.R = cv2.Rodrigues(vector[:3])[0]
-            self.t = vector[3:6]
-            self.d = vector[-2:]
-        elif n==9:
-            self.K = np.diag((1,1,1)).astype(float)
-            self.K[0,0], self.K[1,1] = vector[0], vector[0]
-            self.K[:2,-1] = vector[1:3]
-            self.R = cv2.Rodrigues(vector[3:6])[0]
-            self.t = vector[6:9]
-        elif n==11:
-            self.K = np.diag((1,1,1)).astype(float)
-            self.K[0,0], self.K[1,1] = vector[0], vector[0]
-            self.K[:2,-1] = vector[1:3]
-            self.R = cv2.Rodrigues(vector[3:6])[0]
-            self.t = vector[6:9]
-            self.d = vector[-2:]
-        elif n==12:
+        if calib:
             self.K = np.diag((1,1,1)).astype(float)
             self.K[0,0], self.K[1,1] = vector[0], vector[1]
             self.K[:2,-1] = vector[2:4]
             self.R = cv2.Rodrigues(vector[4:7])[0]
             self.t = vector[7:10]
-            self.d = vector[10:12]
-        elif n==13:
-            self.K = np.diag((1,1,1)).astype(float)
-            self.K[0,0], self.K[1,1] = vector[0], vector[1]
-            self.K[:2,-1] = vector[2:4]
-            self.R = cv2.Rodrigues(vector[4:7])[0]
-            self.t = vector[7:10]
-            self.d = vector[10:13]
+            self.d = vector[10:15]
+        else:
+            self.R = cv2.Rodrigues(vector[:3])[0]
+            self.t = vector[3:6]
 
         self.compose()
         return self.P
@@ -819,18 +766,8 @@ class Camera:
 
         num = points.shape[1]
 
-        if len(self.d)==2:
-            distCoeff = np.concatenate((self.d,self.tan))
-        elif len(self.d)==3:
-            if self.d[-1] == 0:
-                distCoeff = np.concatenate((self.d,self.tan))
-            else:
-                distCoeff = np.array([self.d[0], self.d[1], self.tan[0], self.tan[1], self.d[2]])
-        else:
-            raise Exception('Wrong distortion coefficients')
-
         src = np.ascontiguousarray(points.T).reshape((num,1,2))
-        dst = cv2.undistortPoints(src, self.K, distCoeff)
+        dst = cv2.undistortPoints(src, self.K, self.d)
         dst_unnorm = np.dot(self.K, util.homogeneous(dst.reshape((num,2)).T))
 
         return dst_unnorm[:2]
@@ -845,3 +782,57 @@ class Camera:
         print(self.R)
         print('\n t:')
         print(self.t)
+
+
+def create_scene(path_input):
+    '''
+    Create a scene from the imput template in json format
+    '''
+
+    # Read the config file
+    with open(path_input, 'r') as file:
+        config = json.load(file)
+
+    # Create the scene
+    flight = Scene()
+
+    # Load settings
+    flight.settings = config['settings']
+
+    # Load detections
+    path_detect = config['necessary inputs']['path_detections']
+    flight.numCam = len(path_detect)
+    for i in path_detect:
+        detect = np.loadtxt(i,usecols=(2,0,1))[:flight.settings['num_detections']].T
+        flight.addDetection(detect)
+
+    # Load cameras, currently only work for opencv
+    path_calib = config['necessary inputs']['path_calibration']
+    fps = config['necessary inputs']['camera_fps']
+    resolution = config['necessary inputs']['camera_resolution']
+
+    if len(path_calib['opencv']):
+        path_calib = path_calib['opencv']
+        for i in range(flight.numCam):
+            calib = np.load(path_calib[i])
+            flight.addCamera(Camera(K=calib.f.mtx, d=calib.f.dist[0], fps=fps[i], resolution=resolution[i]))
+    elif len(path_calib['matlab']):
+        path_calib = path_calib['matlab']
+    elif len(path_calib['txt']):
+        path_calib = path_calib['txt']
+
+    #  Load sequence
+    if len(config['settings']['camera_sequence']):
+        flight.sequence = config['settings']['camera_sequence']
+    else:
+        flight.sequence = [i for i in range(flight.numCam)]
+
+    # Load time shifts
+    flight.beta = np.asarray(config['optional inputs']['relative_time_shifts'])
+
+    # Load rolling shutter parameter
+    init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0
+    flight.rs = np.asarray([init_rs for i in range(flight.numCam)])
+
+    print('Input data are loaded successfully, a scene is created.\n')
+    return flight

@@ -1,0 +1,52 @@
+{
+    "necessary inputs":
+    {
+        "path_detections": ["./data/fixposition/detection/outp_mate10_1.txt",
+                            "./data/fixposition/detection/outp_sonyg1.txt",
+                            "./data/fixposition/detection/outp_sonyalpha5001.txt",
+                            "./data/fixposition/detection/outp_mate7_1.txt",
+                            "./data/fixposition/detection/outp_gopro1.txt",
+                            "./data/fixposition/detection/outp_sony5n1.txt"],
+
+        "path_calibration":
+        {
+            "opencv": ["./data/fixposition/calibration/mate10.npz",
+                       "./data/fixposition/calibration/sonyG.npz",
+                       "./data/fixposition/calibration/sony_alpha_5100.npz",
+                       "./data/fixposition/calibration/mate7.npz",
+                       "./data/fixposition/calibration/gopro.npz",
+                       "./data/fixposition/calibration/sony_alpha_5n.npz"],
+            "matlab": [],
+            "txt":[]
+        },
+
+        "camera_resolution": [[3840,2160],[1920,1080],[1920,1080],[1920,1080],[1920,1080],[1440,1080]],
+
+        "camera_fps": [29.727612, 50, 29.970030, 30.020690, 59.940060, 25]
+    },
+
+
+    "optional inputs":
+    {
+        "relative_time_shifts":[0, 465.2250, -406.2928, -452.2184, 546.9844, 248.3173]
+    },
+
+
+    "settings":
+    {
+        "num_detections": 100000,
+        "opt_calib": false,
+        "undist_points": true,
+        "rolling_shutter": false,
+        "init_rs": 1,
+        "cut_detection_second": 0.5,
+        "camera_sequence": [0,4,2,1,5,3],
+        "thres_Fmatix": 30,
+        "thres_PnP": 30,
+        "thres_outlier": 10,
+        "thres_triangulation": 20,
+        "smooth_factor": 0.001,
+        "sampling_rate": 0.02
+    }
+
+}
