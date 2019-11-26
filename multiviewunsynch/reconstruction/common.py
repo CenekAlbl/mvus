@@ -834,5 +834,8 @@ def create_scene(path_input):
     init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0
     flight.rs = np.asarray([init_rs for i in range(flight.numCam)])
 
+    # Load gps alignment parameter (optinal)
+    flight.gps = {'alpha':config['optional inputs']['gps_alpha'], 'beta':config['optional inputs']['gps_beta']}
+
     print('Input data are loaded successfully, a scene is created.\n')
     return flight
