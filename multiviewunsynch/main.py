@@ -1,11 +1,11 @@
 import numpy as np
 import pickle
-import tools.visualization as vis
+from tools import visualization as vis
 from datetime import datetime
 from reconstruction import common
 
 # Initialize a scene from the json template
-flight = common.create_scene('./data/fixposition/config.json')
+flight = common.create_scene('config.json')
 
 # Truncate detections
 flight.cut_detection(second=flight.settings['cut_detection_second'])

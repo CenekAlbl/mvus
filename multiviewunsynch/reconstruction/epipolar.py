@@ -2,7 +2,7 @@ import numpy as np
 import math
 import cv2
 from tools import ransac
-import tools.visualization as vis
+from tools import visualization as vis
 from scipy.optimize import least_squares, root
 
 
