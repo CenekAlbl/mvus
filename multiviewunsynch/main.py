@@ -62,8 +62,8 @@ while True:
 flight.spline_to_traj(sampling_rate=1)
 vis.show_trajectory_3D(flight.traj[1:],line=False)
 
-# with open('./data/paper/fixposition/trajectory/flight_spline_2.pkl','wb') as f:
-#     pickle.dump(flight, f)
+with open(flight.settings['path_output'],'wb') as f:
+    pickle.dump(flight, f)
 
 
 print('Finish!')

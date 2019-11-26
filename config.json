@@ -18,7 +18,9 @@
 
     "optional inputs":
     {
-        "relative_time_shifts":[]
+        "relative_time_shifts":[],
+        "gps_alpha": false,
+        "gps_beta": false
     },
 
 
@@ -36,7 +38,8 @@
         "thres_outlier": 10,
         "thres_triangulation": 20,
         "smooth_factor": 0.001,
-        "sampling_rate": 0.02
+        "sampling_rate": 0.02,
+        "path_output":""
     }
 
 }
