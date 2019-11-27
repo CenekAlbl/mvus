@@ -68,22 +68,26 @@ def optimize(alpha, beta, flight, gps):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    data_path = './data/paper/fixposition/trajectory/flight_rs_false.pkl'
-    with open(data_path, 'rb') as file:
+    reconst_path = ''
+    with open(reconst_path, 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data
-    gps_ori = np.loadtxt('./data/paper/fixposition/GT_position/GT_ENU.txt').T
+    gps_path = ''
+    gps_ori = np.loadtxt(gps_path).T
 
-    # error = np.sqrt(np.sum((flight.gps['gps']-flight.gps['traj'])**2,axis=0))
-    # vis.error_traj(flight.gps['traj'], error,size=50,colormap='Wistia')
 
     '''-----------------Transformation estimation-----------------'''
     # Set parameters
-    f_gps = 5
-    f_spline = 29.727612      # fixposition: 29.727612    thesis1: 29.970030      thesis2: 29.970030
-    alpha = f_spline / f_gps
-    beta = -1290         # fixposition: -1290        thesis1: -19700         thesis2: -4720
+    if flight.gps['alpha'] and flight.gps['beta']:
+        alpha = flight.gps['alpha']
+        beta = flight.gps['beta']
+    else:
+        # Please enter the numbers manually if thers's no prior values
+        f_gps = 5
+        f_spline = 29.727612      # fixposition: 29.727612    thesis1: 29.970030      thesis2: 29.970030
+        alpha = f_spline / f_gps
+        beta = -1290         # fixposition: -1290        thesis1: -19700         thesis2: -4720
     error_min = np.inf
 
     # Optimization
@@ -97,18 +101,6 @@ if __name__ == "__main__":
     traj_tran /= traj_tran[-1]
     error = np.sqrt(np.sum((gps_part-traj_tran[:3])**2,axis=0))
     print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(error)))
-
-    # # Print timestamps of large errors
-    # thres = 1
-    # t_large_trans = traj[0,error>thres].astype(int)
-    # print('Global timestamps for large errors after comparison with GPS:  ', t_large_trans)
-    # for i in range(flight.numCam):
-    #     error_cam_i = flight.error_cam(i,'each')
-    #     error_xy = np.split(error_cam_i,2)
-    #     error_cam_i = np.sqrt(error_xy[0]**2 + error_xy[1]**2)
-    #     idx_large = np.argsort(error_cam_i)[-len(t_large_trans):]
-    #     t_large_reconst = flight.detections_global[i][0,idx_large].astype(int)
-    #     print('Global timestamps for large errors from camera{}:  '.format(i), t_large_reconst)
 
 
     '''-----------------Visualization-----------------'''
@@ -127,7 +119,7 @@ if __name__ == "__main__":
 
     # save the comparison result
     flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3], 'timestamp':traj[0], 'M':M}
-    with open(data_path,'wb') as f:
+    with open(reconst_path,'wb') as f:
         pickle.dump(flight, f) 
 
     print('Finish!')

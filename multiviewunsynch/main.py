@@ -43,10 +43,13 @@ while True:
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
-
-    if cam_temp == len(flight.sequence):
+    num_end = flight.numCam if flight.find_order else len(flight.sequence)
+    if cam_temp == num_end:
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
         break
+    
+    # Select the next camera if not pre-defined
+    flight.select_most_overlap()
 
     # Add the next camera and get its pose
     flight.get_camera_pose(flight.sequence[cam_temp])

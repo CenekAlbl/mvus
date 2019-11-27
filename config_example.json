@@ -42,12 +42,13 @@
         "rolling_shutter": false,
         "init_rs": 1,
         "cut_detection_second": 0.5,
-        "camera_sequence": [0,4,2,1,5,3],
+        "camera_sequence": [],
+        "ref_cam": 0,
         "thres_Fmatix": 30,
         "thres_PnP": 30,
         "thres_outlier": 10,
         "thres_triangulation": 20,
-        "smooth_factor": 0.001,
+        "smooth_factor": 0.005,
         "sampling_rate": 0.02,
         "path_output": "./data/fixposition/trajectory/flight_0.pkl"
     }

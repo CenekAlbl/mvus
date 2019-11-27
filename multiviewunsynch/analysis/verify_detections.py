@@ -6,8 +6,8 @@ This script verifies drone detections of a given video by playing the video with
 '''
 
 # Read a video and its corresponding detection
-detection_path = '../data/paper/crash/detection/out_xiaomi_1_30.txt'
-video_path = 'C:/Users/tong2/MyStudy/ETH/2019FS/Thesis/ICRA/crash/Xiaomi_mi9.mp4'
+detection_path = ''
+video_path = ''
 
 # Create a mask for detections in the same size of the video
 detection = np.loadtxt(detection_path[1:],usecols=(2,0,1)).T.astype(int)

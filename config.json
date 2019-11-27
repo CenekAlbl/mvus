@@ -19,8 +19,8 @@
     "optional inputs":
     {
         "relative_time_shifts":[],
-        "gps_alpha": false,
-        "gps_beta": false
+        "gps_alpha": null,
+        "gps_beta": null
     },
 
 
@@ -33,13 +33,14 @@
         "init_rs": 1,
         "cut_detection_second": 0.5,
         "camera_sequence": [],
+        "ref_cam": 0,
         "thres_Fmatix": 30,
         "thres_PnP": 30,
         "thres_outlier": 10,
         "thres_triangulation": 20,
-        "smooth_factor": 0.001,
+        "smooth_factor": 0.005,
         "sampling_rate": 0.02,
-        "path_output":""
+        "path_output": ""
     }
 
 }

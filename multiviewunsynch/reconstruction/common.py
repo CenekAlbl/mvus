@@ -45,6 +45,8 @@ class Scene:
         self.gps = []
         self.spline = {'tck':[], 'int':[]}
         self.rs = []
+        self.ref_cam = 0
+        self.find_order = True
         
 
     def addCamera(self,*camera):
@@ -83,7 +85,7 @@ class Scene:
             self.alpha = prior
         else:
             self.alpha = np.ones(self.numCam)
-            fps_ref = self.cameras[self.sequence[0]].fps
+            fps_ref = self.cameras[self.ref_cam].fps
             for i in range(self.numCam):
                 self.alpha[i] = fps_ref / self.cameras[i].fps
 
@@ -217,6 +219,8 @@ class Scene:
         Select the first two cams in the sequence, compute fundamental matrix, triangulate points
         '''
 
+        self.select_most_overlap(init=True)
+
         t1, t2 = self.sequence[0], self.sequence[1]
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
@@ -269,10 +273,11 @@ class Scene:
 
         for i in range(interval.shape[1]):
             part = self.traj[:,idx[0,i]:idx[1,i]+1]
+            s = smooth_factor**2*len(part[0])
             try:
-                tck[i], u = interpolate.splprep(part[1:],u=part[0],s=smooth_factor,k=3)
+                tck[i], u = interpolate.splprep(part[1:],u=part[0],s=s,k=3)
             except:
-                tck[i], u = interpolate.splprep(part[1:],u=part[0],s=smooth_factor,k=1)
+                tck[i], u = interpolate.splprep(part[1:],u=part[0],s=s,k=1)
             
         self.spline['tck'], self.spline['int'] = tck, interval
         return self.spline
@@ -652,6 +657,41 @@ class Scene:
 
         plt.show()
 
+
+    def select_most_overlap(self,init=False):
+        '''
+        Select either the initial pair of cameras or the next best camera with largest overlap
+        '''
+
+        if not self.find_order:
+            return
+
+        self.detection_to_global()
+        overlap_max = 0
+        
+        if init:
+            for i in range(self.numCam-1):
+                for j in range(i+1,self.numCam):
+                    x, y = self.match_overlap(self.detections_global[i],self.detections_global[j])
+                    overlap = x.shape[1] / self.cameras[i].fps
+                    if overlap > overlap_max:
+                        overlap_max = overlap
+                        self.sequence = [i,j]
+        else:
+            traj = self.spline_to_traj()
+            candidate = []
+            for i in range(self.numCam):
+                if self.cameras[i].P is None:
+                    candidate.append(i)
+            for i in candidate:
+                interval = self.find_intervals(self.detections_global[i][0])
+                overlap, _ = self.sampling(traj[0], interval)
+
+                if len(overlap) > overlap_max:
+                    overlap_max = len(overlap)
+                    next_cam = i
+            self.sequence.append(i)
+
         
 class Camera:
     """ 
@@ -822,10 +862,9 @@ def create_scene(path_input):
         path_calib = path_calib['txt']
 
     #  Load sequence
-    if len(config['settings']['camera_sequence']):
-        flight.sequence = config['settings']['camera_sequence']
-    else:
-        flight.sequence = [i for i in range(flight.numCam)]
+    flight.ref_cam = config['settings']['ref_cam']
+    flight.sequence = config['settings']['camera_sequence']
+    flight.find_order = False if len(flight.sequence) else True
 
     # Load time shifts
     flight.beta = np.asarray(config['optional inputs']['relative_time_shifts'])
