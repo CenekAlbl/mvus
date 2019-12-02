@@ -5,7 +5,7 @@ from datetime import datetime
 from reconstruction import common
 
 # Initialize a scene from the json template
-flight = common.create_scene('config.json')
+flight = common.create_scene('config_example.json')
 
 # Truncate detections
 flight.cut_detection(second=flight.settings['cut_detection_second'])
@@ -42,6 +42,11 @@ while True:
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+
+    #Compute reconstruction with motion prior
+    res = flight.BA_mot(cam_temp,rs=flight.settings['rolling_shutter'],motion=True,motion_weights=1)
+
+    print('\nMean error of each camera after second BA with MP reg.: ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:
