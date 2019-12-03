@@ -365,10 +365,16 @@ class Scene:
         tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id)
 
+        
+
         if motion:
             # Select part of raw detection indices within spline intervals and create temp. traj with global time stamps
-            _,traj_idx,det_idx = np.intersect1d(self.traj[0],self.detections[cam_id][0],return_indices=True,assume_unique=True)
-            temp_traj = np.vstack((self.detections_global[cam_id][0,det_idx],self.traj[1:,traj_idx]))
+            det_idx = np.isin(raw_time_stamps_all,self.traj[0])
+            traj_idx = np.isin(self.traj[0],self.detections[cam_id][0])
+            #_,traj_idx,det_idx = np.intersect1d(self.traj[0],self.detections[cam_id][0],return_indices=True,assume_unique=True)
+
+            temp_traj = np.vstack((global_time_stamps_all[det_idx==True],self.traj[1:]))
+            
             #self.detect_to_traj([cam_id]) #self.sequence[:self.numCam])
             # time_stamps_all = np.array([])
             # for i in range(self.numCam):
@@ -387,7 +393,7 @@ class Scene:
             detect_part = self.detections_global[cam_id][:,idx==i+1]
             if detect_part.size:
                 if motion:
-                    # Select traj. point that overlap with detections in spline intervals
+                    # Select traj. point that overlap with detections in spline interval
                     _,idx0,idx1 = np.intersect1d(detect_part[0],temp_traj[0],return_indices=True,assume_unique=False)
                     # Determine index of traj points in global detections
                     _,idx2,_ = np.intersect1d(self.detections_global[cam_id][0],temp_traj[0,idx1],return_indices=True,assume_unique=False)
@@ -633,6 +639,7 @@ class Scene:
                 mot_error = np.array([])
             for i in range(numCam):
                 if motion:
+                    raw_time_stamps_all,global_time_stamps_all = self.all_detect_to_traj(self.sequence[:numCam])
                     error_each,mot_error_each = self.error_cam_mot(self.sequence[i], mode='each',motion=motion,norm=True,motion_weights=motion_weights)
                     error = np.concatenate((error, error_each))
                     mot_error = np.concatenate((mot_error, mot_error_each))
@@ -828,7 +835,23 @@ class Scene:
         if motion:
             #interpolate 3d points from detections in all cameras
 
-            raw_traj,traj_idx = self.all_detect_to_traj(self.sequence[:numCam])
+            raw_time_stamps_all,global_time_stamps_all = self.all_detect_to_traj(self.sequence[:numCam])
+            self.spline_to_traj(t=np.sort(global_time_stamps_all))
+        
+        # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
+        
+            # WIP
+            idx = np.isin(global_time_stamps_all,self.traj[0])
+            global_time_stamps_all = global_time_stamps_all[idx==True]
+            raw_time_stamps_all = raw_time_stamps_all[idx==True]
+            #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
+
+            raw_traj = np.empty([4,0])
+            for i,j in enumerate(raw_time_stamps_all):
+                for k,l in enumerate(self.traj[0]):
+                    if global_time_stamps_all[i] == l:
+                        raw_traj = np.hstack((np.vstack((j,self.traj[1:,k].reshape(3,1))),raw_traj))
+                        break 
             self.traj = raw_traj
             #model_traj_1 = np.empty([3,0])
             #model_traj = np.zeros((3,time_stamps_all.shape[0]))
@@ -1099,20 +1122,30 @@ class Scene:
                 global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
                 raw_time_stamps_all = np.concatenate((raw_time_stamps_all,self.detections[i][0]))
         #global_time_stamps_all = np.sort(global_time_stamps_all)
-        raw_time_stamps_all = np.sort(raw_time_stamps_all)
-        self.spline_to_traj(t=np.sort(global_time_stamps_all))
+        #raw_time_stamps_all = np.sort(raw_time_stamps_all)
+        return raw_time_stamps_all,global_time_stamps_all
         
-        #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
+        # self.spline_to_traj(t=np.sort(global_time_stamps_all))
         
-        _,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
-        g_ts_sort = np.sort(global_time_stamps_all)[idx1]
-        _,idx2,idx3 = np.intersect1d(global_time_stamps_all,np.sort(global_time_stamps_all),assume_unique=True,return_indices=True)
+        # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
         
-        raw_traj = np.vstack((raw_time_stamps_all[idx1],self.traj[1:,idx]))
+        # # WIP
+        # idx = np.isin(global_time_stamps_all,self.traj[0])
+        # global_time_stamps_all = global_time_stamps_all[idx==True]
+        # raw_time_stamps_all = raw_time_stamps_all[idx==True]
+        # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
+
+        # raw_traj = np.empty([4,0])
+        # for i,j in enumerate(raw_time_stamps_all):
+        #     for k,l in enumerate(self.traj[0]):
+        #         if global_time_stamps_all[i] == l:
+        #             raw_traj = np.hstack((np.vstack((j,self.traj[1:,k].reshape(3,1))),raw_traj))
+        #             break 
+    
         
         #_,idx,_ = np.intersect1d(global_time_stamps_all,self.traj[0],assume_unique=True,return_indices=True)
         #raw_traj = np.vstack((raw_time_stamps_all[idx],self.traj[1:]))
-        return raw_traj,idx
+        #return raw_traj,idx
 
     def motion_prior(self,traj,weights,eps=1e-20,prior='F'):
         
