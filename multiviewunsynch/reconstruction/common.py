@@ -48,6 +48,10 @@ class Scene:
         self.rs = []
         self.ref_cam = 0
         self.find_order = True
+        self.frame_id_all = []
+        self.global_time_stamps_all = []
+        self.global_detections = []
+        self.global_traj = []
         
 
     def addCamera(self,*camera):
@@ -91,7 +95,7 @@ class Scene:
                 self.alpha[i] = fps_ref / self.cameras[i].fps
 
 
-    def detection_to_global(self,*cam):
+    def detection_to_global(self,*cam,motion=False):
         '''
         Convert frame indices of raw detections into the global timeline.
 
@@ -104,6 +108,8 @@ class Scene:
 
         if len(cam):
             cams = cam
+            if type(cams[0]) != int:
+                cams = cams[0]
         else:
             cams = range(self.numCam)
             self.detections_global = [[] for i in cams]
@@ -112,6 +118,21 @@ class Scene:
             timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cameras[i].resolution[1]
             detect = self.cameras[i].undist_point(self.detections[i][1:]) if self.settings['undist_points'] else self.detections[i][1:]
             self.detections_global[i] = np.vstack((timestamp, detect))
+            if motion:
+                    # Update glob_traj timestamps for camera cam_id
+                    #temp_cam_id = self.global_detections[1]
+                    temp_glob_traj = self.global_traj[:,self.global_traj[1] == i]
+                    temp_glob_detections = self.global_detections[:,self.global_detections[1] == i]
+                    temp_glob_det_idx = temp_glob_detections[0].astype(int)
+                    temp_glob_traj_mask = np.isin(self.global_traj[0],temp_glob_det_idx)
+                    temp_glob_det_mask = np.isin(self.global_detections[0],temp_glob_traj[0])
+
+                    assert np.sum(temp_glob_traj_mask == True) == np.sum(temp_glob_det_mask == True)
+                    # Update global detection timestamps for cam_id
+                    self.global_detections[3,temp_glob_det_idx.astype(int)] = self.detections_global[i][0]
+                    # Update global traj timestamps for detections in global_traj
+
+                    self.global_traj[3,temp_glob_traj_mask] = self.global_detections[3,temp_glob_det_mask]
 
 
     def cut_detection(self,second=1):
@@ -315,7 +336,7 @@ class Scene:
         return self.traj
 
 
-    def error_cam(self,cam_id,mode='dist'):
+    def error_cam(self,cam_id,mode='dist',motion=False,norm=False):
         '''
         Calculate the reprojection errors for a given camera
 
@@ -323,7 +344,7 @@ class Scene:
         '''
 
         tck, interval = self.spline['tck'], self.spline['int']
-        self.detection_to_global(cam_id)
+        self.detection_to_global(cam_id,motion=motion)
 
         _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
         detect = np.empty([3,0])
@@ -331,12 +352,23 @@ class Scene:
         for i in range(interval.shape[1]):
             detect_part = self.detections_global[cam_id][:,idx==i+1]
             if detect_part.size:
-                detect = np.hstack((detect,detect_part))
-                point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
+                if motion:
+                    detect_idx = np.isin(detect_part[0],self.global_traj[3])
+                    traj_idx = np.isin(self.global_traj[3],detect_part[0])
+                    detect_part = detect_part[:,detect_idx]
+                    detect = np.hstack((detect,detect_part))
+                    point_3D = np.hstack((point_3D,self.global_traj[4:,traj_idx]))
+                else:
+                    detect = np.hstack((detect,detect_part)) 
+                    point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
 
         X = util.homogeneous(point_3D)
         x = detect[1:]
         x_cal = self.cameras[cam_id].projectPoint(X)
+        # #Normalize Tracks
+        if norm:
+            x_cal = np.dot(np.linalg.inv(self.cameras[cam_id].K), x_cal)
+            x = np.dot(np.linalg.inv(self.cameras[cam_id].K), util.homogeneous(x))
 
         if mode == 'dist':
             return ep.reprojection_error(x, x_cal)
@@ -351,7 +383,7 @@ class Scene:
             error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             return np.concatenate((error_x, error_y))
 
-    def error_cam_mot(self,cam_id,mode='dist',motion=False,norm=False,motion_weights=1):
+    def error_cam_mot(self,cams,mode='dist',motion=False,norm=False,motion_weights=1):
         '''
         Calculate the reprojection errors for a given camera for a multi_spline object. 
 
@@ -363,88 +395,89 @@ class Scene:
         '''
 
         tck, interval = self.spline['tck'], self.spline['int']
-        self.detection_to_global(cam_id)
+        self.detection_to_global(cams,motion=motion)
+        _, idx = self.sampling(self.global_traj[3], interval, belong=True)
 
-        
-
-        if motion:
-            # Select part of raw detection indices within spline intervals and create temp. traj with global time stamps
-            det_idx = np.isin(raw_time_stamps_all,self.traj[0])
-            traj_idx = np.isin(self.traj[0],self.detections[cam_id][0])
-            #_,traj_idx,det_idx = np.intersect1d(self.traj[0],self.detections[cam_id][0],return_indices=True,assume_unique=True)
-
-            temp_traj = np.vstack((global_time_stamps_all[det_idx==True],self.traj[1:]))
-            
-            #self.detect_to_traj([cam_id]) #self.sequence[:self.numCam])
-            # time_stamps_all = np.array([])
-            # for i in range(self.numCam):
-            #     self.detections[i] = self.detections[i][:,:]
-            #     self.detection_to_global(i)
-            #     time_stamps_all = np.concatenate((time_stamps_all,self.detections_global[i][0]))
-            # time_stamps_all = np.sort(time_stamps_all)
-            # self.spline_to_traj(t=time_stamps_all)
-
-        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
+        temp_glob_ts = np.array([])
         mot_err_res = np.array([])
         mot_idx = np.array([]) 
+
         for i in range(interval.shape[1]):
-            detect_part = self.detections_global[cam_id][:,idx==i+1]
-            if detect_part.size:
-                if motion:
-                    # Select traj. point that overlap with detections in spline interval
-                    _,idx0,idx1 = np.intersect1d(detect_part[0],temp_traj[0],return_indices=True,assume_unique=False)
-                    # Determine index of traj points in global detections
-                    _,idx2,_ = np.intersect1d(self.detections_global[cam_id][0],temp_traj[0,idx1],return_indices=True,assume_unique=False)
-                    #idx2 = np.arange(self.detections_global[cam_id].shape[1])[idx==i+1]
-                    weights = np.ones(temp_traj[:,idx1].shape[1]) * motion_weights
-                    mot_err = self.motion_prior(temp_traj[:,idx1],weights)
-                    mot_err_res = np.concatenate((mot_err_res, mot_err))
-                    mot_idx = np.concatenate((mot_idx, idx2[1:-1]))
-                    point_3D = np.hstack((point_3D, temp_traj[1:,idx1]))
-                    detect = np.hstack((detect,detect_part[:,idx0]))
-                else:
-                    detect = np.hstack((detect,detect_part))
-                    point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
-        if motion:
-            assert mot_err_res.shape[0] == mot_idx.shape[0], 'Motion prior indices are wrong shape'
-            motion_error = np.zeros((self.detections[cam_id].shape[1]))
-            motion_error[mot_idx.astype(int)] = mot_err_res
+            traj_part = self.global_traj[:,idx==i+1]
+            if traj_part.size:
+                # Update glob_traj timestamps for camera cam_id
+                # temp_cam_id = self.global_detections[1]
+                #temp_glob_traj = self.global_traj[:,temp_cam_id == cam_id]
+                # temp_glob_detections = self.global_detections[:,temp_cam_id == cam_id]
+                # temp_glob_det_idx = temp_global_detections[0]
+                # temp_glob_traj_idx = temp_global_traj[0]
+                # # Update global detection timestamps for cam_id
+                # self.global_detections[3,temp_glob_det_idx] = self.detections_global[cam_id][0]
+                # # Update global traj timestamps for detections in global_traj
+                # self.global_traj[3,temp_glob_traj_idx] = self.global_detections[3,temp_glob_traj_idx]
+                # temp_frame_id = self.global_traj[2]
+                # temp_glob_ts = self.global_traj[3]
+                # Select traj. points that overlap with detections in spline interval
+                
+                # Determine index of traj points in global detections
+                
+                #idx2 = np.arange(self.detections_global[cam_id].shape[1])[idx==i+1]
+                weights = np.ones(traj_part.shape[1]) * motion_weights
+                mot_err = self.motion_prior(traj_part[3:],weights)
+                mot_err_res = np.concatenate((mot_err_res, mot_err))
+                #mot_idx = np.concatenate((mot_idx, idx2[1:-1]))
+                #point_3D = np.hstack((point_3D, temp_traj[1:,idx1]))
+                #detect = np.hstack((detect,detect_part[:,idx0]))
 
-        X = util.homogeneous(point_3D)
-        x = detect[1:]
-        x_cal = self.cameras[cam_id].projectPoint(X)
+        return mot_err_res
+        
+        # for i in range(interval.shape[1]):
+        #     detect_part = self.detections_global[cam_id][:,idx==i+1]
+        #     if detect_part.size:
+                
+    
+        #     detect = np.hstack((detect,detect_part))
+        #     point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
+        # if motion:
+        #     assert mot_err_res.shape[0] == mot_idx.shape[0], 'Motion prior indices are wrong shape'
+        #     motion_error = np.zeros((self.detections[cam_id].shape[1]))
+        #     motion_error[mot_idx.astype(int)] = mot_err_res
 
-        #Normalize Tracks
-        if norm:
-            x_cal = np.dot(np.linalg.inv(self.cameras[cam_id].K), x_cal)
-            x = np.dot(np.linalg.inv(self.cameras[cam_id].K), util.homogeneous(x))
+        # X = util.homogeneous(point_3D)
+        # x = detect[1:]
+        # x_cal = self.cameras[cam_id].projectPoint(X)
 
-        if mode == 'dist':
-            return ep.reprojection_error(x, x_cal)
-        elif mode == 'xy_1D':
-            return np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
-        elif mode == 'xy_2D':
-            return np.vstack((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
-        elif mode == 'each':
+        # #Normalize Tracks
+        # if norm:
+        #     x_cal = np.dot(np.linalg.inv(self.cameras[cam_id].K), x_cal)
+        #     x = np.dot(np.linalg.inv(self.cameras[cam_id].K), util.homogeneous(x))
+
+        # if mode == 'dist':
+        #     return ep.reprojection_error(x, x_cal)
+        # elif mode == 'xy_1D':
+        #     return np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
+        # elif mode == 'xy_2D':
+        #     return np.vstack((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
+        # elif mode == 'each':
             
-            error_x = np.zeros_like(self.detections[cam_id][0])
-            error_y = np.zeros_like(self.detections[cam_id][0])
+        #     error_x = np.zeros_like(self.detections[cam_id][0])
+        #     error_y = np.zeros_like(self.detections[cam_id][0])
 
-            if motion:
-                _,idx3,_ = np.intersect1d(self.detections_global[cam_id][0],detect[0],return_indices=True,assume_unique=False)
-                error_x[idx3.astype(int)] = abs(x_cal[0]-x[0])
-                error_y[idx3.astype(int)] = abs(x_cal[1]-x[1])
+        #     if motion:
+        #         _,idx3,_ = np.intersect1d(self.detections_global[cam_id][0],detect[0],return_indices=True,assume_unique=False)
+        #         error_x[idx3.astype(int)] = abs(x_cal[0]-x[0])
+        #         error_y[idx3.astype(int)] = abs(x_cal[1]-x[1])
             
-            else:
-                error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
-                error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
+        #     else:
+        #         error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
+        #         error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             
-            if motion:
-                    return np.concatenate((error_x, error_y)),motion_error
-            else:
-                    return np.concatenate((error_x, error_y))
+        #     if motion:
+        #             return np.concatenate((error_x, error_y)),motion_error
+        #     else:
+        #             return np.concatenate((error_x, error_y))
 
     def compute_visibility(self):
         '''
@@ -625,7 +658,7 @@ class Scene:
         
             if motion:
             #   self.detect_to_traj(self.sequence[:numCam])
-                self.traj[1:] = model_parts[4].reshape(-1,3).T
+                self.global_traj[4:] = model_parts[4].reshape(-1,3).T
 
             else:
                 spline_parts = np.split(model_parts[4],idx_spline[0,1:])
@@ -638,16 +671,11 @@ class Scene:
             if motion:
                 mot_error = np.array([])
             for i in range(numCam):
-                if motion:
-                    raw_time_stamps_all,global_time_stamps_all = self.all_detect_to_traj(self.sequence[:numCam])
-                    error_each,mot_error_each = self.error_cam_mot(self.sequence[i], mode='each',motion=motion,norm=True,motion_weights=motion_weights)
-                    error = np.concatenate((error, error_each))
-                    mot_error = np.concatenate((mot_error, mot_error_each))
-                else:
-                    error_each = self.error_cam(self.sequence[i], mode='each')
-                    error = np.concatenate((error, error_each))
+                error_each = self.error_cam(self.sequence[i], mode='each',motion=motion)
+                error = np.concatenate((error, error_each))
             if motion:
-                error = np.concatenate((error, mot_error))
+                error_mot = self.error_cam_mot(self.sequence[:numCam],motion=motion)
+                error = np.concatenate((error, error_mot))
 
             # Compute errors
             # error = np.array([])
@@ -724,6 +752,8 @@ class Scene:
             else:
                 jac = np.empty([0,num_param])
             
+            num_global_pnt = self.global_traj.shape[1]
+
             for i in range(numCam):
                 cam_id = self.sequence[i]
                 num_detect = self.detections[cam_id].shape[1]
@@ -734,7 +764,7 @@ class Scene:
                 else:
                     #jac_cam = np.zeros((num_detect, num_param))
                     jac_cam = lil_matrix((num_detect, num_param),dtype=int)
-                    m_jac_cam = lil_matrix((num_detect, num_param),dtype=int)
+                    m_jac = lil_matrix((num_global_pnt, num_param),dtype=int)
 
                 # alpha and beta
                 jac_cam[:,[i,i+numCam]] = 1
@@ -750,8 +780,8 @@ class Scene:
                 jac_cam[:,start:start+num_camParam] = 1
 
                 if motion:
-                    start = numCam * (3+num_camParam)
-                    traj_len = self.traj.shape[1]
+                    pnt_start = numCam * (3+num_camParam)
+                    traj_len = self.global_traj.shape[1]
                     for j in range(num_detect):
                         spline_id = self.visible[cam_id][j]
                         # Find the corresponding spline for each detection
@@ -759,40 +789,32 @@ class Scene:
                             #spline_id -= 1
                             #interval = self.spline['int'][:,spline_id]
                             timestamp = self.detections_global[cam_id][0,j]
-                            _,_,idx2 = np.intersect1d(timestamp,self.traj[0],assume_unique=True,return_indices=True)
+                            _,_,idx2 = np.intersect1d(timestamp,self.global_traj[3],assume_unique=True,return_indices=True)
                             idx2 += start
                             traj_idx = np.array([idx2[0]]) #np.argsort(abs(knot-timestamp))[:near]
                             traj_idx = np.concatenate((traj_idx, traj_idx+traj_len, traj_idx+2*traj_len))
                             
-                            m_traj_idx = np.array([idx2[0]-1,idx2[0],idx2[0]+1]) 
-                            m_traj_idx = np.concatenate((m_traj_idx, m_traj_idx+traj_len, m_traj_idx+2*traj_len))
+                            #m_traj_idx = np.array([idx2[0]-1,idx2[0],idx2[0]+1]) 
+                            #m_traj_idx = np.concatenate((m_traj_idx, m_traj_idx+traj_len, m_traj_idx+2*traj_len))
                             
                             if traj_idx.all() < num_param:
                                 jac_cam[j,traj_idx] = 1
-                            #if m_traj_idx.any() == num_param:
-                            #    continue
-                            #if m_traj_idx.any() == num_param:
-                            if m_traj_idx[-1] == num_param:
-                                m_jac_cam[j,m_traj_idx[:-1]] = 1   
                             else:
-                                m_jac_cam[j,m_traj_idx] =  1       
+                                jac_cam[j,traj_idx[-1]] = 1
                         else:
                             jac_cam[j] = 0
-                            m_jac_cam[j] = 0
-                    
-                            #detect_2D = self.detections_global[cam_id][:,idx==spline_id+1]
+                        
                     jac_X = jac_cam
-                    #for i in (range(2)):
                     jac_X = vstack([jac_X,jac_cam])
-                    jac_X = vstack([jac_X,m_jac_cam])
+            
+                    #jac_X = vstack([jac_X,m_jac_cam])
                     #jac_X = vstack([jac_X,jac_cam])#.toarray()
                     #jac_X = jac_X.toarray()
-                    jac = vstack((jac, jac_X)).toarray() 
+                    jac = vstack((jac, jac_X)) 
                 else:
                     # spline parameters
                     for j in range(num_detect):
                         spline_id = self.visible[cam_id][j]
-
                         # Find the corresponding spline for each detecion
                         if spline_id:
                             spline_id -= 1
@@ -811,6 +833,17 @@ class Scene:
             # fix the first camera
             # jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
             if motion:
+                for j in range(num_global_pnt):
+                        m_jac[j] = 0
+                        m_traj_idx = np.array([j,j+1,j+2]) 
+                        m_traj_idx = np.concatenate((m_traj_idx, m_traj_idx+traj_len, m_traj_idx+2*traj_len))
+                        # Find the corresponding spline for each detection
+                        if m_traj_idx.all() < num_param:
+                                m_jac[j,m_traj_idx] = 1
+                        else:
+                            m_jac[j,m_traj_idx[-1]] = 1
+                #jac_X = vstack([jac_X,m_jac])
+                jac = vstack((jac, m_jac)).toarray()
                 return jac[1:]
             else:
                 return jac
@@ -835,28 +868,29 @@ class Scene:
         if motion:
             #interpolate 3d points from detections in all cameras
 
-            raw_time_stamps_all,global_time_stamps_all = self.all_detect_to_traj(self.sequence[:numCam])
-            self.spline_to_traj(t=np.sort(global_time_stamps_all))
+            self.all_detect_to_traj(self.sequence[:numCam])
+            #self.spline_to_traj(t=np.sort(self.global_time_stamps_all))
         
-        # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
+           #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
         
             # WIP
-            idx = np.isin(global_time_stamps_all,self.traj[0])
-            global_time_stamps_all = global_time_stamps_all[idx==True]
-            raw_time_stamps_all = raw_time_stamps_all[idx==True]
+            #idx = np.isin(self.global_time_stamps_all,self.traj[0])
+            #global_time_stamps_all = self.global_time_stamps_all[idx==True]
+            #raw_time_stamps_all = self.raw_time_stamps_all[idx==True]
             #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
 
-            raw_traj = np.empty([4,0])
-            for i,j in enumerate(raw_time_stamps_all):
-                for k,l in enumerate(self.traj[0]):
-                    if global_time_stamps_all[i] == l:
-                        raw_traj = np.hstack((np.vstack((j,self.traj[1:,k].reshape(3,1))),raw_traj))
-                        break 
-            self.traj = raw_traj
+            # Define a set of 3d points for each raw detection
+            # raw_traj = np.empty([4,0])
+            # for i,j in enumerate(raw_time_stamps_all):
+            #     for k,l in enumerate(self.traj[0]):
+            #         if global_time_stamps_all[i] == l:
+            #             raw_traj = np.hstack((np.vstack((j,self.traj[1:,k].reshape(3,1))),raw_traj))
+            #             break 
+            #self.traj = raw_traj
             #model_traj_1 = np.empty([3,0])
             #model_traj = np.zeros((3,time_stamps_all.shape[0]))
             #model_traj = np.zeros((3,time_stamps_all.shape[0]))
-            model_traj = np.ravel(self.traj[1:].T)
+            model_traj = np.ravel(self.global_traj[4:].T)
             
             # for i in self.sequence[:numCam]:
             #     temp_det = np.zeros((3,self.detections[i].shape[1]))
@@ -903,13 +937,13 @@ class Scene:
             self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
         
         if motion:
-            self.traj[1:] = model_parts[4].reshape(-1,3).T
-            global_time_stamps_all = np.array([])
-            for i in range(numCam):
-                self.detection_to_global(i)
-                global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
-            global_time_stamps_all = np.sort(global_time_stamps_all)
-            self.traj = np.vstack((global_time_stamps_all[traj_idx],self.traj[1:]))
+            self.global_traj[4:] = model_parts[4].reshape(-1,3).T
+            #global_time_stamps_all = np.array([])
+            #for i in range(numCam):
+            #    self.detection_to_global(i)
+            #    global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
+            #global_time_stamps_all = np.sort(global_time_stamps_all)
+            self.traj = self.global_traj[3:] #np.vstack((global_time_stamps_all[traj_idx],self.traj[1:]))
             self.traj_to_spline()
 
         else:
@@ -918,8 +952,8 @@ class Scene:
                 spline_i = spline_parts[i].reshape(3,-1)
                 self.spline['tck'][i][1] = [spline_i[0],spline_i[1],spline_i[2]]
 
-            # Update global timestamps for each serie of detections
-            self.detection_to_global()
+        # Update global timestamps for each serie of detections
+        self.detection_to_global()
 
         return res
 
@@ -1108,25 +1142,42 @@ class Scene:
             self.sequence.append(i)
 
     def all_detect_to_traj(self,*cam):
+        #global_traj = np.empty()
         global_time_stamps_all = np.array([])
-        raw_time_stamps_all = np.array([])
+        frame_id_all = np.array([])
+        cam_id = np.array([])
 
         if len(cam):
             for i in cam[0]:
                 self.detection_to_global(i)
                 global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
-                raw_time_stamps_all = np.concatenate((raw_time_stamps_all,self.detections[i][0]))
+                frame_id_all  = np.concatenate((frame_id_all,self.detections[i][0]))
+                cam_id = np.concatenate((cam_id,np.ones(len(self.detections[i][0])) * i ))
+
         else:
             for i in range(self.numCam):
                 self.detection_to_global(i)
                 global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
-                raw_time_stamps_all = np.concatenate((raw_time_stamps_all,self.detections[i][0]))
+                frame_id_all = np.concatenate((frame_id_all,self.detections[i][0]))
+                cam_id = np.concatenate((cam_id,np.ones(len(self.detections[i][0])) * i ))
+
         #global_time_stamps_all = np.sort(global_time_stamps_all)
         #raw_time_stamps_all = np.sort(raw_time_stamps_all)
-        return raw_time_stamps_all,global_time_stamps_all
+        self.frame_id_all = frame_id_all 
+        self.global_time_stamps_all = global_time_stamps_all
+        #return raw_time_stamps_all,global_time_stamps_all
         
-        # self.spline_to_traj(t=np.sort(global_time_stamps_all))
-        
+        self.spline_to_traj(t=np.sort(global_time_stamps_all))
+        idx = np.arange(len(self.global_time_stamps_all))
+        self.global_detections = np.vstack((idx,cam_id,frame_id_all,global_time_stamps_all))
+        #self.global_traj = np.vstack((idx,cam_id,frame_id_all,global_time_stamps_all))
+        #Sort global_traj by global time stamp
+        temp_global_traj = self.global_detections[:,np.argsort(self.global_detections[3,:])]
+        traj_idx = np.isin(temp_global_traj[3],self.traj[0])
+        temp_global_traj = np.vstack((temp_global_traj[:,traj_idx],self.traj[1:]))
+        # Resort by global_traj idx to maintain original detection order
+        self.global_traj = temp_global_traj[:,np.argsort(temp_global_traj[0,:])]
+
         # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
         
         # # WIP

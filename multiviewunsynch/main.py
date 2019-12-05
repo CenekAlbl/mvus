@@ -33,7 +33,7 @@ while True:
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     # Bundle adjustment
-    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=True,motion_weights=1)
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
