@@ -159,11 +159,11 @@ class Scene:
     def find_intervals(self,x,gap=5,idx=False):
         '''
         Given indices of detections, return a matrix that contains the start and the end of each
-        continues part.
+        continuous part.
         
         Input indices must be in ascending order. 
         
-        The gap defines the maximal interruption, with which it's still considered as continues. 
+        The gap defines the maximal interruption, with which it's still considered as continuous. 
         '''
 
         assert len(x.shape)==1 and (x[1:]>x[:-1]).all(), 'Input must be an ascending 1D-array'
@@ -356,11 +356,14 @@ class Scene:
             detect_part = self.detections_global[cam_id][:,idx==i+1]
             if detect_part.size:
                 if motion:
-                    detect_idx = np.isin(detect_part[0],self.global_traj[3])
-                    traj_idx = np.isin(self.global_traj[3],detect_part[0])
+                    cam_global_traj = self.global_traj[:,self.global_traj[1] == cam_id]
+                    #assert len(x.shape)==1 and (x[1:]>x[:-1]).all(), 'Input must be an ascending 1D-array'
+                    #detect_idx = np.isin(detect_part[0],self.global_traj[3])
+                    #traj_idx = np.isin(self.global_traj[3],detect_part[0])
+                    _,traj_idx,detect_idx = np.intersect1d(cam_global_traj[3],detect_part[0],assume_unique=True,return_indices=True)
                     detect_part = detect_part[:,detect_idx]
                     detect = np.hstack((detect,detect_part))
-                    point_3D = np.hstack((point_3D,self.global_traj[4:,traj_idx]))
+                    point_3D = np.hstack((point_3D,cam_global_traj[4:,traj_idx]))
                 else:
                     detect = np.hstack((detect,detect_part)) 
                     point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
@@ -847,13 +850,18 @@ class Scene:
             if motion:
                 for j in range(num_global_pnt):
                         m_jac[j] = 0
-                        m_traj_idx = np.array([j,j+1,j+2]) 
+                        if j < 10:
+                           m_traj_idx = np.arange(0,j+10)#
+                        else:
+                            m_traj_idx = np.arange(j-10,j+10)
+                            #np.array([j,j+1,j+2]) 
+                        #m_traj_idx = np.array([j,j+1,j+2]) 
                         m_traj_idx = np.concatenate((m_traj_idx, m_traj_idx+traj_len, m_traj_idx+2*traj_len))
                         # Find the corresponding spline for each detection
-                        if m_traj_idx.all() < num_param:
-                                m_jac[j,m_traj_idx] = 1
-                        else:
-                            m_jac[j,m_traj_idx[-1]] = 1
+                        #if m_traj_idx.all() < num_param:
+                        #        m_jac[j,m_traj_idx] = 1
+                        #else:
+                        m_jac[j,m_traj_idx[m_traj_idx < num_param]] = 1
                 #jac_X = vstack([jac_X,m_jac])
                 jac = vstack((jac, m_jac)).toarray()
                 return jac[1:]
@@ -1175,22 +1183,24 @@ class Scene:
                 frame_id_all = np.concatenate((frame_id_all,self.detections[i][0]))
                 cam_id = np.concatenate((cam_id,np.ones(len(self.detections[i][0])) * i ))
 
-        #global_time_stamps_all = np.sort(global_time_stamps_all)
-        #raw_time_stamps_all = np.sort(raw_time_stamps_all)
         self.frame_id_all = frame_id_all 
         self.global_time_stamps_all = global_time_stamps_all
-        #return raw_time_stamps_all,global_time_stamps_all
-        
+    
+        # Interpolate 3D points for global timestamps in all cameras
         self.spline_to_traj(t=np.sort(global_time_stamps_all))
         idx = np.arange(len(self.global_time_stamps_all))
         self.global_detections = np.vstack((idx,cam_id,frame_id_all,global_time_stamps_all))
         #self.global_traj = np.vstack((idx,cam_id,frame_id_all,global_time_stamps_all))
         #Sort global_traj by global time stamp
         temp_global_traj = self.global_detections[:,np.argsort(self.global_detections[3,:])]
+        
+        # Create ascending global timestamp trajectory
         traj_idx = np.isin(temp_global_traj[3],self.traj[0])
         temp_global_traj = np.vstack((temp_global_traj[:,traj_idx],self.traj[1:]))
+        
         # Resort by global_traj idx to maintain original detection order
-        self.global_traj = temp_global_traj[:,np.argsort(temp_global_traj[0,:])]
+        #self.global_traj = temp_global_traj[:,np.argsort(temp_global_traj[0,:])]
+        self.global_traj = temp_global_traj
 
         # #_,idx,idx1 = np.intersect1d(self.traj[0],global_time_stamps_all,assume_unique=True,return_indices=True)
         

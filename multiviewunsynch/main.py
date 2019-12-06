@@ -36,7 +36,7 @@ while True:
     res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=True,motion_weights=0)
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
 
-    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion=True,mode='each')) for x in flight.sequence[:cam_temp]]))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
