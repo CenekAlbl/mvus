@@ -346,6 +346,9 @@ class Scene:
         tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id,motion=motion)
 
+        #if motion:
+        #    _, idx = self.sampling(self.global_d,interval)
+        #else:
         _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
@@ -379,8 +382,14 @@ class Scene:
         elif mode == 'each':
             error_x = np.zeros_like(self.detections[cam_id][0])
             error_y = np.zeros_like(self.detections[cam_id][0])
-            error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
-            error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
+            if motion:
+                mot_idx = np.isin(self.detections_global[cam_id][0],detect[0])
+                assert np.sum(mot_idx == True) == x_cal.shape[1], '# of detections and traj. points are not equal'
+                error_x[mot_idx] = abs(x_cal[0]-x[0])
+                error_y[mot_idx] = abs(x_cal[1]-x[1])
+            else:
+                error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
+                error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             return np.concatenate((error_x, error_y))
 
     def error_cam_mot(self,cams,mode='dist',motion=False,norm=False,motion_weights=1):
@@ -427,11 +436,14 @@ class Scene:
                 weights = np.ones(traj_part.shape[1]) * motion_weights
                 mot_err = self.motion_prior(traj_part[3:],weights)
                 mot_err_res = np.concatenate((mot_err_res, mot_err))
-                #mot_idx = np.concatenate((mot_idx, idx2[1:-1]))
+                mot_idx = np.concatenate((mot_idx, traj_part[0,1:-1]))
+                
                 #point_3D = np.hstack((point_3D, temp_traj[1:,idx1]))
                 #detect = np.hstack((detect,detect_part[:,idx0]))
-
-        return mot_err_res
+        motion_error = np.zeros((self.global_traj.shape[1]))
+        mot_idx = np.isin(self.global_traj[0],mot_idx)
+        motion_error[mot_idx] = mot_err_res
+        return motion_error
         
         # for i in range(interval.shape[1]):
         #     detect_part = self.detections_global[cam_id][:,idx==i+1]
@@ -669,9 +681,9 @@ class Scene:
             # Compute errors
             error = np.array([])
             if motion:
-                mot_error = np.array([])
+                norm = True
             for i in range(numCam):
-                error_each = self.error_cam(self.sequence[i], mode='each',motion=motion)
+                error_each = self.error_cam(self.sequence[i], mode='each',motion=motion,norm=norm)
                 error = np.concatenate((error, error_each))
             if motion:
                 error_mot = self.error_cam_mot(self.sequence[:numCam],motion=motion)
@@ -928,13 +940,14 @@ class Scene:
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline
-        sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*self.cam_model]
+        sections = [numCam, numCam*2, numCam*3, numCam*3+numCam*num_camParam]
         model_parts = np.split(res.x, sections)
         self.alpha[self.sequence[:numCam]], self.beta[self.sequence[:numCam]], self.rs[self.sequence[:numCam]] = model_parts[0], model_parts[1], model_parts[2]
 
         cams = np.split(model_parts[3],numCam)
         for i in range(numCam):
-            self.cameras[self.sequence[i]].vector2P(cams[i], n=self.cam_model) 
+            self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib'])
+
         
         if motion:
             self.global_traj[4:] = model_parts[4].reshape(-1,3).T
@@ -943,7 +956,8 @@ class Scene:
             #    self.detection_to_global(i)
             #    global_time_stamps_all = np.concatenate((global_time_stamps_all,self.detections_global[i][0]))
             #global_time_stamps_all = np.sort(global_time_stamps_all)
-            self.traj = self.global_traj[3:] #np.vstack((global_time_stamps_all[traj_idx],self.traj[1:]))
+            #temp_global_traj = self.global_detections[:,np.argsort(self.global_detections[3,:])]
+            self.traj = self.global_traj[3:,np.argsort(self.global_traj[3,:])] #np.vstack((global_time_stamps_all[traj_idx],self.traj[1:]))
             self.traj_to_spline()
 
         else:
@@ -1241,7 +1255,7 @@ class Scene:
             accel = (v2 - v1) / dt3
             mot_resid = np.array([weights[:traj_for.shape[1]]*(accel * (dt2 - dt1))])
 
-        mot_resid = np.sum(mot_resid[0],axis=0)
+        mot_resid = np.sum(abs(mot_resid[0]),axis=0)
         return mot_resid
         
 class Camera:
