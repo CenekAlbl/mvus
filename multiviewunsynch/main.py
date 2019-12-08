@@ -41,14 +41,14 @@ while True:
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
-    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=True,motion_weights=0)
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     #Compute reconstruction with motion prior
-    res = flight.BA_mot(cam_temp,rs=flight.settings['rolling_shutter'],motion=True,motion_weights=1)
+    #res = flight.BA_mot(cam_temp,rs=flight.settings['rolling_shutter'],motion=True,motion_weights=1)
 
-    print('\nMean error of each camera after second BA with MP reg.: ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+    #print('\nMean error of each camera after second BA with MP reg.: ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:
