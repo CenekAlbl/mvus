@@ -4,7 +4,7 @@
         "path_detections": ["./data/fixposition/detection/outp_mate10_1.txt",
                             "./data/fixposition/detection/outp_sonyg1.txt",
                             "./data/fixposition/detection/outp_sonyalpha5001.txt",
-                            "./data/fixposition/detection/outp_mate7_1.txt",
+                            "./data/fixposition/detection/outp_mate7_cleaned.txt",
                             "./data/fixposition/detection/outp_gopro1.txt",
                             "./data/fixposition/detection/outp_sony5n1.txt"],
 
@@ -36,7 +36,7 @@
 
     "settings":
     {
-        "num_detections": 100000,
+        "num_detections": 5000,
         "opt_calib": false,
         "undist_points": true,
         "rolling_shutter": false,

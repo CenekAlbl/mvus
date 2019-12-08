@@ -28,6 +28,7 @@ start = datetime.now()
 np.set_printoptions(precision=4)
 
 cam_temp = 2
+
 while True:
     print('\n----------------- Bundle Adjustment with {} cameras -----------------'.format(cam_temp))
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
@@ -36,7 +37,7 @@ while True:
     res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=True,motion_weights=0)
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
 
-    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion=True,mode='each')) for x in flight.sequence[:cam_temp]]))
+    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion=True,mode='dist',norm=False)) for x in flight.sequence[:cam_temp]]))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
