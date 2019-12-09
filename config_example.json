@@ -36,7 +36,7 @@
 
     "settings":
     {
-        "num_detections": 5000,
+        "num_detections": 4000,
         "opt_calib": false,
         "undist_points": true,
         "rolling_shutter": false,

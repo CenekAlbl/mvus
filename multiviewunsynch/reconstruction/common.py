@@ -469,11 +469,11 @@ class Scene:
         
         
         _,traj_idx,detect_idx = np.intersect1d(self.global_traj[3],mot_idx,assume_unique=True,return_indices=True)
-        temp_glob_traj = self.global_traj[:,traj_idx]
-        temp_glob_traj[:,np.argsort(temp_glob_traj[0,:])]
-        #_,traj_idx,detect_idx = np.intersect1d(temp_glo_traj[3],mot_idx,assume_unique=True,return_indices=True)
+        #temp_glob_traj = self.global_traj[:,traj_idx]
+        #temp_glob_traj[:,np.argsort(temp_glob_traj[0,:])]
         #mot_idx = np.isin(self.global_traj[3],mot_idx)
-        motion_error[temp_glob_traj[0].astype(int)] = mot_err_res
+        #motion_error[temp_glob_traj[0].astype(int)] = mot_err_res
+        motion_error[traj_idx] = mot_err_res
         return motion_error
         
         # for i in range(interval.shape[1]):
@@ -711,8 +711,9 @@ class Scene:
             # Compute errors
             error = np.array([])
             if motion:
-                norm = True
+                norm = False
             for i in range(numCam):
+                norm = False
                 error_each = self.error_cam(self.sequence[i], mode='each',motion=motion,norm=norm)
                 error = np.concatenate((error, error_each))
             if motion:
@@ -789,23 +790,23 @@ class Scene:
             num_param = len(model)
             self.compute_visibility()
             
-            if motion:
-                jac = lil_matrix((1, num_param),dtype=int)
-            else:
-                jac = np.empty([0,num_param])
-            
-            num_global_pnt = self.global_traj.shape[1]
-
+            #if motion:
+            jac = lil_matrix((1, num_param),dtype=int)
+            #else:
+            #    jac = np.empty([0,num_param])
+            off_set = 500
             for i in range(numCam):
                 cam_id = self.sequence[i]
                 num_detect = self.detections[cam_id].shape[1]
 
-                if not motion:
+                #if not motion:
                     # consider only reprojection in x direction, which is the same in y direction
-                    jac_cam = np.zeros((num_detect, num_param))  
-                else:
+                #jac_cam = np.zeros((num_detect, num_param))  
+                jac_cam = lil_matrix((num_detect, num_param),dtype=int)
+                if motion:
+                    num_global_pnt = self.global_traj.shape[1]
                     #jac_cam = np.zeros((num_detect, num_param))
-                    jac_cam = lil_matrix((num_detect, num_param),dtype=int)
+                    #jac_cam = lil_matrix((num_detect, num_param),dtype=int)
                     m_jac = lil_matrix((num_global_pnt, num_param),dtype=int)
 
                 # alpha and beta
@@ -835,11 +836,11 @@ class Scene:
                             idx2 += traj_start
 
                             traj_idx = np.array([idx2[0]])
-                            if (idx2-traj_start) < 500:
-                                traj_idx = np.arange(traj_start,idx2+500) 
+                            if (idx2-traj_start) < off_set:
+                                traj_idx = np.arange(traj_start,idx2+off_set) 
                                 
                             else:
-                                traj_idx = np.arange(idx2-500,idx2+500) 
+                                traj_idx = np.arange(idx2-off_set,idx2+off_set) 
                                 
                             traj_idx = np.concatenate((traj_idx, traj_idx+traj_len, traj_idx+2*traj_len))
                             
@@ -853,7 +854,7 @@ class Scene:
                                 jac_cam[j,traj_idx] = 1 
                             else:
                                 jac_cam[j,traj_idx[traj_idx < num_param]] = 1
-                            jac_cam[j,traj_start:] = 1
+                            #jac_cam[j,traj_start:] = 1
                             
                                 
                         else:
@@ -883,7 +884,10 @@ class Scene:
                     #if motion:
                     #    jac = np.vstack((jac, np.tile(jac_cam,(3,1))))
                     #else:
-                    jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
+                    jac_X = jac_cam
+                    jac_XY = vstack([jac_X,jac_cam])
+                    jac = vstack((jac, jac_XY))
+                    #jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
                     
             # fix the first camera
             # jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
@@ -891,11 +895,11 @@ class Scene:
                 traj_start = numCam * (3+num_camParam)
                 for j in range(num_global_pnt):
                         m_jac[j] = 0
-                        if j < 10:
-                           m_traj_idx = np.arange(0,j+500) 
+                        if j < off_set:
+                           m_traj_idx = np.arange(0,j+off_set) 
                            m_traj_idx += traj_start#
                         else:
-                            m_traj_idx = np.arange(j-500,j+500) 
+                            m_traj_idx = np.arange(j-off_set,j+off_set) 
                             m_traj_idx += traj_start
                             #np.array([j,j+1,j+2]) 
                         #m_traj_idx = np.array([j,j+1,j+2]) 
@@ -905,12 +909,12 @@ class Scene:
                             m_jac[j,m_traj_idx] = 1
                         else:
                             m_jac[j,m_traj_idx[m_traj_idx < num_param]] = 1
-                        m_jac[j,traj_start:] = 1
+                        #m_jac[j,traj_start:] = 1
                 #jac_X = vstack([jac_X,m_jac])
                 jac = vstack((jac, m_jac)).toarray()
                 return jac[1:]
             else:
-                return jac
+                return jac.toarray()[1:]
         starttime = datetime.now()
         
         '''Before BA'''
