@@ -691,7 +691,7 @@ class Scene:
             assert idx_spline_sum[-1,-1] == len(model), 'Wrong with spline indices'
 
         # Set the Jacobian matrix
-        A = jac_BA(motion_offset=100)
+        A = jac_BA(motion_offset=10)
         #A = None
 
         '''Compute BA'''
