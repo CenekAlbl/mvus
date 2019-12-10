@@ -41,6 +41,7 @@
         "undist_points": true,
         "rolling_shutter": false,
         "init_rs": 1,
+        "motion_prior":true,
         "cut_detection_second": 0.5,
         "camera_sequence": [],
         "ref_cam": 0,
