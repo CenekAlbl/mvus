@@ -6,6 +6,7 @@ from reconstruction import common
 
 # Initialize a scene from the json template
 flight = common.create_scene('config_example.json')
+#flight = common.create_scene('syn_traj.json')
 
 # Truncate detections
 flight.cut_detection(second=flight.settings['cut_detection_second'])
@@ -34,18 +35,21 @@ while True:
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     # Bundle adjustment
-    res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=motion,motion_weights=0)
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
+        motion=flight.settings['motion_prior'],motion_weights=1000,norm=True)
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion=motion,mode='dist',norm=False)) for x in flight.sequence[:cam_temp]]))
+    
+    print('\nBA time: {}\n\n\n'.format(datetime.now()-start))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
-    res = flight.BA_mot(cam_temp, rs=flight.settings['rolling_shutter'],motion=motion,motion_weights=0)
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
-
+    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
+        motion=flight.settings['motion_prior'],motion_weights=1000,norm=True)
+    
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x,motion=motion)) for x in flight.sequence[:cam_temp]]))
 
+    print('\nBA time: {}\n\n\n'.format(datetime.now()-start))
     #Compute reconstruction with motion prior
     #res = flight.BA_mot(cam_temp,rs=flight.settings['rolling_shutter'],motion=True,motion_weights=1)
 
