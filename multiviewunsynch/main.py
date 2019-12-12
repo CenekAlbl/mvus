@@ -64,6 +64,7 @@ while True:
 
     print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
     cam_temp += 1
+    flight.traj_len = []
 
 # Visualize the 3D trajectory
 flight.spline_to_traj(sampling_rate=1)
