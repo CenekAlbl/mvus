@@ -41,6 +41,7 @@ class Scene:
         self.alpha = []
         self.beta = []
         self.traj = []
+        self.traj_len = []
         self.sequence = []
         self.visible = []
         self.settings = []
@@ -489,7 +490,7 @@ class Scene:
         interval = self.spline['int']
         
         # Update global_detections and global_traj timestamps
-        self.detection_to_global(cams,motion=True)
+        self.detection_to_global(cams,motion_prior=True)
         # Update global_traj for motion_reg
         if motion_reg:
             self.spline_to_traj()
