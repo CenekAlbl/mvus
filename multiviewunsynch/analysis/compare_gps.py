@@ -50,7 +50,8 @@ def optimize(alpha, beta, flight, gps):
         error[idx] = error_M(M.ravel(),data)
         
         if output:
-            return traj, gps_part, M, error
+            gps_idx = np.arange(len(idx))
+            return traj, gps_part, M, error, gps_idx[idx]
         else:
             return error
 
@@ -60,20 +61,20 @@ def optimize(alpha, beta, flight, gps):
     fn = lambda x: error_fn(x)
     ls = least_squares(fn,model)
 
-    traj, gps_part, M, error = error_fn(np.array([ls.x[0],ls.x[1]]),output=True)
+    res = error_fn(np.array([ls.x[0],ls.x[1]]),output=True)
 
-    return ls, [traj, gps_part, M, error]
+    return ls, res
 
 
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    reconst_path = ''
+    reconst_path = 'data/fixposition/trajectory/flight_ds2.pkl'
     with open(reconst_path, 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data
-    gps_path = ''
+    gps_path = 'data/fixposition/Raw_gps/GT_ENU.txt'
     gps_ori = np.loadtxt(gps_path).T
 
 
@@ -95,7 +96,7 @@ if __name__ == "__main__":
 
     # Apply the estimated transformation and show results
     alpha, beta = ls.x[0], ls.x[1]
-    traj, gps_part, M = result[0], result[1], result[2]
+    traj, gps_part, M, gps_idx = result[0], result[1], result[2], result[4]
 
     traj_tran = np.dot(M,util.homogeneous(traj[1:]))
     traj_tran /= traj_tran[-1]
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     flight.plot_reprojection(interval,match=True)
 
     # save the comparison result
-    flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3], 'timestamp':traj[0], 'M':M}
+    flight.gps = {'alpha':alpha, 'beta':beta, 'gps':gps_part, 'traj':traj_tran[:3], 'timestamp':traj[0], 'M':M, 'gps_idx':gps_idx}
     with open(reconst_path,'wb') as f:
         pickle.dump(flight, f) 
 
