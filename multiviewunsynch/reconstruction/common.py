@@ -509,14 +509,14 @@ class Scene:
                 traj_part = self.global_traj[:,idx==i+1]
                 if traj_part.size:
                     weights = np.ones(traj_part.shape[1]) * motion_weights
-                    mot_err = self.motion_prior(traj_part[3:],weights)
+                    mot_err = self.motion_prior(traj_part[3:],weights,prior=self.setting['motion_type'])
                     mot_err_res = np.concatenate((mot_err_res, mot_err))
                     global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))
         
         if motion_reg :
             motion_error = np.zeros((self.traj.shape[1]))
             weights = np.ones(self.traj.shape[1]) * motion_weights
-            mot_err = self.motion_prior(self.traj,weights)
+            mot_err = self.motion_prior(self.traj,weights,prior=self.setting['motion_type'])
             mot_err_res = np.concatenate((mot_err_res, mot_err))
             motion_error[1:-1] = mot_err_res
             #motion_error = np.zeros((self.global_detections.shape[1]))

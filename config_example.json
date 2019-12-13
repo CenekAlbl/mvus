@@ -8,12 +8,12 @@
                             "./data/fixposition/detection/outp_gopro1.txt",
                             "./data/fixposition/detection/outp_sony5n1.txt"],
 
-        "path_cameras": ["./data/fixposition/calibration/mate10.json",
-                         "./data/fixposition/calibration/sonyG.json",
-                         "./data/fixposition/calibration/sony_alpha_5100.json",
-                         "./data/fixposition/calibration/mate7.json",
-                         "./data/fixposition/calibration/gopro.json",
-                         "./data/fixposition/calibration/sony_alpha_5n.json"]
+        "path_cameras": ["./data/fixposition/calibration/calib_json/mate10.json",
+                         "./data/fixposition/calibration/calib_json/sonyG.json",
+                         "./data/fixposition/calibration/calib_json/sony_alpha_5100.json",
+                         "./data/fixposition/calibration/calib_json/mate7.json",
+                         "./data/fixposition/calibration/calib_json/gopro.json",
+                         "./data/fixposition/calibration/calib_json/sony_alpha_5n.json"]
     },
 
 
@@ -27,14 +27,15 @@
 
     "settings":
     {
-        "num_detections": 30000,
+        "num_detections": 100000,
         "opt_calib": false,
         "undist_points": true,
         "rolling_shutter": false,
         "init_rs": 1,
         "motion_prior":false,
-        "motion_reg":false,
-        "motion_weights":100,
+        "motion_reg":true,
+        "motion_type":"KE",
+        "motion_weights":1000,
         "cut_detection_second": 0.5,
         "camera_sequence": [],
         "ref_cam": 0,
@@ -44,7 +45,7 @@
         "thres_triangulation": 20,
         "smooth_factor": [20,25],
         "sampling_rate": 0.5,
-        "path_output": "./data/fixposition/trajectory/flight_ds2.pkl"
+        "path_output": "./data/fixposition/trajectory/flight_ds2_KE.pkl"
     }
 
 }
