@@ -509,16 +509,19 @@ class Scene:
                 traj_part = self.global_traj[:,idx==i+1]
                 if traj_part.size:
                     weights = np.ones(traj_part.shape[1]) * motion_weights
-                    mot_err = self.motion_prior(traj_part[3:],weights,prior=self.setting['motion_type'])
+                    mot_err = self.motion_prior(traj_part[3:],weights,prior=self.settings['motion_type'])
                     mot_err_res = np.concatenate((mot_err_res, mot_err))
                     global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))
         
         if motion_reg :
             motion_error = np.zeros((self.traj.shape[1]))
             weights = np.ones(self.traj.shape[1]) * motion_weights
-            mot_err = self.motion_prior(self.traj,weights,prior=self.setting['motion_type'])
+            mot_err = self.motion_prior(self.traj,weights,prior=self.settings['motion_type'])
             mot_err_res = np.concatenate((mot_err_res, mot_err))
-            motion_error[1:-1] = mot_err_res
+            if self.settings['motion_type'] == 'F':
+                motion_error[1:-1] = mot_err_res
+            else:
+                motion_error[:-1] = mot_err_res
             #motion_error = np.zeros((self.global_detections.shape[1]))
             #_,traj_idx,_ = np.intersect1d(self.global_detections[2],global_traj_ts,assume_unique=True,return_indices=True)
         else:     
@@ -1070,7 +1073,7 @@ class Scene:
             traj_aft = traj[1:,1:]
         
             #diff = norm((traj_aft[:,:] - traj_for[:,:])/((idx[1:]-idx[:-1])+eps),axis=0)
-            vel = traj_aft[:,:] - traj_for[:,:]/((ts[1:]-ts[:-1])+eps)
+            vel = (traj_aft - traj_for)/((ts[1:]-ts[:-1])+eps)
             mot_resid = np.array([weights[:traj_for.shape[1]]*0.5*(vel**2 * (ts[1:]-ts[:-1]))])
         
         # Constant Force Motion Prior
@@ -1087,7 +1090,7 @@ class Scene:
             v1 = (traj_mid - traj_for) / ( dt1 + eps)
             v2 = (traj_aft - traj_mid) / ( dt2 + eps )
 
-            accel = (v2 - v1) / dt3
+            accel = (v2 - v1) / (dt3 + eps)
             mot_resid = np.array([weights[:traj_for.shape[1]]*(accel * (dt2 - dt1))])
 
         mot_resid = np.sum(abs(mot_resid[0]),axis=0)

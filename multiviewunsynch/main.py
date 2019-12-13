@@ -33,20 +33,20 @@ while True:
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     # Bundle adjustment
-    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
-    #    motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
-    #    motion_weights=flight.settings['motion_weights'])
+    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
+        motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
+        motion_weights=flight.settings['motion_weights'])
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
-    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
-    #    motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
-    #    motion_weights=flight.settings['motion_weights'])
+    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
+        motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
+        motion_weights=flight.settings['motion_weights'])
 
     print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))

@@ -30,7 +30,7 @@
         "num_detections": 100000,
         "opt_calib": false,
         "undist_points": true,
-        "rolling_shutter": false,
+        "rolling_shutter": true,
         "init_rs": 1,
         "motion_prior":false,
         "motion_reg":true,
@@ -45,7 +45,7 @@
         "thres_triangulation": 20,
         "smooth_factor": [20,25],
         "sampling_rate": 0.5,
-        "path_output": "./data/fixposition/trajectory/flight_ds2_KE.pkl"
+        "path_output": "./data/fixposition/trajectory/flight_ds2_KE_rs.pkl"
     }
 
 }
