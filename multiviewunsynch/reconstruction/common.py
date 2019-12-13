@@ -1012,11 +1012,11 @@ class Scene:
     
         # Interpolate 3D points for global timestamps in all cameras
         self.spline_to_traj()
-        temp_traj_len = self.traj.shape[1]
-        if len(self.traj_len):
-            assert self.traj_len[0] == temp_traj_len
-        else:
-            self.traj_len = [self.traj.shape[1]]
+        #temp_traj_len = self.traj.shape[1]
+        #if len(self.traj_len):
+        #    assert self.traj_len[0] == temp_traj_len
+        #else:
+        #    self.traj_len = [self.traj.shape[1]]
         self.spline_to_traj(t=np.sort(global_time_stamps_all))
 
         
