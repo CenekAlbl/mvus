@@ -391,7 +391,7 @@ class Scene:
 
         tck, interval = self.spline['tck'], self.spline['int']
         if motion_prior:
-            self.detection_to_global(motion=motion_prior)
+            self.detection_to_global(motion_prior=motion_prior)
         else:
             self.detection_to_global(cam_id)
 
@@ -495,7 +495,7 @@ class Scene:
         if motion_reg:
             self.spline_to_traj()
         if motion_prior:
-            self.all_detect_to_traj(cams)
+            #self.all_detect_to_traj(cams)
             _, idx = self.sampling(self.global_traj[3], interval, belong=True)
 
         detect = np.empty([3,0])
@@ -633,9 +633,9 @@ class Scene:
                         # Verify traj. point lies within current spline interval
                         if self.visible[cam_id][j]:
                             timestamp = self.detections_global[cam_id][0,j]
-                            _,_,traj_pnt = np.intersect1d(timestamp,self.global_traj[3],assume_unique=True,return_indices=True)
+                            #_,_,traj_pnt = np.intersect1d(timestamp,self.global_traj[3],assume_unique=True,return_indices=True)
+                            traj_pnt = np.where(self.global_traj[3] == timestamp)[0]
                             traj_pnt += traj_start
-                            #traj_idx = np.array([traj_pnt[0]])
                             if (traj_pnt-traj_start) < motion_offset:
                                 traj_idx = np.arange(traj_start,traj_pnt+motion_offset)   
                             else:
@@ -676,8 +676,8 @@ class Scene:
                             #    glob_idx = np.where(self.global_detections[2] == self.detections_global[cam_id][0,j])[0]
                             #    m_jac[glob_idx,:] = 0
 
-                jac = vstack((jac, vstack([jac_cam,jac_cam])))
-                #jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
+                    jac = vstack((jac, vstack([jac_cam,jac_cam])))
+                    #jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
 
             if motion_reg:
                 tck, interval = self.spline['tck'], self.spline['int']
