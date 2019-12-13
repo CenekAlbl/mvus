@@ -113,7 +113,7 @@ class Scene:
             self.detections_global = [[] for i in cams]
 
         for i in cams:
-            timestamp = self.alpha[i] * self.detections[i][0] + self.beta[i] + self.rs[i] * self.detections[i][2] / self.cameras[i].resolution[1]
+            timestamp = self.alpha[i] * (self.detections[i][0] + self.rs[i] * self.detections[i][2] / self.cameras[i].resolution[1]) + self.beta[i] 
             detect = self.cameras[i].undist_point(self.detections[i][1:]) if self.settings['undist_points'] else self.detections[i][1:]
             self.detections_global[i] = np.vstack((timestamp, detect))
 
