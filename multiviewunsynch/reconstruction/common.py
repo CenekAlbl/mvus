@@ -1213,6 +1213,9 @@ def create_scene(path_input):
                 cam = json.load(file)
         except:
             raise Exception('Wrong input of camera')
+
+        if len(cam['distCoeff']) == 4:
+            cam['distCoeff'].append(0)
         
         flight.addCamera(Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']),
                                 fps=cam['fps'], resolution=cam['resolution']))
@@ -1223,7 +1226,7 @@ def create_scene(path_input):
     flight.find_order = False if len(flight.sequence) else True
 
     # Load time shifts
-    flight.beta = np.asarray(config['optional inputs']['relative_time_shifts'])
+    flight.beta = np.asfarray(config['optional inputs']['relative_time_shifts'])
 
     # Load rolling shutter parameter
     init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0
