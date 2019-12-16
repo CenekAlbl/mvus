@@ -439,42 +439,6 @@ class Scene:
                 error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             return np.concatenate((error_x, error_y))
     
-    def jl_error_cam(self,cam_id,mode='dist'):
-        '''
-        Calculate the reprojection errors for a given camera
-
-        Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'each'
-        '''
-
-        tck, interval = self.spline['tck'], self.spline['int']
-        self.detection_to_global(cam_id)
-
-        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
-        detect = np.empty([3,0])
-        point_3D = np.empty([3,0])
-        for i in range(interval.shape[1]):
-            detect_part = self.detections_global[cam_id][:,idx==i+1]
-            if detect_part.size:
-                detect = np.hstack((detect,detect_part))
-                point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
-
-        X = util.homogeneous(point_3D)
-        x = detect[1:]
-        x_cal = self.cameras[cam_id].projectPoint(X)
-
-        if mode == 'dist':
-            return ep.reprojection_error(x, x_cal)
-        elif mode == 'xy_1D':
-            return np.concatenate((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
-        elif mode == 'xy_2D':
-            return np.vstack((abs(x_cal[0]-x[0]),abs(x_cal[1]-x[1])))
-        elif mode == 'each':
-            error_x = np.zeros_like(self.detections[cam_id][0])
-            error_y = np.zeros_like(self.detections[cam_id][0])
-            error_x[idx.astype(bool)] = abs(x_cal[0]-x[0])
-            error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
-            return np.concatenate((error_x, error_y))
-
     def error_motion(self,cams,mode='dist',norm=False,motion_weights=0,motion_reg = False,motion_prior = False):
         '''
         Calculate the reprojection errors for a given camera for a multi_spline object. 
@@ -486,7 +450,6 @@ class Scene:
         computes error for motion prior regularization
         '''
 
-        #tck = self.spline['tck']
         interval = self.spline['int']
         
         # Update global_detections and global_traj timestamps
@@ -494,41 +457,46 @@ class Scene:
         # Update global_traj for motion_reg
         if motion_reg:
             self.spline_to_traj()
+            _, idx = self.sampling(self.traj[0], interval, belong=True)
         if motion_prior:
-            #self.all_detect_to_traj(cams)
             _, idx = self.sampling(self.global_traj[3], interval, belong=True)
 
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
         temp_glob_ts = np.array([])
         mot_err_res = np.array([])
-        global_traj_ts = np.array([]) 
+         
 
         if motion_prior:
+            global_traj_ts = np.array([])
             for i in range(interval.shape[1]):
                 traj_part = self.global_traj[:,idx==i+1]
                 if traj_part.size:
                     weights = np.ones(traj_part.shape[1]) * motion_weights
                     mot_err = self.motion_prior(traj_part[3:],weights,prior=self.settings['motion_type'])
                     mot_err_res = np.concatenate((mot_err_res, mot_err))
-                    global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))
-        
-        if motion_reg :
-            motion_error = np.zeros((self.traj.shape[1]))
-            weights = np.ones(self.traj.shape[1]) * motion_weights
-            mot_err = self.motion_prior(self.traj,weights,prior=self.settings['motion_type'])
-            mot_err_res = np.concatenate((mot_err_res, mot_err))
-            if self.settings['motion_type'] == 'F':
-                motion_error[1:-1] = mot_err_res
-            else:
-                motion_error[:-1] = mot_err_res
-            #motion_error = np.zeros((self.global_detections.shape[1]))
-            #_,traj_idx,_ = np.intersect1d(self.global_detections[2],global_traj_ts,assume_unique=True,return_indices=True)
-        else:     
+                    global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))    
             motion_error = np.zeros((self.global_traj.shape[1]))
             _,traj_idx,_ = np.intersect1d(self.global_traj[3],global_traj_ts,assume_unique=True,return_indices=True)
             assert traj_idx.shape[0] == mot_err_res.shape[0], 'wrong number of global_traj points'
             motion_error[traj_idx] = mot_err_res
+        
+        elif motion_reg :
+            traj_ts = np.array([]) 
+            motion_error = np.zeros((self.traj.shape[1]))
+            for i in range(interval.shape[1]):
+                traj_part = self.traj[:,idx==i+1]
+                if traj_part.size:
+                    weights = np.ones(traj_part.shape[1]) * motion_weights
+                    mot_err = self.motion_prior(traj_part,weights,prior=self.settings['motion_type'])
+                    mot_err_res = np.concatenate((mot_err_res, mot_err))
+                    if self.settings['motion_type'] == 'F':
+                        traj_ts = np.concatenate((traj_ts, traj_part[0,1:-1]))  
+                    else:
+                        traj_ts = np.concatenate((traj_ts, traj_part[0,1:])) 
+            _,traj_idx,_ = np.intersect1d(self.traj[0],traj_ts,assume_unique=True,return_indices=True)
+            motion_error[traj_idx] = mot_err_res
+            
         return motion_error
     
     def compute_visibility(self):
@@ -603,7 +571,6 @@ class Scene:
             #jac = np.empty([0,num_param])
 
             if motion_reg:
-                    #m_jac = lil_matrix((self.global_detections.shape[1], num_param),dtype=int)
                     m_jac = lil_matrix((self.traj.shape[1], num_param),dtype=int)
             elif motion_prior:
                 m_jac = lil_matrix((self.global_traj.shape[1], num_param),dtype=int)
@@ -636,7 +603,6 @@ class Scene:
                         # Verify traj. point lies within current spline interval
                         if self.visible[cam_id][j]:
                             timestamp = self.detections_global[cam_id][0,j]
-                            #_,_,traj_pnt = np.intersect1d(timestamp,self.global_traj[3],assume_unique=True,return_indices=True)
                             traj_pnt = np.where(self.global_traj[3] == timestamp)[0]
                             traj_pnt += traj_start
                             if (traj_pnt-traj_start) < motion_offset:
@@ -668,16 +634,8 @@ class Scene:
                             knot_idx = np.concatenate((knot_idx, knot_idx+len(knot), knot_idx+2*len(knot)))
                             jac_cam[j,idx_spline_sum[0,spline_id]+knot_idx] = 1
 
-                            #if motion_reg:
-                            #    motion_idx = np.where(self.global_detections[2] == timestamp)[0]
-                            #    m_jac[motion_idx,idx_spline_sum[0,spline_id]+knot_idx] = 1
-
                         else:
                             jac_cam[j,:] = 0
-
-                            #if motion_reg:
-                            #    glob_idx = np.where(self.global_detections[2] == self.detections_global[cam_id][0,j])[0]
-                            #    m_jac[glob_idx,:] = 0
 
                     jac = vstack((jac, vstack([jac_cam,jac_cam])))
                     #jac = np.vstack((jac, np.tile(jac_cam,(2,1))))
@@ -695,10 +653,6 @@ class Scene:
                     timestamp = self.traj[0,j]
                     knot_idx = np.argsort(abs(knot-timestamp))[:near]
                     knot_idx = np.concatenate((knot_idx, knot_idx+len(knot), knot_idx+2*len(knot)))
-                    #jac_cam[j,idx_spline_sum[0,spline_id]+knot_idx] = 1
-
-                    #motion_idx = np.where(self.global_detections[2] == timestamp)[0]
-                    #m_jac[motion_idx,idx_spline_sum[0,spline_id]+knot_idx] = 1
                     m_jac[j,idx_spline_sum[0,spline_id[0]]+knot_idx] = 1
                 jac = vstack((jac, m_jac))
             
@@ -791,7 +745,7 @@ class Scene:
             if (self.global_traj[3][1:]>self.global_traj[3][:-1]).all():
                 self.traj_to_spline(smooth_factor=self.settings['smooth_factor'])
             else:
-                self.traj = self.global_traj[3:,np.argsort(self.global_traj[3,:])] #np.vstack((global_time_stamps_all[traj_idx],self.traj[1:]))
+                self.traj = self.global_traj[3:,np.argsort(self.global_traj[3,:])] 
                 self.traj_to_spline(smooth_factor=self.settings['smooth_factor'])
         else:
             spline_parts = np.split(model_parts[4],idx_spline[0,1:])
@@ -1014,17 +968,10 @@ class Scene:
         self.global_time_stamps_all = global_time_stamps_all
     
         # Interpolate 3D points for global timestamps in all cameras
-        self.spline_to_traj()
-        #temp_traj_len = self.traj.shape[1]
-        #if len(self.traj_len):
-        #    assert self.traj_len[0] == temp_traj_len
-        #else:
-        #    self.traj_len = [self.traj.shape[1]]
         self.spline_to_traj(t=np.sort(global_time_stamps_all))
 
         
         self.global_detections = np.vstack((cam_id,frame_id_all,global_time_stamps_all))
-        #self.global_traj = np.vstack((idx,cam_id,frame_id_all,global_time_stamps_all))
         #Sort global_traj by global time stamp
         temp_global_traj = self.global_detections[:,np.argsort(self.global_detections[2,:])]
         
@@ -1033,8 +980,6 @@ class Scene:
         temp_global_traj = np.vstack((temp_global_traj[:,traj_idx],self.traj[1:]))
         # Apply index to track original order of the global traj.
         temp_global_traj = np.vstack((np.arange(temp_global_traj.shape[1]),temp_global_traj))
-        # Resort by global_traj idx to maintain original detection order
-        #self.global_traj = temp_global_traj[:,np.argsort(temp_global_traj[0,:])]
         self.global_traj = temp_global_traj
         
         #verify global timestamps are sorted in ascending order
@@ -1071,8 +1016,6 @@ class Scene:
             
             traj_for = traj[1:,:-1]
             traj_aft = traj[1:,1:]
-        
-            #diff = norm((traj_aft[:,:] - traj_for[:,:])/((idx[1:]-idx[:-1])+eps),axis=0)
             vel = (traj_aft - traj_for)/((ts[1:]-ts[:-1])+eps)
             mot_resid = np.array([weights[:traj_for.shape[1]]*0.5*(vel**2 * (ts[1:]-ts[:-1]))])
         
@@ -1085,7 +1028,7 @@ class Scene:
 
             dt1 = ts[1:-1] - ts[:-2]
             dt2 = ts[2:] - ts[1:-1]
-            dt3 = ts[2:] - ts[:-2]
+            dt3 = dt1 + dt2 
 
             v1 = (traj_mid - traj_for) / ( dt1 + eps)
             v2 = (traj_aft - traj_mid) / ( dt2 + eps )
