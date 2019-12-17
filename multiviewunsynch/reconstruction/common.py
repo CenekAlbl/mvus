@@ -153,7 +153,7 @@ class Scene:
 
         for i in range(self.numCam):
             detect = self.detections[i]
-            interval = self.find_intervals(detect[0])
+            interval = util.find_intervals(detect[0])
             cut = int(self.cameras[i].fps * second)
 
             interval_long = interval[:,interval[1]-interval[0]>cut*2]
@@ -162,87 +162,7 @@ class Scene:
 
             assert (interval_long[1]-interval_long[0]>=0).all()
 
-            self.detections[i], _ = self.sampling(detect,interval_long)
-
-    
-    def find_intervals(self,x,gap=5,idx=False):
-        '''
-        Given indices of detections, return a matrix that contains the start and the end of each
-        continues part.
-        
-        Input indices must be in ascending order. 
-        
-        The gap defines the maximal interruption, with which it's still considered as continues. 
-        '''
-
-        assert len(x.shape)==1 and (x[1:]>x[:-1]).all(), 'Input must be an ascending 1D-array'
-
-        # Compute start and end
-        x_s, x_e = np.append(-np.inf,x), np.append(x,np.inf)
-        start = x_s[1:] - x_s[:-1] >= gap
-        end = x_e[:-1] - x_e[1:] <= -gap
-        interval = np.array([x[start],x[end]])
-        int_idx = np.array([np.where(start)[0],np.where(end)[0]])
-
-        # Remove intervals that are too short
-        mask = interval[1]-interval[0] >= gap
-        interval = interval[:,mask]
-        int_idx = int_idx[:,mask]
-
-        assert (interval[0,1:]>interval[1,:-1]).all()
-
-        if idx:
-            return interval, int_idx
-        else:
-            return interval
-
-
-    def sampling(self,x,interval,belong=False):
-        '''
-        Sample points from the input which are inside the given intervals
-        '''
-
-        # Define timestamps
-        if len(x.shape)==1:
-            timestamp = x
-        elif len(x.shape)==2:
-            assert x.shape[0]==3 or x.shape[0]==4, 'Input should be 1D array or 2D array with 3 or 4 rows'
-            timestamp = x[0]
-
-        # Sample points from each interval
-        idx_ts = np.zeros_like(timestamp, dtype=int)
-        for i in range(interval.shape[1]):
-            mask = np.logical_xor(timestamp-interval[0,i] >= 0, timestamp-interval[1,i] >= 0)
-            idx_ts[mask] = i+1
-
-        if not belong:
-            idx_ts = idx_ts.astype(bool)
-
-        if len(x.shape)==1:
-            return x[idx_ts.astype(bool)], idx_ts
-        elif len(x.shape)==2:
-            return x[:,idx_ts.astype(bool)], idx_ts
-        else:
-            raise Exception('The shape of input is wrong')
-
-
-    def match_overlap(self,x,y):
-        '''
-        Given two inputs in the same timeline (global), return the parts of them which are temporally overlapped
-
-        Important: it's assumed that x has a higher frequency (fps) so that points are interpolated in y
-        '''
-
-        interval = self.find_intervals(y[0])
-        x_s, _ = self.sampling(x, interval)
-
-        tck, u = interpolate.splprep(y[1:],u=y[0],s=0,k=3)
-        y_s = np.asarray(interpolate.splev(x_s[0],tck))
-        y_s = np.vstack((x_s[0],y_s))
-
-        assert (x_s[0] == y_s[0]).all(), 'Both outputs should have the same timestamps'
-
-        return x_s, y_s
+            self.detections[i], _ = util.sampling(detect,interval_long)
 
 
     def init_traj(self,error=10,inlier_only=False):
@@ -257,9 +177,9 @@ class Scene:
 
         # Find correspondences
         if self.cameras[t1].fps > self.cameras[t2].fps:
-            d1, d2 = self.match_overlap(self.detections_global[t1], self.detections_global[t2])
+            d1, d2 = util.match_overlap(self.detections_global[t1], self.detections_global[t2])
         else:
-            d2, d1 = self.match_overlap(self.detections_global[t2], self.detections_global[t1])
+            d2, d1 = util.match_overlap(self.detections_global[t2], self.detections_global[t1])
         
         # Compute fundamental matrix
         F,inlier = ep.computeFundamentalMat(d1[1:],d2[1:],error=error)
@@ -301,7 +221,7 @@ class Scene:
         assert len(smooth_factor)==2, 'Smoothness should be defined by two parameters (min, max)'
 
         timestamp = self.traj[0]
-        interval, idx = self.find_intervals(timestamp,idx=True)
+        interval, idx = util.find_intervals(timestamp,idx=True)
         tck = [None] * interval.shape[1]
 
         for i in range(interval.shape[1]):
@@ -332,17 +252,6 @@ class Scene:
                         break
 
                 dist = np.sum(np.sqrt(np.sum((part[1:,1:]-part[1:,:-1])**2,axis=0)))
-
-                # b = np.asarray(interpolate.splev(u,tck[i]))
-                # fig = plt.figure(figsize=(20, 15))
-                # ax = fig.add_subplot(111,projection='3d')
-                # ax.scatter3D(part[1],part[2],part[3],c='red')
-                # ax.scatter3D(b[0],b[1],b[2],c='blue')
-                # plt.suptitle('i = {}, number of knot = {}, number of points = {}, \
-                #               total dist = {:.2f}, total time = {:.2f}'.format(i, len(tck[i][0])-4, len(u), dist, u[-1]-u[0]))
-                # plt.savefig('./data/fig/{}_{}.png'.format(len(self.sequence),i))
-                # plt.show()
-                # plt.close()
 
             except:
                 tck[i], u = interpolate.splprep(part[1:],u=part[0],s=s,k=1)
@@ -395,7 +304,7 @@ class Scene:
         else:
             self.detection_to_global(cam_id)
 
-        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
+        _, idx = util.sampling(self.detections_global[cam_id], interval, belong=True)
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
         for i in range(interval.shape[1]):
@@ -457,9 +366,9 @@ class Scene:
         # Update global_traj for motion_reg
         if motion_reg:
             self.spline_to_traj()
-            _, idx = self.sampling(self.traj[0], interval, belong=True)
+            _, idx = util.sampling(self.traj[0], interval, belong=True)
         if motion_prior:
-            _, idx = self.sampling(self.global_traj[3], interval, belong=True)
+            _, idx = util.sampling(self.global_traj[3], interval, belong=True)
 
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
@@ -509,7 +418,7 @@ class Scene:
         self.detection_to_global()
 
         for cam_id in range(self.numCam):
-            _, visible = self.sampling(self.detections_global[cam_id], interval, belong=True)
+            _, visible = util.sampling(self.detections_global[cam_id], interval, belong=True)
             self.visible.append(visible)
 
 
@@ -643,7 +552,7 @@ class Scene:
             if motion_reg:
                 tck, interval = self.spline['tck'], self.spline['int']
                 for j in range(self.traj.shape[1]):
-                    _, spline_id = self.sampling(self.traj[:,j], interval, belong=True)
+                    _, spline_id = util.sampling(self.traj[:,j], interval, belong=True)
                     detect = np.empty([3,0])
                     point_3D = np.empty([3,0])
                     
@@ -789,7 +698,7 @@ class Scene:
         tck, interval = self.spline['tck'], self.spline['int']
         self.detection_to_global(cam_id)
 
-        _, idx = self.sampling(self.detections_global[cam_id], interval, belong=True)
+        _, idx = util.sampling(self.detections_global[cam_id], interval, belong=True)
         detect = np.empty([3,0])
         point_3D = np.empty([3,0])
         for i in range(interval.shape[1]):
@@ -827,7 +736,7 @@ class Scene:
         self.detection_to_global(cam_id)
 
         # Find detections from this camera that haven't been triangulated yet
-        _, idx_ex = self.sampling(self.detections_global[cam_id], interval)
+        _, idx_ex = util.sampling(self.detections_global[cam_id], interval)
         detect_new = self.detections_global[cam_id][:, np.logical_not(idx_ex)]
 
         # Matching these detections with detections from previous cameras and triangulate them
@@ -838,7 +747,7 @@ class Scene:
 
             # Detections of previous cameras are interpolated, no matter the fps
             try:
-                x1, x2 = self.match_overlap(detect_new, detect_ex)
+                x1, x2 = util.match_overlap(detect_new, detect_ex)
             except:
                 continue
             else:
@@ -861,7 +770,7 @@ class Scene:
                 if verbose:
                     print('{} points are triangulated into the 3D spline'.format(X_i.shape[1]))
 
-        _, idx_empty = self.sampling(X_new, interval)
+        _, idx_empty = util.sampling(X_new, interval)
         assert sum(idx_empty)==0, 'Points should not be triangulated into the existing part of the 3D spline'
 
         # Add these points to the discrete 3D trajectory
@@ -886,7 +795,7 @@ class Scene:
         assert interval.shape[0]==2
 
         for i in range(self.numCam):
-            detect_i, _ = self.sampling(self.detections_global[i],interval)
+            detect_i, _ = util.sampling(self.detections_global[i],interval)
             traj = self.spline_to_traj(t=detect_i[0])
             
             if traj.size:
@@ -924,7 +833,7 @@ class Scene:
         if init:
             for i in range(self.numCam-1):
                 for j in range(i+1,self.numCam):
-                    x, y = self.match_overlap(self.detections_global[i],self.detections_global[j])
+                    x, y = util.match_overlap(self.detections_global[i],self.detections_global[j])
                     overlap = x.shape[1] / self.cameras[i].fps
                     if overlap > overlap_max:
                         overlap_max = overlap
@@ -936,8 +845,8 @@ class Scene:
                 if self.cameras[i].P is None:
                     candidate.append(i)
             for i in candidate:
-                interval = self.find_intervals(self.detections_global[i][0])
-                overlap, _ = self.sampling(traj[0], interval)
+                interval = util.find_intervals(self.detections_global[i][0])
+                overlap, _ = util.sampling(traj[0], interval)
 
                 if len(overlap) > overlap_max:
                     overlap_max = len(overlap)
