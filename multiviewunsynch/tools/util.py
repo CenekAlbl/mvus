@@ -2,11 +2,7 @@ import math
 import numpy as np
 from scipy import interpolate
 from thirdparty import transformation
-<<<<<<< HEAD
-import pymap3d as pm
 from tools import ransac
-=======
->>>>>>> 933d7cc375d00a9536f8d01b95b0a93a78ba3436
 
 
 def mapminmax(x,ymin,ymax):

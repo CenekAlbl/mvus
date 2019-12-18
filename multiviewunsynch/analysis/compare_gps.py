@@ -69,12 +69,12 @@ def optimize(alpha, beta, flight, gps):
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
-    reconst_path = 'data/fixposition/trajectory/flight_ds2.pkl'
+    reconst_path = ''
     with open(reconst_path, 'rb') as file:
         flight = pickle.load(file)
 
     # Load the GPS data
-    gps_path = 'data/fixposition/Raw_gps/GT_ENU.txt'
+    gps_path = ''
     gps_ori = np.loadtxt(gps_path).T
 
 
