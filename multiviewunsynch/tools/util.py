@@ -3,6 +3,7 @@ import numpy as np
 from reconstruction import common
 from scipy.interpolate import UnivariateSpline
 from thirdparty import transformation
+import pymap3d as pm
 from tools import ransac
 
 
@@ -135,6 +136,16 @@ def umeyama(src, dst, estimate_scale):
 
     return T
 
+def gps_to_enu(gps_xyz,out_file):
+        # Load ground truth 
+        gt = np.loadtxt(gps_xyz).T
+
+        ell_wgs84 = pm.Ellipsoid('wgs84')
+
+        gt_ll = np.vstack(pm.ecef2geodetic(gt[0],gt[1],gt[2],ell=ell_wgs84))
+        gt_enu = np.vstack(pm.geodetic2enu(gt_ll[0],gt_ll[1],gt_ll[2],gt_ll[0][-10],gt_ll[1][-10],gt_ll[2][-10],ell=ell_wgs84))
+
+        np.savetxt(out_file, gt_enu.T,delimiter='  ') 
 
 def sim_tran(src, dst, thres=0.5):
 

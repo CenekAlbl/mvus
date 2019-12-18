@@ -1050,8 +1050,8 @@ class Scene:
         a = np.vstack((v[0,:-1],diff[1:] / diff[0]))
 
         return v,a
-
-        
+    
+    
 class Camera:
     """ 
     Class that describes a single camera in the scene
