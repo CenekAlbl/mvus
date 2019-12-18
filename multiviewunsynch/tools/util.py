@@ -1,10 +1,12 @@
 import math
 import numpy as np
-from reconstruction import common
-from scipy.interpolate import UnivariateSpline
+from scipy import interpolate
 from thirdparty import transformation
+<<<<<<< HEAD
 import pymap3d as pm
 from tools import ransac
+=======
+>>>>>>> 933d7cc375d00a9536f8d01b95b0a93a78ba3436
 
 
 def mapminmax(x,ymin,ymax):
@@ -48,24 +50,90 @@ def rotation_decompose(R):
     return x*180/math.pi, y*180/math.pi, z*180/math.pi
 
 
-def spline_fitting(x,t,t0=[],k=1,s=0,return_object=False):
-    '''
-    This function reads an array of samples (x) and return interpolated values at given positions (t)
-    '''
-    if not len(t0):
-        t0 = np.arange(x.shape[0])
-    spl = UnivariateSpline(t0, x, k=k, s=s)
-
-    if return_object:
-        return spl
-    else:
-        return spl(t)
-
-
 def homogeneous(x):
     return np.vstack((x,np.ones(x.shape[1])))
 
 
+def find_intervals(x,gap=5,idx=False):
+    '''
+    Given indices of detections, return a matrix that contains the start and the end of each
+    continues part.
+    
+    Input indices must be in ascending order. 
+    
+    The gap defines the maximal interruption, with which it's still considered as continues. 
+    '''
+
+    assert len(x.shape)==1 and (x[1:]>x[:-1]).all(), 'Input must be an ascending 1D-array'
+
+    # Compute start and end
+    x_s, x_e = np.append(-np.inf,x), np.append(x,np.inf)
+    start = x_s[1:] - x_s[:-1] >= gap
+    end = x_e[:-1] - x_e[1:] <= -gap
+    interval = np.array([x[start],x[end]])
+    int_idx = np.array([np.where(start)[0],np.where(end)[0]])
+
+    # Remove intervals that are too short
+    mask = interval[1]-interval[0] >= gap
+    interval = interval[:,mask]
+    int_idx = int_idx[:,mask]
+
+    assert (interval[0,1:]>interval[1,:-1]).all()
+
+    if idx:
+        return interval, int_idx
+    else:
+        return interval
+
+
+def sampling(x,interval,belong=False):
+    '''
+    Sample points from the input which are inside the given intervals
+    '''
+
+    # Define timestamps
+    if len(x.shape)==1:
+        timestamp = x
+    elif len(x.shape)==2:
+        assert x.shape[0]==3 or x.shape[0]==4, 'Input should be 1D array or 2D array with 3 or 4 rows'
+        timestamp = x[0]
+
+    # Sample points from each interval
+    idx_ts = np.zeros_like(timestamp, dtype=int)
+    for i in range(interval.shape[1]):
+        mask = np.logical_xor(timestamp-interval[0,i] >= 0, timestamp-interval[1,i] >= 0)
+        idx_ts[mask] = i+1
+
+    if not belong:
+        idx_ts = idx_ts.astype(bool)
+
+    if len(x.shape)==1:
+        return x[idx_ts.astype(bool)], idx_ts
+    elif len(x.shape)==2:
+        return x[:,idx_ts.astype(bool)], idx_ts
+    else:
+        raise Exception('The shape of input is wrong')
+
+
+def match_overlap(x,y):
+    '''
+    Given two inputs in the same timeline (global), return the parts of them which are temporally overlapped
+
+    Important: it's assumed that x has a higher frequency (fps) so that points are interpolated in y
+    '''
+
+    interval = find_intervals(y[0])
+    x_s, _ = sampling(x, interval)
+
+    tck, u = interpolate.splprep(y[1:],u=y[0],s=0,k=3)
+    y_s = np.asarray(interpolate.splev(x_s[0],tck))
+    y_s = np.vstack((x_s[0],y_s))
+
+    assert (x_s[0] == y_s[0]).all(), 'Both outputs should have the same timestamps'
+
+    return x_s, y_s
+
+        
 def umeyama(src, dst, estimate_scale):
     """Estimate N-D similarity transformation with or without scaling.
     Parameters
@@ -146,25 +214,6 @@ def gps_to_enu(gps_xyz,out_file):
         gt_enu = np.vstack(pm.geodetic2enu(gt_ll[0],gt_ll[1],gt_ll[2],gt_ll[0][-10],gt_ll[1][-10],gt_ll[2][-10],ell=ell_wgs84))
 
         np.savetxt(out_file, gt_enu.T,delimiter='  ') 
-
-def sim_tran(src, dst, thres=0.5):
-
-    def model_fn(data,param):
-        x, y = data[:3], data[3:]
-        M = transformation.affine_matrix_from_points(x,y,shear=False)
-        return M.ravel()
-    
-    def error_fn(model,data,param):
-        x, y = data[:3], data[3:]
-        M = model.reshape((4,4))
-        y_t = np.dot(M,homogeneous(x))
-        y_t /= y_t[-1]
-        return np.sqrt((y[0]-y_t[0])**2+(y[1]-y_t[1])**2+(y[2]-y_t[2])**2)
-
-    Data = np.vstack((src,dst))
-    return ransac.vanillaRansac(model_fn,error_fn,Data,10,thres,500)
-
-
 
 if __name__ == "__main__":
     R = rotation(0.38,-176.3,100)

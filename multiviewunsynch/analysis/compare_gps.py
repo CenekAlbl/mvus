@@ -33,9 +33,9 @@ def optimize(alpha, beta, flight, gps):
         alpha, beta = model[0], model[1]
         t_gps = alpha * np.arange(gps.shape[1]) + beta
         try:
-            _, idx = flight.sampling(t_gps, flight.spline[1])
+            _, idx = util.sampling(t_gps, flight.spline[1])
         except:
-            _, idx = flight.sampling(t_gps, flight.spline['int'])
+            _, idx = util.sampling(t_gps, flight.spline['int'])
         gps_part = gps[:,idx]
         t_part = t_gps[idx]
         traj = flight.spline_to_traj(t=t_part)
