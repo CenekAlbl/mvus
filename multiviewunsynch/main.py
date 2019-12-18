@@ -5,13 +5,16 @@ from datetime import datetime
 from reconstruction import common
 
 # Initialize a scene from the json template
-flight = common.create_scene('config_example.json')
+flight = common.create_scene('')
 
 # Truncate detections
 flight.cut_detection(second=flight.settings['cut_detection_second'])
 
 # Add prior alpha
 flight.init_alpha()
+
+# Compute time shift for each camera
+flight.time_shift()
 
 # Convert raw detections into the global timeline
 flight.detection_to_global()

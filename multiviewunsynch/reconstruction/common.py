@@ -1,9 +1,10 @@
 # Classes that are common to the entire project
 import numpy as np
 from tools import util
-import reconstruction.epipolar as ep
 import cv2
 import json
+from reconstruction import epipolar as ep
+from reconstruction import synchronization as sync
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
@@ -40,6 +41,7 @@ class Scene:
         self.detections_global = []
         self.alpha = []
         self.beta = []
+        self.cf = []
         self.traj = []
         self.traj_len = []
         self.sequence = []
@@ -348,6 +350,7 @@ class Scene:
                 error_y[idx.astype(bool)] = abs(x_cal[1]-x[1])
             return np.concatenate((error_x, error_y))
     
+
     def error_motion(self,cams,mode='dist',norm=False,motion_weights=0,motion_reg = False,motion_prior = False):
         '''
         Calculate the reprojection errors for a given camera for a multi_spline object. 
@@ -408,6 +411,7 @@ class Scene:
             
         return motion_error
     
+
     def compute_visibility(self):
         '''
         Decide for each raw detection if it is visible from current 3D spline
@@ -837,7 +841,8 @@ class Scene:
                     overlap = x.shape[1] / self.cameras[i].fps
                     if overlap > overlap_max:
                         overlap_max = overlap
-                        self.sequence = [i,j]
+                        init_pair = [i,j]
+            self.sequence = init_pair
         else:
             traj = self.spline_to_traj()
             candidate = []
@@ -852,6 +857,7 @@ class Scene:
                     overlap_max = len(overlap)
                     next_cam = i
             self.sequence.append(next_cam)
+
 
     def all_detect_to_traj(self,*cam):
         #global_traj = np.empty()
@@ -948,19 +954,35 @@ class Scene:
         mot_resid = np.sum(abs(mot_resid[0]),axis=0)
         return mot_resid
         
-    def kinetic(self,traj):
-
-        assert traj.shape[0]==4 and traj.shape[1]>=3, 'Trajectory in wrong shape'
-
-        diff = traj[:,1:]- traj[:,:-1]
-        v = np.vstack((traj[0,:-1],diff[1:] / diff[0]))
-
-        diff = v[:,1:]- v[:,:-1]
-        a = np.vstack((v[0,:-1],diff[1:] / diff[0]))
-
-        return v,a
-
         
+    def time_shift(self, iter=False):
+        '''
+        This function computes relative time shifts of each camera to the ref camera using the given corresponding frame numbers
+
+        If the given frame indices are precise, then the time shifts are directly transformed from them.
+        '''
+
+        assert len(self.cf)==self.numCam, 'The number of frame indices should equal to the number of cameras'
+
+        if self.settings['cf_exact']:
+            self.beta = self.cf[self.ref_cam] - self.alpha*self.cf
+            print('The given corresponding frames are directly exploited for temporal synchronization\n')
+        else:
+            print('Computing temporal synchronization...\n')
+            beta = np.zeros((self.numCam, self.numCam))
+            overlap_max = 0
+            pair = [0,0]
+            for i in range(self.numCam-1):
+                for j in range(i+1,self.numCam):
+                    beta[i,j], overlap = sync.sync_bf(self.cameras[i].fps, self.cameras[j].fps,
+                                                    self.detections[i], self.detections[j],
+                                                    self.cf[i], self.cf[j])
+                    if overlap > overlap_max:
+                        overlap_max = overlap
+                        pair = [i,j]
+            self.beta = beta[0]
+
+
 class Camera:
     """ 
     Class that describes a single camera in the scene
@@ -1134,8 +1156,8 @@ def create_scene(path_input):
     flight.sequence = config['settings']['camera_sequence']
     flight.find_order = False if len(flight.sequence) else True
 
-    # Load time shifts
-    flight.beta = np.asfarray(config['optional inputs']['relative_time_shifts'])
+    # Load corresponding frames
+    flight.cf = np.asfarray(config['necessary inputs']['corresponding_frames'])
 
     # Load rolling shutter parameter
     init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0

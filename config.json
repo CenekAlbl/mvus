@@ -1,24 +1,23 @@
 {
+    "comments":
+    [
+        "This is the templete for configure a dataset for the pipeline.",
+
+        "Further instruction goes here..."
+    ],
+
     "necessary inputs":
     {
         "path_detections": [],
 
-        "path_calibration":
-        {
-            "opencv": [],
-            "matlab": [],
-            "txt":[]
-        },
-
-        "camera_resolution": [],
-
-        "camera_fps": []
+        "path_cameras": [],
+                    
+        "corresponding_frames":[]
     },
 
 
     "optional inputs":
     {
-        "relative_time_shifts":[],
         "gps_alpha": null,
         "gps_beta": null
     },
@@ -28,9 +27,13 @@
     {
         "num_detections": 100000,
         "opt_calib": false,
+        "cf_exact":true,
         "undist_points": true,
         "rolling_shutter": false,
         "init_rs": 1,
+        "motion_prior":false,
+        "motion_reg":false,
+        "motion_weights":100,
         "cut_detection_second": 0.5,
         "camera_sequence": [],
         "ref_cam": 0,
@@ -38,8 +41,8 @@
         "thres_PnP": 30,
         "thres_outlier": 10,
         "thres_triangulation": 20,
-        "smooth_factor": 0.005,
-        "sampling_rate": 0.02,
+        "smooth_factor": [20,25],
+        "sampling_rate": 0.5,
         "path_output": ""
     }
 
