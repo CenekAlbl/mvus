@@ -47,7 +47,8 @@ class Scene:
         self.sequence = []
         self.visible = []
         self.settings = []
-        self.gps = []
+        self.gt = []
+        self.out = {}
         self.spline = {'tck':[], 'int':[]}
         self.rs = []
         self.ref_cam = 0
@@ -966,21 +967,28 @@ class Scene:
 
         if self.settings['cf_exact']:
             self.beta = self.cf[self.ref_cam] - self.alpha*self.cf
-            print('The given corresponding frames are directly exploited for temporal synchronization\n')
+            print('The given corresponding frames are directly exploited as temporal synchronization\n')
         else:
+
+            if self.settings['sync_method'] == 'iter':
+                sync_fun = sync.sync_iter
+            elif self.settings['sync_method'] == 'bf':
+                sync_fun = sync.sync_bf
+            else:
+                raise ValueError('Synchronization method must be either "iter" or "bf"')
+
             print('Computing temporal synchronization...\n')
-            beta = np.zeros((self.numCam, self.numCam))
-            overlap_max = 0
-            pair = [0,0]
-            for i in range(self.numCam-1):
-                for j in range(i+1,self.numCam):
-                    beta[i,j], overlap = sync.sync_bf(self.cameras[i].fps, self.cameras[j].fps,
+            beta = np.zeros(self.numCam)
+            i = self.ref_cam
+            for j in range(self.numCam):
+                if j==i:
+                    beta[j] = 0
+                else:
+                    beta[j], _ = sync_fun(self.cameras[i].fps, self.cameras[j].fps,
                                                     self.detections[i], self.detections[j],
                                                     self.cf[i], self.cf[j])
-                    if overlap > overlap_max:
-                        overlap_max = overlap
-                        pair = [i,j]
-            self.beta = beta[0]
+                print('Status: {} from {} cam finished'.format(j+1,self.numCam))
+            self.beta = beta
 
 
 class Camera:
@@ -1163,8 +1171,8 @@ def create_scene(path_input):
     init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0
     flight.rs = np.asfarray([init_rs for i in range(flight.numCam)])
 
-    # Load gps alignment parameter (optinal)
-    flight.gps = {'alpha':config['optional inputs']['gps_alpha'], 'beta':config['optional inputs']['gps_beta']}
+    # Load ground truth setting (optinal)
+    flight.gt = config['optional inputs']['ground_truth']
 
     print('Input data are loaded successfully, a scene is created.\n')
     return flight

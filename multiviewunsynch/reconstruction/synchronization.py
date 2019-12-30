@@ -6,47 +6,20 @@ from reconstruction import epipolar
 from tools import util
 
 
-def sync_iter(fps1, fps2, detect1, detect2, frame1, frame2):
+def sync_iter(fps1, fps2, detect1, detect2, frame1, frame2, maxIter=200, threshold=10, step=10, p_min=0, p_max=6, verbose=False):
+    '''
+    This function is a modified implementation of the Iterative Algorithm from the following paper 
+
+    >>> Albl, Cenek, et al. "On the two-view geometry of unsynchronized cameras." Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2017.
+    
+    The function returns both the estimated time shift (beta) and the according ratio of inliers, which can be considered as scoring
+    '''
 
 
-    def correspondence(beta_estimate, d=0):
-
-        if d:
-            ts2_d, _ = util.sampling(detect2[0]+d, int2)
-            ts2 = ts2_d-d 
-            ts1 = ts2 + beta_estimate
-            ts1, idx = util.sampling(ts1, int1)
-            ts2, ts2_d = ts2[idx], ts2_d[idx]
-
-            x1 = np.asarray(interpolate.splev(ts1, spline1))
-            x2 = np.asarray(interpolate.splev(ts2, spline2))
-            x2_d = np.asarray(interpolate.splev(ts2_d, spline2))
-            xd = x2_d - x2
-            return np.concatenate((x1,x2,xd),axis=0)
-            # return x1, x2, xd
-        else:
-            ts1, idx = util.sampling(detect2[0]+beta_estimate, int1)
-            ts2 = detect2[0,idx]
-            try:
-                x1 = np.asarray(interpolate.splev(ts1, spline1))
-                x2 = np.asarray(interpolate.splev(ts2, spline2))
-                return x1, x2
-            except:
-                return None        
-
-
-    def solver(data,param):
+    def solver(s1,s2,ds,d):
         '''
         This function reads data of 9 points and return a list of possible solution for Beta and F
         '''
-
-        assert data.shape[1]==9, 'Number of input points must be 9'
-        assert data.shape[0]==6, 'Input data must have 6 rows'
-
-        # decompose input data
-        s1 = data[:2,:]
-        s2 = data[2:4,:]
-        ds = data[4:,:]
 
         # Create design matrices A1, A2
         A1 = np.array([s1[0]*s2[0],s1[0]*s2[1],s1[0], s1[1]*s2[0],s1[1]*s2[1],s1[1], s2[0],s2[1],np.ones(9)]).T
@@ -65,113 +38,109 @@ def sync_iter(fps1, fps2, detect1, detect2, frame1, frame2):
             F, mask = cv2.findFundamentalMat(s1[:2].T,x2[:2].T,method=cv2.FM_8POINT)
 
             if len(np.ravel(F)) == 9:
-                M_i = np.append(np.ravel(F),np.array([beta*param['d']]))
+                M_i = np.append(np.ravel(F),np.array([beta*d]))
                 M = np.vstack((M, M_i))
 
         return M
 
 
-    def error(M,data,param):
-        cor = correspondence(beta_prior+M[-1])
-        if cor is not None:
-            x1, x2 = cor[0], cor[1]
-            return epipolar.Sampson_error(util.homogeneous(x1), util.homogeneous(x2), M[:9].reshape((3,3)))
-        else:
+    def error(M):
+        try:
+            detect2_temp = np.vstack((detect2[0]-M[-1],detect2[1:]))
+            pts1, pts2 = util.match_overlap(detect1, detect2_temp)
+            return epipolar.Sampson_error(util.homogeneous(pts1[1:]), util.homogeneous(pts2[1:]), M[:9].reshape((3,3)))
+        except:
             return None
 
 
-    def vanillaRansac(estimateFn, verifyFn, data, minSamples, threshold, maxIter, param=None, verbose=0):
-
-        nsamples = data.shape[1]
-        nInliersMax = 0
-        idxs = np.arange(nsamples)
-        result = []
-        for i in range(0,maxIter):
-            sampleIdxs = np.random.choice(idxs, size=minSamples, replace=False)
-            M = estimateFn(data[:,sampleIdxs],param)
+    def ransac(d, maxIter, threshold):
+        InliersMax = 0
+        numSample = min(detect1.shape[1], detect2.shape[1])
+        for i in range(maxIter):
+            sampleIdx = np.random.choice(np.arange(numSample-2*abs(d)), size=9, replace=False)
+            timestamp = detect2[0,sampleIdx]
+            s1 = np.asarray(interpolate.splev(timestamp, spline1))
+            s2 = np.asarray(interpolate.splev(timestamp, spline2))
+            ds = np.asarray(interpolate.splev(timestamp+d, spline2)) - s2
+            M = solver(s1,s2,ds,d)
             if len(M) is not 0:
                 if len(M.shape)==1:
                     M = np.expand_dims(M,axis=0)
                 for Mi in M:
-                    err = verifyFn(Mi,data,param)
+                    err = error(Mi)
                     if err is not None:
-                        numInliers = sum(err<threshold)
-                        if numInliers > nInliersMax:
+                        numInliers = np.sum(err<threshold) / len(err)
+                        if numInliers > InliersMax:
                             result = Mi
-                            nInliersMax = numInliers
-        return result, nInliersMax
+                            InliersMax = numInliers
+        return -result[-1], InliersMax
 
 
     # Pre-processing
     alpha = fps1 / fps2
     beta_prior = frame1/alpha - frame2
-    detect1[0] /= alpha
-
-    int1 = util.find_intervals(detect1[0])
-    int2 = util.find_intervals(detect2[0])
+    detect1_ori, detect2_ori = detect1, detect2
+    detect1 = np.vstack((detect1[0]/alpha,detect1[1:]))
+    detect2 = np.vstack((detect2[0]+beta_prior,detect2[1:]))
 
     spline1, _ = interpolate.splprep(detect1[1:], u=detect1[0], s=0, k=3)
     spline2, _ = interpolate.splprep(detect2[1:], u=detect2[0], s=0, k=3)
 
-    # Iterativ algorithm
-    skip, maxInlier, k, k_max = 0, 0, 0, 20
-    p_min, p_max = 0, 6
+    # The Iterative Algorithm
+    skip, maxInlier, k = 0, 0, 0
     d, p, beta = 2**p_min, p_min, beta_prior
 
-    while k < k_max:
+    while k < step:
 
         # Ransac with d
-        d = abs(d)
-        data = correspondence(beta, d)
-        param = {'d':d}
-        model1, numInlier1 = vanillaRansac(solver,error,data,9,5,200,param)
+        beta1, Inlier1 = ransac(d=d, maxIter=maxIter, threshold=threshold)
 
         # Ransac with -d
-        d = -d
-        data = correspondence(beta, d)
-        param = {'d':d}
-        model2, numInlier2 = vanillaRansac(solver,error,data,9,5,200,param)
+        beta2, Inlier2 = ransac(d=-d, maxIter=maxIter, threshold=threshold)
 
         # Select the better one
-        model = model1 if numInlier1 >= numInlier2 else model2
-        numInlier = numInlier1 if numInlier1 >= numInlier2 else numInlier2
+        beta_temp = beta1 if Inlier1 >= Inlier2 else beta2
+        Inlier = Inlier1 if Inlier1 >= Inlier2 else Inlier2
 
-        print('d:{}, beta:{:.3f}, maxInlier:{}, numInlier:{}'.format(abs(d), beta, maxInlier, numInlier))
+        if verbose:
+            print('d:{}, beta:{:.3f}, maxInlier:{}, Inlier:{}'.format(d, (beta+beta_temp)*alpha, maxInlier, Inlier))
 
-        if numInlier < maxInlier:
+        if skip > p_max:
+                break
+        elif Inlier < maxInlier:
             if p < p_max:
                 p += 1
             else:
                 p = 0
             d = 2**p
             skip += 1
-
-            if skip >= p_max:
-                break
         else:
-            beta -= model[-1]
-            maxInlier = numInlier
+            beta += beta_temp
+            maxInlier = Inlier
+            detect2 = np.vstack((detect2_ori[0]+beta,detect2_ori[1:]))
+            spline2, _ = interpolate.splprep(detect2[1:], u=detect2[0], s=0, k=3)
             skip = 0
             k += 1
 
-
-    return beta*alpha
+    return beta*alpha, maxInlier
 
 
 def sync_bf(fps1, fps2, detect1, detect2, frame1, frame2, r=10):
+    '''
+    Brute-force method for temporal synchronization of two series of detections
 
-    # Pre-processing
-    alpha = fps1 / fps2
-    detect1[0] /= alpha
-    beta_prior = frame1/alpha - frame2
+    r is the half length of the search interval in unit second
+
+    Function returns both the time shift (beta) and the temporal overlap of the two series of detections in unit second
+    '''
 
 
     def search(beta_list, thres=8):
         maxInlier = 0
         beta_est = 0
         for beta in beta_list:
-            detect2_b = np.vstack((detect2[0]+beta,detect2[1:]))
-            pts1, pts2 = util.match_overlap(detect1, detect2_b)
+            detect2_temp = np.vstack((detect2[0]+beta,detect2[1:]))
+            pts1, pts2 = util.match_overlap(detect1_temp, detect2_temp)
 
             F, mask = cv2.findFundamentalMat(pts1[1:].T, pts2[1:].T, method=cv2.FM_RANSAC, ransacReprojThreshold=thres)
             inlier = sum(mask.reshape(-1,)) #/ len(pts1[0])
@@ -183,26 +152,47 @@ def sync_bf(fps1, fps2, detect1, detect2, frame1, frame2, r=10):
         return beta_est, maxInlier
 
 
+    # Pre-processing
+    alpha = fps1 / fps2
+    detect1_temp = np.vstack((detect1[0]/alpha,detect1[1:]))
+    beta_prior = frame1/alpha - frame2
+
+    # Two-stage search
     beta_coarse = np.arange(beta_prior-r*fps2, beta_prior+r*fps2, fps2)
     beta_est, _ = search(beta_coarse)
-
     beta_fine = np.arange(beta_est-fps2/2, beta_est+fps2/2, fps2/20)
     beta_est, numInlier  = search(beta_fine)
 
-    return beta_est * alpha, numInlier/fps1
+    # Result
+    beta = beta_est * alpha
+    overlap_second = numInlier/fps1
+
+    return beta, overlap_second
 
 
 if __name__ == "__main__":
 
-    path = './data/fixposition/trajectory/flight_5_25_20.pkl'
+    from reconstruction import common
+    import cProfile
+    from datetime import datetime
+
+    path = ''
     with open(path, 'rb') as file:
-        flight = pickle.load(file)
+        flight0 = pickle.load(file)
 
-    fps1, fps2 = flight.cameras[0].fps, flight.cameras[2].fps
-    detect1, detect2 = flight.detections[0], flight.detections[2]
-    frame1, frame2 = 0, 409.606
+    flight = common.create_scene('')
+    flight.cut_detection(second=flight.settings['cut_detection_second'])
 
-    # beta = sync_iter(fps1, fps2, detect1, detect2, frame1, frame2)
-    beta, overlap = sync_bf(fps1, fps2, detect1, detect2, frame1, frame2)
+    i, j = 0, 1
+    fps1, fps2 = flight.cameras[i].fps, flight.cameras[j].fps
+    detect1, detect2 = flight.detections[i], flight.detections[j]
+    frame1, frame2 = flight.cf[i]-20, flight.cf[j]+30
 
+    start = datetime.now()
+    print('Correct beta: {:.3f}\n'.format(flight0.beta[j]))
+    cProfile.run("beta, InlierRatio = sync_iter(fps1, fps2, detect1, detect2, frame1, frame2, p_max=5, threshold=10)",sort='cumulative')
+    # beta, InlierRatio = sync_iter(fps1, fps2, detect1, detect2, frame1, frame2, p_max=5, threshold=15)
+    # beta, overlap = sync_bf(fps1, fps2, detect1, detect2, frame1, frame2)
+    
+    print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
     print('Finished!')

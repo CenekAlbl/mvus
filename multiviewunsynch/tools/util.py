@@ -3,6 +3,7 @@ import numpy as np
 from scipy import interpolate
 from thirdparty import transformation
 from tools import ransac
+# from numba import jit
 
 
 def mapminmax(x,ymin,ymax):
@@ -49,7 +50,7 @@ def rotation_decompose(R):
 def homogeneous(x):
     return np.vstack((x,np.ones(x.shape[1])))
 
-
+# @jit
 def find_intervals(x,gap=5,idx=False):
     '''
     Given indices of detections, return a matrix that contains the start and the end of each
@@ -81,7 +82,7 @@ def find_intervals(x,gap=5,idx=False):
     else:
         return interval
 
-
+# @jit
 def sampling(x,interval,belong=False):
     '''
     Sample points from the input which are inside the given intervals
@@ -200,16 +201,6 @@ def umeyama(src, dst, estimate_scale):
 
     return T
 
-def gps_to_enu(gps_xyz,out_file):
-        # Load ground truth 
-        gt = np.loadtxt(gps_xyz).T
-
-        ell_wgs84 = pm.Ellipsoid('wgs84')
-
-        gt_ll = np.vstack(pm.ecef2geodetic(gt[0],gt[1],gt[2],ell=ell_wgs84))
-        gt_enu = np.vstack(pm.geodetic2enu(gt_ll[0],gt_ll[1],gt_ll[2],gt_ll[0][-10],gt_ll[1][-10],gt_ll[2][-10],ell=ell_wgs84))
-
-        np.savetxt(out_file, gt_enu.T,delimiter='  ') 
 
 if __name__ == "__main__":
     R = rotation(0.38,-176.3,100)

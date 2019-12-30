@@ -6,6 +6,7 @@
         "Further instruction goes here..."
     ],
 
+    
     "necessary inputs":
     {
         "path_detections": [],
@@ -18,8 +19,7 @@
 
     "optional inputs":
     {
-        "gps_alpha": null,
-        "gps_beta": null
+        "ground_truth": {"filepath":"", "frequency":1}
     },
 
 
@@ -28,6 +28,7 @@
         "num_detections": 100000,
         "opt_calib": false,
         "cf_exact":true,
+        "sync_method":"iter",
         "undist_points": true,
         "rolling_shutter": false,
         "init_rs": 1,

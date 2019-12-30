@@ -3,6 +3,7 @@ import pickle
 from tools import visualization as vis
 from datetime import datetime
 from reconstruction import common
+from analysis.compare_gt import align_gt
 
 # Initialize a scene from the json template
 flight = common.create_scene('')
@@ -76,6 +77,9 @@ while True:
 # Visualize the 3D trajectory
 flight.spline_to_traj(sampling_rate=1)
 #vis.show_trajectory_3D(flight.traj[1:],line=False)
+
+# Align with the ground truth data if available
+flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=True)
 
 with open(flight.settings['path_output'],'wb') as f:
     pickle.dump(flight, f)
