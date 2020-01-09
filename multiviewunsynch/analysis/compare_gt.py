@@ -115,19 +115,15 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
     thres = 10
     error_ = res[3]
     idx = error_ <= thres*np.mean(error_)
-    reconst_, gt_ = res[0][:,idx], res[1][:,idx]
-    M = transformation.affine_matrix_from_points(reconst_[1:], gt_, shear=False, scale=True)
-    tran = np.dot(M, util.homogeneous(reconst_[1:]))
-    tran /= tran[-1]
-    error_ = np.sqrt(np.sum((gt_-tran[:3])**2,axis=0))
+    reconst_, gt_, error_ = res[0][:,idx], res[1][:,idx], error_[idx]
 
     # Result
-    out = {'align_param':ls.x, 'reconst_tran':reconst_, 'gt':gt_, 'tran_matrix':M, 'error':error_}
+    out = {'align_param':ls.x, 'reconst_tran':reconst_, 'gt':gt_, 'tran_matrix':res[2], 'error':error_}
     print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(out['error'])))
 
     if visualize:
         # Compare the trajectories
-        vis.show_trajectory_3D(out['reconst_tran'][1:], out['gt'], line=False)
+        vis.show_trajectory_3D(out['reconst_tran'][1:], out['gt'], line=False, title='Reconstruction(left) vs Ground Truth(right)')
 
         # Error histogram
         vis.error_hist(out['error'])

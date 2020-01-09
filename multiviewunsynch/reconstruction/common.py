@@ -819,7 +819,7 @@ class Scene:
                 plt.scatter(repro[0],repro[1],c='blue')
                 plt.xlabel('X')
                 plt.ylabel('Y')
-                plt.suptitle('Camera {}: undistorted detection (red) vs reporjection (blue)'.format(i))
+                plt.suptitle('Camera {}: undistorted detection (red) vs reprojection (blue)'.format(i))
 
         plt.show()
 

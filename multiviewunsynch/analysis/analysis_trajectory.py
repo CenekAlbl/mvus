@@ -4,6 +4,7 @@ import tools.visualization as vis
 from datetime import datetime
 from analysis.compare_gt import align_gt
 from reconstruction import synchronization as sync
+from analysis.compare_gt import align_gt
 
 
 # Load trajectories
