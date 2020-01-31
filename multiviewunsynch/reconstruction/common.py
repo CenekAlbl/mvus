@@ -388,7 +388,10 @@ class Scene:
                     weights = np.ones(traj_part.shape[1]) * motion_weights
                     mot_err = self.motion_prior(traj_part[3:],weights,prior=self.settings['motion_type'])
                     mot_err_res = np.concatenate((mot_err_res, mot_err))
-                    global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))    
+                    if self.settings['motion_type'] == 'F':
+                        global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:-1]))
+                    else:
+                        global_traj_ts = np.concatenate((global_traj_ts, traj_part[3,1:]))
             motion_error = np.zeros((self.global_traj.shape[1]))
             _,traj_idx,_ = np.intersect1d(self.global_traj[3],global_traj_ts,assume_unique=True,return_indices=True)
             assert traj_idx.shape[0] == mot_err_res.shape[0], 'wrong number of global_traj points'
