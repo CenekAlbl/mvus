@@ -42,7 +42,7 @@ while True:
         motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'])
 
-    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+    print('\nMean error of each camera after first BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
 
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
@@ -52,7 +52,7 @@ while True:
         motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'])
 
-    print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
+    print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
