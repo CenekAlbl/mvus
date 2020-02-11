@@ -4,9 +4,14 @@ from tools import visualization as vis
 from datetime import datetime
 from reconstruction import common
 from analysis.compare_gt import align_gt
+import sys
+
+if len(sys.argv) < 2:
+    print( "Please provide a path to a proper config file")
+    sys.exit()
 
 # Initialize a scene from the json template
-flight = common.create_scene('')
+flight = common.create_scene(sys.argv[1])
 
 # Truncate detections
 flight.cut_detection(second=flight.settings['cut_detection_second'])
