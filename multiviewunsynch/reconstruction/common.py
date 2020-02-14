@@ -643,7 +643,7 @@ class Scene:
         '''Compute BA'''
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
-        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=2)
+        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=0)
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline

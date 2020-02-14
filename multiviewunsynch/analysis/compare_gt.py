@@ -30,9 +30,12 @@ def optimize(alpha, beta, flight, gt):
 
     def error_fn(model,output=False):
         alpha, beta = model[0], model[1]
-        t_gt = alpha * np.arange(gt.shape[1]) + beta
+        if gt.shape[0] == 3:
+            t_gt = alpha * np.arange(gt.shape[1]) + beta
+        else:
+            t_gt = gt[0]
         _, idx = util.sampling(t_gt, flight.spline['int'])
-        gt_part = gt[:,idx]
+        gt_part = gt[-3:,idx]
         t_part = t_gt[idx]
         traj = flight.spline_to_traj(t=t_part)
 
@@ -75,12 +78,12 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
             print('Ground truth not correctly loaded')
             return
 
-    if gt_ori.shape[0] == 3:
+    if gt_ori.shape[0] == 3 or gt_ori.shape[0] == 4:
         pass
-    elif gt_ori.shape[1] == 3:
+    elif gt_ori.shape[1] == 3 or gt_ori.shape[1] == 4:
         gt_ori = gt_ori.T
     else:
-        raise Exception('Ground truth data must be a 3D matrix')
+        raise Exception('Ground truth data have an invalid shape')
 
     # Pre-processing
     f_reconst = flight.cameras[flight.settings['ref_cam']].fps
@@ -89,7 +92,10 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
     reconst = flight.spline_to_traj(sampling_rate=alpha)
     t0 = reconst[0,0]
     reconst = np.vstack(((reconst[0]-t0)/alpha,reconst[1:]))
-    gt = np.vstack((np.arange(len(gt_ori[0])),gt_ori))
+    if gt_ori.shape[0] == 3:
+        gt = np.vstack((np.arange(len(gt_ori[0])),gt_ori))
+    else:
+        gt = gt_ori
 
     # Coarse search
     error_min = np.inf
