@@ -126,6 +126,11 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
     # Result
     out = {'align_param':ls.x, 'reconst_tran':reconst_, 'gt':gt_, 'tran_matrix':res[2], 'error':error_}
     print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(out['error'])))
+    print('The median error (distance) is {:.5f} meter\n'.format(np.median(out['error'])))
+    print('The max error (distance) is {:.5f} meter\n'.format(np.max(out['error'])))
+    print('The min error (distance) is {:.5f} meter\n'.format(np.min(out['error'])))
+
+    print(ls.x)
 
     if visualize:
         # Compare the trajectories
