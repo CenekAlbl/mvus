@@ -33,7 +33,7 @@ def optimize(alpha, beta, flight, gt):
         if gt.shape[0] == 3:
             t_gt = alpha * np.arange(gt.shape[1]) + beta
         else:
-            t_gt = gt[0]
+            t_gt = alpha * (gt[0]-gt[0,0]) + beta
         _, idx = util.sampling(t_gt, flight.spline['int'])
         gt_part = gt[-3:,idx]
         t_part = t_gt[idx]
