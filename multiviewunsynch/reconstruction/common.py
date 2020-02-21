@@ -953,7 +953,7 @@ class Scene:
             v2 = (traj_aft - traj_mid) / ( dt2 + eps )
 
             accel = (v2 - v1) / (dt3 + eps)
-            mot_resid = np.array([weights[:traj_for.shape[1]]*(accel * (dt2 - dt1))])
+            mot_resid = np.array([weights[:traj_for.shape[1]]*(accel * (dt3))])
 
         mot_resid = np.sum(abs(mot_resid[0]),axis=0)
         return mot_resid
