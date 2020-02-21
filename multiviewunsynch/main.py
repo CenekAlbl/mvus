@@ -44,7 +44,7 @@ while True:
     # Bundle adjustment
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
-        motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
+        motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'])
 
     print('\nMean error of each camera after first BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
@@ -54,7 +54,7 @@ while True:
 
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
-        motion_prior=flight.settings['motion_prior'],motion_reg=flight.settings['motion_reg'],\
+        motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'])
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
@@ -84,10 +84,9 @@ flight.spline_to_traj(sampling_rate=1)
 #vis.show_trajectory_3D(flight.traj[1:],line=False)
 
 # Align with the ground truth data if available
-flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=True)
-
+flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
 with open(flight.settings['path_output'],'wb') as f:
     pickle.dump(flight, f)
 
 
-print('Finish!')
+print('Finished!')
