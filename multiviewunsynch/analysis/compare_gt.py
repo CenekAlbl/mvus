@@ -95,11 +95,15 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
     if gt_ori.shape[0] == 3:
         gt = np.vstack((np.arange(len(gt_ori[0])),gt_ori))
     else:
-        gt = gt_ori
+        gt = np.vstack((gt_ori[0]-gt_ori[0,0],gt_ori[1:]))
 
     # Coarse search
+    thres = int(reconst[0,-1] / 2)
+    if int(gt[0,-1]-thres) < 0:
+        raise Exception('Ground truth too short!')
+
     error_min = np.inf
-    for i in range(int(gt[0,-1]-reconst[0,-1])):
+    for i in range(-thres, int(gt[0,-1]-thres)):
         reconst_i = np.vstack((reconst[0]+i,reconst[1:]))
         p1, p2 = util.match_overlap(reconst_i, gt)
         M = transformation.affine_matrix_from_points(p1[1:], p2[1:], shear=False, scale=True)
@@ -107,7 +111,7 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
         tran = np.dot(M, util.homogeneous(p1[1:]))
         tran /= tran[-1]
         error_all = np.sqrt((p2[1]-tran[0])**2 + (p2[2]-tran[1])**2 + (p2[3]-tran[2])**2)
-        error = np.sum(error_all**2) # np.mean(error_all)
+        error = np.mean(error_all)
         if error < error_min:
             error_min = error
             error_coarse = error_all
