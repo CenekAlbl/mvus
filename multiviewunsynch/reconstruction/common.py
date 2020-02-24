@@ -12,6 +12,7 @@ from scipy.sparse import lil_matrix, vstack
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from tools import visualization as vis
+from tools import util 
 
 
 class Scene:
@@ -122,28 +123,34 @@ class Scene:
 
             if motion_prior:
                 if (self.global_traj[1] == i).any():
-                    # Update glob_traj timestamps for current camera 
+                    # Update glob_traj timestamps for current camera
+                    # np.logical_and(timestamp>=interval[0,i], timestamp<=interval[1,i]) 
+                    #temp_glob_traj = self.global_traj[:,np.logical_and(self.global_traj[1] == i,self.global_traj[3] in ]
                     temp_glob_traj = self.global_traj[:,self.global_traj[1] == i]
                     # Save traj. point locations in global_traj before update
-                    temp_glob_traj_mask = np.isin(self.global_traj[3],temp_glob_traj[3])
+                    #temp_glob_traj_mask = np.isin(self.global_traj[3],temp_glob_traj[3])
+                    temp_glob_traj_mask = np.where(self.global_traj[1] == i)
                     # Select global det. points for current camera
                     temp_glob_det = self.global_detections[:,self.global_detections[0] == i]
                     # Save traj. point locations in global_traj
-                    temp_glob_det_mask = np.isin(self.global_detections[2],temp_glob_det[2])
+                    #temp_glob_det_mask = np.isin(self.global_detections[2],temp_glob_det[2])
+                    temp_glob_det_mask = np.where(self.global_detections[0] == i)
                     # Save camera detections that are used within the global traj. 
                     _,temp_glob_traj_idx,temp_glob_traj_det_idx = np.intersect1d(temp_glob_traj[2],self.detections[i][0],return_indices=True,assume_unique=True)
                     # Save camera detections that are used within global detections. 
                     _,temp_glob_det_idx,temp_det_idx = np.intersect1d(temp_glob_det[1],self.detections[i][0],return_indices=True,assume_unique=True)  
                     
-                    assert np.sum(temp_glob_traj_mask == True) == len(temp_glob_traj_det_idx)
-                    assert np.sum(temp_glob_det_mask == True) == len(self.detections_global[i][0])
+                    #assert np.sum(temp_glob_traj_mask == True) == len(temp_glob_traj_det_idx)
+                    assert np.shape(temp_glob_traj_mask)[1] == np.shape(temp_glob_traj_det_idx)[0]
+                    assert np.shape(temp_glob_det_mask)[1] == np.shape(self.detections_global[i][0])[0]
+                    
                     # Update global detection timestamps for cam_id
                     self.global_detections[2,temp_glob_det_mask] = self.detections_global[i][0]
                     # Update global traj timestamps for detections in global_traj
                     self.global_traj[3,temp_glob_traj_mask] = self.detections_global[i][0,temp_glob_traj_det_idx]
         if motion_prior:
             # Resort global_traj according to updated global timestamps 
-            if not (self.global_traj[3,1:]>self.global_traj[3,:-1]).all():
+            if not (self.global_traj[3,1:]>=self.global_traj[3,:-1]).all():
                 self.global_traj[:,np.argsort(self.global_traj[3,:])] 
 
 
@@ -289,7 +296,7 @@ class Scene:
                 continue
             self.traj = np.hstack((self.traj, np.vstack((t_part,traj_part))))
 
-        assert (self.traj[0,1:] > self.traj[0,:-1]).all()
+        assert (self.traj[0,1:] >= self.traj[0,:-1]).all()
 
         return self.traj
 
@@ -884,25 +891,46 @@ class Scene:
                 cam_id = np.concatenate((cam_id,np.ones(len(self.detections[i][0])) * i ))
 
         self.frame_id_all = frame_id_all 
+        #global_time_stamps_all = np.sort(global_time_stamps_all)
+        #Remove duplicate timestamps
+        #if (global_time_stamps_all[1:]==global_time_stamps_all[:-1]).any():
+        #    gt_uniq = remove_dupes(global_time_stamps_all)
+        #    fram_id_uniq = remove_dupes(frame_id_all)
+        #    gt_uniq = global_time_stamps_all[1:][(global_time_stamps_all[1:]>global_time_stamps_all[:-1])]
+        #    gt_dupes = global_time_stamps_all[1:][(global_time_stamps_all[1:] == global_time_stamps_all[:-1])]
+        #    gt_uniq = np.hstack((global_time_stamps_all[0],gt_uniq))
+        #    assert (gt_uniq[1:]>gt_uniq[:-1]).all()
+        #    self.global_time_stamps_all = gt_uniq #global_time_stamps_all
+        #else:
         self.global_time_stamps_all = global_time_stamps_all
-    
+
+        #assert (global_time_stamps_all[1:]>=global_time_stamps_all[:-1]).all()
+        
+        
         # Interpolate 3D points for global timestamps in all cameras
         self.spline_to_traj(t=np.sort(global_time_stamps_all))
 
-        
         self.global_detections = np.vstack((cam_id,frame_id_all,global_time_stamps_all))
         #Sort global_traj by global time stamp
         temp_global_traj = self.global_detections[:,np.argsort(self.global_detections[2,:])]
         
+        # Remove duplicate timestamps from temp traj.
+        #temp_global_traj = np.hstack((temp_global_traj[:,0].reshape(3,1),temp_global_traj[:,1:][:,(temp_global_traj[2][1:]>temp_global_traj[2][:-1])]))
+        
+        # Remove duplicate timestamps from self.traj.
+        #if (self.traj[0][1:]==self.traj[0][:-1]).any():
+        #    self.traj = np.hstack((self.traj[:,0].reshape(4,1),self.traj[:,1:][:,(self.traj[0][1:]>self.traj[0][:-1])]))
+        
         # Create ascending global timestamp trajectory
-        _,traj_idx,_= np.intersect1d(temp_global_traj[2],self.traj[0],assume_unique=True,return_indices=True)
+        #_,traj_idx,_= np.intersect1d(temp_global_traj[2],self.traj[0],assume_unique=False,return_indices=True)
+        traj_idx = np.isin(temp_global_traj[2],self.traj[0])
         temp_global_traj = np.vstack((temp_global_traj[:,traj_idx],self.traj[1:]))
         # Apply index to track original order of the global traj.
         temp_global_traj = np.vstack((np.arange(temp_global_traj.shape[1]),temp_global_traj))
         self.global_traj = temp_global_traj
         
         #verify global timestamps are sorted in ascending order
-        assert (self.global_traj[3][1:]>self.global_traj[3][:-1]).all(), 'timestamps are not in ascending order'
+        assert (self.global_traj[3][1:]>=self.global_traj[3][:-1]).all(), 'timestamps are not in ascending order'
         
         # # Plot timestamps for visualinspection
         # fig = plt.figure(figsize=(12, 10))
