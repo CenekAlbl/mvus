@@ -1200,7 +1200,11 @@ def create_scene(path_input):
 
     # Load rolling shutter parameter
     init_rs = config['settings']['init_rs'] if config['settings']['rolling_shutter'] else 0
-    flight.rs = np.asfarray([init_rs for i in range(flight.numCam)])
+    if isinstance(init_rs,list):
+        assert len(init_rs) == flight.numCam, 'the number of initial rolling shutter values must equal the number of cameras'
+        flight.rs = np.asfarray([init_rs[i] for i in range(flight.numCam)])
+    else:
+        flight.rs = np.asfarray([init_rs for i in range(flight.numCam)])
 
     # Load ground truth setting (optinal)
     flight.gt = config['optional inputs']['ground_truth']
