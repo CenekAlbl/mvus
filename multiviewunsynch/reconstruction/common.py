@@ -42,6 +42,7 @@ class Scene:
         self.detections_global = []
         self.alpha = []
         self.beta = []
+        self.beta_after_Fbeta = []
         self.cf = []
         self.traj = []
         self.traj_len = []
@@ -1020,6 +1021,7 @@ class Scene:
                                                     self.cf[i], self.cf[j])
                 print('Status: {} from {} cam finished'.format(j+1,self.numCam))
             self.beta = beta
+            self.beta_after_Fbeta = beta
 
 
 class Camera:
