@@ -509,7 +509,10 @@ class Scene:
                 #jac_cam = np.zeros((num_detect, num_param))
 
                 # alpha and beta
-                jac_cam[:,[i,i+numCam]] = 1
+                try:
+                    jac_cam[:,[i,i+numCam]] = 1 if self.settings['opt_sync'] else 0
+                except:
+                    jac_cam[:,[i,i+numCam]] = 1
 
                 # rolling shutter
                 if rs:
