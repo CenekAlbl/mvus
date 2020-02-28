@@ -32,6 +32,7 @@
         "undist_points": true,
         "rolling_shutter": false,
         "init_rs": 1,
+        "rs_bounds":false,
         "motion_prior":false,
         "motion_reg":false,
         "motion_weights":100,
