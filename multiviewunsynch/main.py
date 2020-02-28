@@ -45,7 +45,8 @@ while True:
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
-        motion_weights=flight.settings['motion_weights'])
+        motion_weights=flight.settings['motion_weights'],\
+        rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after first BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
@@ -55,7 +56,8 @@ while True:
     #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
-        motion_weights=flight.settings['motion_weights'])
+        motion_weights=flight.settings['motion_weights'],\
+        rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     #print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))

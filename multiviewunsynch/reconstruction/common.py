@@ -438,7 +438,7 @@ class Scene:
             self.visible.append(visible)
 
 
-    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False):
+    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False,rs_bounds=False):
         '''
         Bundle Adjustment with multiple splines
 
@@ -651,13 +651,23 @@ class Scene:
             assert idx_spline_sum[-1,-1] == len(model), 'Error in spline indices'
         print('Number of BA parameters is {}'.format(len(model)))
 
+        # constrain rs params to between 0 and 1
+        if rs_bounds:
+            l_bounds = np.ones((model.shape[0])) * -np.inf
+            u_bounds = np.ones((model.shape[0])) * np.inf
+            l_bounds[2*numCam:numCam*3] = 0
+            u_bounds[2*numCam:numCam*3] = 1
+            bounds_rs = (l_bounds, u_bounds)
+        else:
+            bounds_rs = (-np.inf,np.inf)
+
         # Set the Jacobian matrix
         A = jac_BA()
 
         '''Compute BA'''
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
-        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=0)
+        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=0,bounds=bounds_rs)
 
         '''After BA'''
         # Assign the optimized model to alpha, beta, cam, and spline
