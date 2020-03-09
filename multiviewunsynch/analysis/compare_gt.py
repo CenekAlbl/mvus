@@ -1,3 +1,7 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 import numpy as np
 import pickle
 from scipy.optimize import least_squares
@@ -131,8 +135,6 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
     out = {'align_param':ls.x, 'reconst_tran':reconst_, 'gt':gt_, 'tran_matrix':res[2], 'error':error_}
     print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(out['error'])))
     print('The median error (distance) is {:.5f} meter\n'.format(np.median(out['error'])))
-    print('The max error (distance) is {:.5f} meter\n'.format(np.max(out['error'])))
-    print('The min error (distance) is {:.5f} meter\n'.format(np.min(out['error'])))
 
     print(ls.x)
 
