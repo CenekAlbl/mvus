@@ -75,7 +75,32 @@ The reconstruction configuration file initializes the settings and defines the d
 ```
 A description of each setting flag in the configuration flag is as follows:
 
-| Settings  | Description |
+### "comments":
+| Flag  | Description |
+| ------------- | ------------- |
+| "num_detections" | Content Cell  |
+| "opt_calib"  | Content Cell  |
+| "cf_exact"  | Content Cell  |
+| "undist_points"  | Content Cell  |
+
+### "neccessary inputs":
+| Flag  | Description |
+| ------------- | ------------- |
+| "num_detections" | Content Cell  |
+| "opt_calib"  | Content Cell  |
+| "cf_exact"  | Content Cell  |
+| "undist_points"  | Content Cell  |
+
+### "optional inputs":
+| Flag  | Description |
+| ------------- | ------------- |
+| "num_detections" | Content Cell  |
+| "opt_calib"  | Content Cell  |
+| "cf_exact"  | Content Cell  |
+| "undist_points"  | Content Cell  |
+
+### "settings":
+| Flag  | Description |
 | ------------- | ------------- |
 | "num_detections" | Content Cell  |
 | "opt_calib"  | Content Cell  |
