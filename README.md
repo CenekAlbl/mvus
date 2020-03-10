@@ -1,7 +1,7 @@
 # MultiViewUnsynch
 
 <p align="center">
-<img src="BA_pipeline.jpg" width="600" alt="Camera 0 trajectory">
+<img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
 </p>
 
 # Inputs
@@ -13,15 +13,10 @@ text files containing 2D detections and frame indicies in the form:
 ## Camera Intrinsic Calibration files
 .json files containing:
 - K-matrix: 3*3 matrix of intrinsic camera parameters in the form:
-<mrow>
-   <mo> ( </mo>
-   <mtable>
-      <mtr> <mn>fx</mn> <mn>0</mn> <mn>cx</mn> </mtr>
-      <mtr> <mn>0</mn> <mn>fy</mn> <mn>cy</mn> </mtr>
-      <mtr> <mn>0</mn> <mn>0</mn> <mn>1</mn> </mtr>
-   </mtable>
-   <mo> ) </mo>
-</mrow>
+
+<p align="left">
+<img src="k_matrix.jpg" width="200" alt="Intrinsic camera parameter matrix">
+</p>
 
     where:
         - (cx, cy) is a principal point that is usually at the image center
@@ -32,16 +27,7 @@ text files containing 2D detections and frame indicies in the form:
         - k1, k2, k3 are radial distortion coefficients. 
         - p1 and p2 are tangential distortion coefficients. 
 
-$$
-\left(\begin{array}{cc} 
-0.8944272 & 0.4472136\\
--0.4472136 & -0.8944272
-\end{array}\right)
-\left(\begin{array}{cc} 
-10 & 0\\ 
-0 & 5
-\end{array}\right)
-$$ 
+
 
 
 # Outputs
