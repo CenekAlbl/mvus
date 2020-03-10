@@ -12,7 +12,7 @@ text files containing 2D detections and frame indicies in the order:
 x-dim,y-dim, frame-id
 
 ## Camera Intrinsic Calibration files
-'''
+```
 {
     "comment":["Templete for providing camera information.",
                "The path of this file should be included in the 'config.json' file under 'path_cameras'",
@@ -28,7 +28,7 @@ x-dim,y-dim, frame-id
     "resolution":[1920,1080]
 
 }
-'''
+```
 json files containing the following flags:
 - "K-matrix": 3*3 matrix of intrinsic camera parameters in the form:
 
