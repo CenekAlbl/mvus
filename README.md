@@ -1,5 +1,41 @@
 # MultiViewUnsynch
 
+<p align="center">
+<img src="BA_pipeline.jpg" width="200" alt="Camera 0 trajectory">
+</p>
+
+# Inputs
+
+## 2D Detections
+text files containing 2D detections and frame indicies in the form:
+| x-dim | y-dim | frame-id|
+
+## Camera Intrinsic Calibration files
+.json files containing:
+- K-matrix: 3*3 matrix of intrinsic camera parameters in the form:
+<mrow>
+   <mo> ( </mo>
+   <mtable>
+      <mtr> <mn>fx</mn> <mn>0</mn> <mn>cx</mn> </mtr>
+      <mtr> <mn>0</mn> <mn>fy</mn> <mn>cy</mn> </mtr>
+      <mtr> <mn>0</mn> <mn>0</mn> <mn>1</mn> </mtr>
+   </mtable>
+   <mo> ) </mo>
+</mrow>
+
+    where:
+        - (cx, cy) is a principal point that is usually at the image center
+        - fx, fy are the focal lengths expressed in pixel units.
+- distCoeff: a vector of [k1,k2,p1,p2[,k3]]"]
+    where:
+        - k1, k2, k3 are radial distortion coefficients. 
+        - p1 and p2 are tangential distortion coefficients. 
+
+
+
+# Outputs
+
+
 ## For developing
 Tracking and trajectory reconstruction of moving objects using multiple unsynchronized cameras 
 
