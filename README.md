@@ -1,4 +1,5 @@
 # MultiViewUnsynch
+Tracking and trajectory reconstruction of moving objects using multiple unsynchronized cameras 
 
 <p align="center">
 <img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
@@ -126,7 +127,6 @@ Each camera in the network should have a corresponding calibration file in json 
 
 
 ## For developing
-Tracking and trajectory reconstruction of moving objects using multiple unsynchronized cameras 
 
 Folder and file structure:
 
