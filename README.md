@@ -11,7 +11,7 @@ text files containing 2D detections and frame indicies in the order:
 
 x-dim,y-dim, frame-id
 
-## Camera Intrinsic Calibration files
+## Camera Intrinsic Parameter json Files
 ```
 {
     "comment":["Templete for providing camera information.",
@@ -37,7 +37,7 @@ json files containing the following flags:
 </p>
 
     where:
-        - (cx, cy) is a principal point that is usually at the image center
+        - (cx, cy) is a principal point that is usually at the image center.
         - fx, fy are the focal lengths expressed in pixel units.
 
 - "distCoeff": a vector of [k1,k2,p1,p2[,k3]]
