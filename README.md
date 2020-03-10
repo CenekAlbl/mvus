@@ -1,7 +1,7 @@
 # MultiViewUnsynch
 
 <p align="center">
-<img src="BA_pipeline.jpg" width="200" alt="Camera 0 trajectory">
+<img src="BA_pipeline.jpg" width="600" alt="Camera 0 trajectory">
 </p>
 
 # Inputs
@@ -26,11 +26,22 @@ text files containing 2D detections and frame indicies in the form:
     where:
         - (cx, cy) is a principal point that is usually at the image center
         - fx, fy are the focal lengths expressed in pixel units.
-- distCoeff: a vector of [k1,k2,p1,p2[,k3]]"]
+- distCoeff: a vector of [k1,k2,p1,p2[,k3]]
+    
     where:
         - k1, k2, k3 are radial distortion coefficients. 
         - p1 and p2 are tangential distortion coefficients. 
 
+$$
+\left(\begin{array}{cc} 
+0.8944272 & 0.4472136\\
+-0.4472136 & -0.8944272
+\end{array}\right)
+\left(\begin{array}{cc} 
+10 & 0\\ 
+0 & 5
+\end{array}\right)
+$$ 
 
 
 # Outputs
