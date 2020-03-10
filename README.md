@@ -7,12 +7,30 @@
 # Inputs
 
 ## 2D Detections
-text files containing 2D detections and frame indicies in the form:
-| x-dim | y-dim | frame-id|
+text files containing 2D detections and frame indicies in the order: 
+
+x-dim,y-dim, frame-id
 
 ## Camera Intrinsic Calibration files
-.json files containing:
-- K-matrix: 3*3 matrix of intrinsic camera parameters in the form:
+'''
+{
+    "comment":["Templete for providing camera information.",
+               "The path of this file should be included in the 'config.json' file under 'path_cameras'",
+               "K-matrix should be a 3*3 matrix",
+               "distCoeff should be a vector of [k1,k2,p1,p2[,k3]]"],
+
+    "K-matrix":[[874.4721846047786, 0.0, 970.2688358898922], [0.0, 894.1080937815644, 531.2757796052425], [0.0, 0.0, 1.0]],
+
+    "distCoeff":[-0.260720634999793, 0.07494782427852716, -0.00013631462898833923, 0.00017484761775924765, -0.00906247784302948],
+           
+    "fps":59.940060,
+
+    "resolution":[1920,1080]
+
+}
+'''
+json files containing the following flags:
+- "K-matrix": 3*3 matrix of intrinsic camera parameters in the form:
 
 <p align="left">
 <img src="k_matrix.jpg" width="200" alt="Intrinsic camera parameter matrix">
@@ -21,16 +39,22 @@ text files containing 2D detections and frame indicies in the form:
     where:
         - (cx, cy) is a principal point that is usually at the image center
         - fx, fy are the focal lengths expressed in pixel units.
-- distCoeff: a vector of [k1,k2,p1,p2[,k3]]
+
+- "distCoeff": a vector of [k1,k2,p1,p2[,k3]]
     
     where:
         - k1, k2, k3 are radial distortion coefficients. 
         - p1 and p2 are tangential distortion coefficients. 
 
+- "fps": nominal fixed frame rate of the camera
+
+- "resolution": sensor resolution of the camera
 
 
 
 # Outputs
+
+- Reconstructed trajectory of the detected object
 
 
 ## For developing
