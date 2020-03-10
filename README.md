@@ -7,7 +7,7 @@
 
 # Inputs
 
-### Reconstruction configuration file
+### Configuration JSON file
 The reconstruction configuration file initializes the settings and defines the data regarding the 2D tracks and cameras that are used in the flight reconstruction. The file shall be in json format. An example config file is as follows:
 
 ```
@@ -73,22 +73,22 @@ The reconstruction configuration file initializes the settings and defines the d
     }
 }
 ```
-A description of each setting flag in the configuration flag is as follows:
+A description of each section in the configuration file is as follows:
 
 ### "comments":
-- specific information regarding the reconstruction job 
+- specific information to the reconstruction job 
 
 ### "neccessary inputs":
 | Flag  | Description |
 | ------------- | ------------- |
-| "path_detections" | Content Cell  |
-| "path_cameras"  | Content Cell  |
-| "corresponding_frames  | Content Cell  |
+| "path_detections" | path to 2d detections  |
+| "path_cameras"  | path to camera calibration JSON files  |
+| "corresponding_frames  | initial corresponding frame indicies between camera streams|
 
 ### "optional inputs":
 | Flag  | Description |
 | ------------- | ------------- |
-| "ground_truth" | Content Cell  |
+| "ground_truth" | path to ground truth trajectory data if available |
 
 ### "settings":
 | Flag  | Description |
