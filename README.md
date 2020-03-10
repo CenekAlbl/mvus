@@ -1,5 +1,5 @@
 # MultiViewUnsynch
-Tracking and trajectory reconstruction of moving objects using multiple unsynchronized cameras 
+3D trajectory reconstruction of moving objects using multiple unsynchronized cameras 
 
 <p align="center">
 <img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
@@ -7,7 +7,7 @@ Tracking and trajectory reconstruction of moving objects using multiple unsynchr
 
 # Inputs
 
-## Reconstruction configuration file
+### Reconstruction configuration file
 The reconstruction configuration file initializes the settings and defines the data regarding the 2D tracks and cameras that are used in the flight reconstruction. The file shall be in json format. An example config file is as follows:
 
 ```
