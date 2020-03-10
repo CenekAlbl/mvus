@@ -73,14 +73,39 @@ The reconstruction configuration file initializes the settings and defines the d
     }
 }
 ```
+A description of each setting flag in the configuration flag is as follows:
+| Settings  | Description |
+| ------------- | ------------- |
+| "num_detections" | Content Cell  |
+| "opt_calib"  | Content Cell  |
+| "cf_exact"  | Content Cell  |
+| "undist_points"  | Content Cell  |
+| "num_detections" | Content Cell  |
+| "rolling_shutter"  | Content Cell  |
+| "init_rs" | Content Cell  |
+| "rs_bounds" | Content Cell |
+| "motion_reg" | Content Cell |
+| "motion_type"  | Content Cell  |
+| "motion_weights"  | Content Cell  |
+| "cut_detection_second"  | Content Cell  |
+| "camera_sequence"  | Content Cell  |
+| "ref_cam"  | Content Cell  |
+| "thres_Fmatix"  | Content Cell  |
+| "thres_PnP"  | Content Cell  |
+| "thres_outlier" | Content Cell  |
+| "thres_triangulation"  | Content Cell  |
+| "smooth_factor" | Content Cell  |
+| "sampling_rate"  | Content Cell  |
+| "path output" | Content Cell |
 
-## 2D Detections for each Camera
-text files containing 2D detections from each camera. The file should contain 
-one detection per row, with each row containing three columns in the following order:
+
+### Detection tracks for each Camera
+text files containing the 2D detections of the target for each camera. The file should contain 
+one detection per row, with each row/detection containing three columns in the following order:
 
 x-coordinate,y-coordinate, frame-id
 
-## Camera Intrinsic Parameter json Files
+### Camera Intrinsic Parameter json Files
 Each camera in the network should have a corresponding calibration file in json format containing the following information as shown in the example below:
 ```
 {
