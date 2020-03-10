@@ -129,25 +129,20 @@ class Scene:
             if motion_prior:
                 if (self.global_traj[1] == i).any():
                     # Update glob_traj timestamps for current camera
-                    # np.logical_and(timestamp>=interval[0,i], timestamp<=interval[1,i]) 
-                    #temp_glob_traj = self.global_traj[:,np.logical_and(self.global_traj[1] == i,self.global_traj[3] in ]
                     temp_glob_traj = self.global_traj[:,self.global_traj[1] == i]
                     # Save traj. point locations in global_traj before update
-                    #temp_glob_traj_mask = np.isin(self.global_traj[3],temp_glob_traj[3])
                     temp_glob_traj_mask = np.where(self.global_traj[1] == i)
                     # Select global det. points for current camera
                     temp_glob_det = self.global_detections[:,self.global_detections[0] == i]
                     # Save traj. point locations in global_traj
-                    #temp_glob_det_mask = np.isin(self.global_detections[2],temp_glob_det[2])
                     temp_glob_det_mask = np.where(self.global_detections[0] == i)
                     # Save camera detections that are used within the global traj. 
                     _,temp_glob_traj_idx,temp_glob_traj_det_idx = np.intersect1d(temp_glob_traj[2],self.detections[i][0],return_indices=True,assume_unique=True)
                     # Save camera detections that are used within global detections. 
                     _,temp_glob_det_idx,temp_det_idx = np.intersect1d(temp_glob_det[1],self.detections[i][0],return_indices=True,assume_unique=True)  
                     
-                    #assert np.sum(temp_glob_traj_mask == True) == len(temp_glob_traj_det_idx)
-                    assert np.shape(temp_glob_traj_mask)[1] == np.shape(temp_glob_traj_det_idx)[0]
-                    assert np.shape(temp_glob_det_mask)[1] == np.shape(self.detections_global[i][0])[0]
+                    assert np.shape(temp_glob_traj_mask)[1] == np.shape(temp_glob_traj_det_idx)[0],'# of 3D points must equal # of detections'
+                    assert np.shape(temp_glob_det_mask)[1] == np.shape(self.detections_global[i][0])[0],'# of 2D points must equal # of selected global detections'
                     
                     # Update global detection timestamps for cam_id
                     self.global_detections[2,temp_glob_det_mask] = self.detections_global[i][0]
@@ -370,9 +365,9 @@ class Scene:
 
         - Accounts for motion prior
 
-        Different modes are available: 'dist', 'xy_1D', 'xy_2D', 'each'
+        - Motion priors available: 'F', 'KE'
 
-        computes error for motion prior regularization
+        - computes error for motion prior regularization terms 
         '''
 
         interval = self.spline['int']
@@ -418,9 +413,10 @@ class Scene:
                     weights = np.ones(traj_part.shape[1]) * motion_weights
                     mot_err = self.motion_prior(traj_part,weights,prior=self.settings['motion_type'])
                     mot_err_res = np.concatenate((mot_err_res, mot_err))
+                    assert self.settings['motion_type'] == 'F' or self.settings['motion_type'] == 'KE','Motion type must be either F or KE' 
                     if self.settings['motion_type'] == 'F':
                         traj_ts = np.concatenate((traj_ts, traj_part[0,1:-1]))  
-                    else:
+                    elif self.settings['motion_type'] == 'KE':
                         traj_ts = np.concatenate((traj_ts, traj_part[0,1:])) 
             _,traj_idx,_ = np.intersect1d(self.traj[0],traj_ts,assume_unique=True,return_indices=True)
             motion_error[traj_idx] = mot_err_res

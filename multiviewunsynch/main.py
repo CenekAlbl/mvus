@@ -46,26 +46,23 @@ while True:
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
 
     # Bundle adjustment
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'],\
         rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after first BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
-    #print('\nMean error of each camera after BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
-
+    
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
-    #res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'])
+    # Bundle adjustment after outlier removal
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'],\
         rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
-    #print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x,motion_prior=flight.settings['motion_prior'])) for x in flight.sequence[:cam_temp]]))
-
+    
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
@@ -85,8 +82,8 @@ while True:
     cam_temp += 1
     flight.traj_len = []
 
-# Visualize the 3D trajectory
 flight.spline_to_traj(sampling_rate=1)
+# Visualize the 3D trajectory
 #vis.show_trajectory_3D(flight.traj[1:],line=False)
 
 # Align with the ground truth data if available
