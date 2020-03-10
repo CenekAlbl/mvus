@@ -74,6 +74,7 @@ The reconstruction configuration file initializes the settings and defines the d
 }
 ```
 A description of each setting flag in the configuration flag is as follows:
+
 | Settings  | Description |
 | ------------- | ------------- |
 | "num_detections" | Content Cell  |
