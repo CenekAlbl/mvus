@@ -76,28 +76,19 @@ The reconstruction configuration file initializes the settings and defines the d
 A description of each setting flag in the configuration flag is as follows:
 
 ### "comments":
-| Flag  | Description |
-| ------------- | ------------- |
-| "num_detections" | Content Cell  |
-| "opt_calib"  | Content Cell  |
-| "cf_exact"  | Content Cell  |
-| "undist_points"  | Content Cell  |
+- specific information regarding the reconstruction job 
 
 ### "neccessary inputs":
 | Flag  | Description |
 | ------------- | ------------- |
-| "num_detections" | Content Cell  |
-| "opt_calib"  | Content Cell  |
-| "cf_exact"  | Content Cell  |
-| "undist_points"  | Content Cell  |
+| "path_detections" | Content Cell  |
+| "path_cameras"  | Content Cell  |
+| "corresponding_frames  | Content Cell  |
 
 ### "optional inputs":
 | Flag  | Description |
 | ------------- | ------------- |
-| "num_detections" | Content Cell  |
-| "opt_calib"  | Content Cell  |
-| "cf_exact"  | Content Cell  |
-| "undist_points"  | Content Cell  |
+| "ground_truth" | Content Cell  |
 
 ### "settings":
 | Flag  | Description |
