@@ -97,7 +97,7 @@ The reconstruction configuration file initializes the settings and defines the d
 ```
 A description of each section in the configuration file is as follows:
 
-#### comments
+#### "comments":
 - notes/information on the reconstruction configuration 
 
 #### neccessary-inputs
