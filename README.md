@@ -13,12 +13,10 @@
     + [necessary inputs](#necessary-inputs)
     + [optional inputs](#optional-inputs)
     + [settings](#settings)
-  * [Detection Tracks](#detection-tracks)
-  * [Camera Intrinsic Parameters](#camera-intrinsic-parameters)
+  * [2D Detection Tracks](#2d-detection-tracks)
+  * [Intrinsic Camera Parameters](#intrinsic-camera-parameters)
 
 - [Outputs](#outputs)
-  * [Sub-heading](#sub-heading-1)
-    + [Sub-sub-heading](#sub-sub-heading-1)
 
 <!-- toc -->
 
@@ -120,7 +118,7 @@ notes/information on the reconstruction configuration
 | "motion_reg" : *true/false* | determines whether to apply motion prior regularization to the reconstruction |
 | "motion_type" : *"F"* or *"KE"* | determines whether to apply least force (*"F"*) or least kinetic energy (*"KE"*) regularization |
 | "motion_weights" : *int/float*  | weight factor to apply to the motion prior regularization error term  |
-| "cut_detection_second"  | Content Cell  |
+| "cut_detection_second"  | number of seconds to remove from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view  |
 | "camera_sequence": * default [] or optional list*  | optional list to fix the order in which camera detections are added to the reconstruction. The camera detections will be automatically determined based on the number of inlier correspondences in the even an empty list, *[]*, is provided.     |
 | "ref_cam": *int*  | determines which camera in the network to start the reconstruction with  |
 | "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[cv2 findFundametalMat](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat)  |
@@ -132,7 +130,7 @@ notes/information on the reconstruction configuration
 | "path output" | path of the saved reconstruction result as a pickle file |
 
 
-### Detection Tracks
+### 2D Detection Tracks
 text files containing the 2D detections of the target for each camera. The file should contain 
 one detection per row, with each row/detection containing three columns in the following order:
 
@@ -153,7 +151,7 @@ Example *.txt* file:
 520 294 932
 ```
 
-### Camera Intrinsic Parameters
+### Intrinsic Camera Parameters
 Each camera in the network should have a corresponding calibration file in **JSON** format containing the following information as shown in the example below:
 ```
 {
