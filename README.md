@@ -170,6 +170,17 @@ Each camera in the network should have a corresponding calibration file in **JSO
 
 }
 ```
+| Flag  | Description |
+| ------------- | ------------- |
+| "K-matrix" | 3*3 matrix of intrinsic camera parameters in the form:
+<p align="left">
+<img src="k_matrix.jpg" width="200" alt="Intrinsic camera parameter matrix">
+</p>
+
+    where:
+        - (cx, cy) is a principal point that is usually at the image center.
+        - fx, fy are the focal lengths expressed in pixel units. |
+
 - "K-matrix": 3*3 matrix of intrinsic camera parameters in the form:
 
 <p align="left">
