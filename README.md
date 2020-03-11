@@ -134,7 +134,7 @@ notes/information on the reconstruction configuration
 text files containing the 2D detections of the target for each camera. The file should contain 
 one detection per row, with each row/detection containing three columns in the following order:
 
-x-coordinate,y-coordinate, frame-id
+|**x-coordinate**|**y-coordinate**|**frame-id**|
 
 Example *.txt* file:
 
