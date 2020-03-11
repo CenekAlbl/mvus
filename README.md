@@ -91,14 +91,14 @@ A description of each section in the configuration file is as follows:
 | "ground_truth" | path to ground truth trajectory data if available |
 
 ### "settings":
-| Flag  | Description |
+| Flag    | Description |
 | ------------- | ------------- |
 | "num_detections": int | maximum number of detections to load from each camera track  |
-| "opt_calib" : true/false  | determines whether to optimize the intrinsic camera parameters |
-| "cf_exact" : true/false  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
+| "opt_calib" : *true/false*  | determines whether to optimize the intrinsic camera parameters |
+| "cf_exact" : *true/false*  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
 | "undist_points" : *true/false* | determines whether to undistort the 2D detections  |
 | "rolling_shutter" : *true/false* | determines whether to apply rolling shutter correction  |
-| "init_rs": *int [0,1]/float list* | determines initial rolling shutter correction values applied to each camera  |
+| "init_rs": *int/float list* | determines initial rolling shutter correction value applied to each camera  |
 | "rs_bounds" : *true/false* | determines whether to bound rolling shutter read out speed to between 0 and 1 |
 | "motion_reg" : *true/false* | determines whether to apply motion prior regularization to the reconstruction |
 | "motion_type" : *"F"* or *"KE"* | determines whether to apply least force (*"F"*) or least kinetic energy (*"KE"*) regularization |
@@ -106,7 +106,7 @@ A description of each section in the configuration file is as follows:
 | "cut_detection_second"  | Content Cell  |
 | "camera_sequence": * default [] or optional list*  | optional list to fix the order in which camera detections are added to the reconstruction. The camera detections will be automatically determined based on the number of inlier correspondences in the even an empty list, *[]*, is provided.     |
 | "ref_cam": *int*  | determines which camera in the network to start the reconstruction with  |
-| "thres_Fmatix"  | Content Cell  |
+| "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[cv2 findFundametalMat](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat)  |
 | "thres_PnP"  | Content Cell  |
 | "thres_outlier" | Content Cell  |
 | "thres_triangulation"  | Content Cell  |
@@ -120,6 +120,8 @@ text files containing the 2D detections of the target for each camera. The file 
 one detection per row, with each row/detection containing three columns in the following order:
 
 x-coordinate,y-coordinate, frame-id
+
+Example *.txt* file:
 
 ```
 525 313 923
@@ -177,7 +179,7 @@ Each camera in the network should have a corresponding calibration file in json 
 
 # Outputs
 
-- Reconstructed trajectory of the detected object
+- Set of splines representing the reconstructed trajectory of the detected object. 
 
 
 ## For developing
