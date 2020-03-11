@@ -93,8 +93,8 @@ A description of each section in the configuration file is as follows:
 ### "settings":
 | Flag  | Description |
 | ------------- | ------------- |
-| "num_detections" | Content Cell  |
-| "opt_calib"  | Content Cell  |
+| "num_detections" | maximum number of detections to load from each camera track  |
+| "opt_calib" : true/false  | determines whether to optimize the intrinsic camera parameters |
 | "cf_exact"  | Content Cell  |
 | "undist_points"  | Content Cell  |
 | "num_detections" | Content Cell  |
