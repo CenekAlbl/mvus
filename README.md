@@ -76,14 +76,14 @@ The reconstruction configuration file initializes the settings and defines the d
 A description of each section in the configuration file is as follows:
 
 ### "comments":
-- specific information to the reconstruction job 
+- notes/information on the reconstruction configuration 
 
 ### "neccessary inputs":
 | Flag  | Description |
 | ------------- | ------------- |
 | "path_detections" | path to 2d detections  |
 | "path_cameras"  | path to camera calibration JSON files  |
-| "corresponding_frames  | initial corresponding frame indicies between camera streams|
+| "corresponding_frames"  | initial corresponding frame indicies between camera streams|
 
 ### "optional inputs":
 | Flag  | Description |
@@ -93,16 +93,15 @@ A description of each section in the configuration file is as follows:
 ### "settings":
 | Flag  | Description |
 | ------------- | ------------- |
-| "num_detections" | maximum number of detections to load from each camera track  |
+| "num_detections": int | maximum number of detections to load from each camera track  |
 | "opt_calib" : true/false  | determines whether to optimize the intrinsic camera parameters |
-| "cf_exact"  | Content Cell  |
-| "undist_points"  | Content Cell  |
-| "num_detections" | Content Cell  |
-| "rolling_shutter"  | Content Cell  |
-| "init_rs" | Content Cell  |
-| "rs_bounds" | Content Cell |
-| "motion_reg" | Content Cell |
-| "motion_type"  | Content Cell  |
+| "cf_exact" : true/false  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
+| "undist_points" : true/false | determines whether to undistort the 2D detections  |
+| "rolling_shutter" : true/false  | determines whether to apply rolling shutter correction  |
+| "init_rs" int [0,1] or float list for each camera | determines initial rolling shutter correction values  |
+| "rs_bounds" : true/false | determines whether to bound rolling shutter read out speed to between 0 and 1 |
+| "motion_reg" : true/false | determines whether to apply motion prior regularization to the reconstruction |
+| "motion_type" : "F" or "KE" | determines whether to apply least force ("F") or least kinetic energy ("KE") regularization |
 | "motion_weights"  | Content Cell  |
 | "cut_detection_second"  | Content Cell  |
 | "camera_sequence"  | Content Cell  |
