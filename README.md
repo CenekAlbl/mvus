@@ -14,7 +14,7 @@
     + [optional inputs](#optional-inputs)
     + [settings](#settings)
   * [Detection Tracks](#detection-tracks)
-  * [Camera Intrinsic Parameters](#Camera-Intrinsic-Parameters)
+  * [Camera Intrinsic Parameters](#camera-intrinsic-parameters)
 
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
@@ -90,19 +90,19 @@ The reconstruction configuration file initializes the settings and defines the d
     }
 }
 ```
-A description of each section in the configuration file is as follows:
+#### A description of each section in the configuration file is as follows:
 
 #### comments
-- notes/information on the reconstruction configuration 
+notes/information on the reconstruction configuration 
 
 #### necessary inputs
 | Flag  | Description |
 | ------------- | ------------- |
-| "path_detections" | path to 2d detections  |
-| "path_cameras"  | path to camera calibration JSON files  |
+| "path_detections" | path to 2D detections for each camera  |
+| "path_cameras"  | path to calibration JSON files for each camera |
 | "corresponding_frames"  | initial corresponding frame indicies between camera streams|
 
-### optional inputs
+#### optional inputs
 | Flag  | Description |
 | ------------- | ------------- |
 | "ground_truth" | path to ground truth trajectory data if available |
