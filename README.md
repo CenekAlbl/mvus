@@ -10,7 +10,8 @@
 - [Inputs](#inputs)
   * [Configuration-JSON-file](#configuration-json-file)
     + [comments](#comments)
-    + [neccessary-inputs](#neccessary-inputs)
+    + [necessary-inputs](#neccessary-inputs)
+    + [optional inputs](#optional-inputs)
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
     + [Sub-sub-heading](#sub-sub-heading-1)
@@ -90,14 +91,14 @@ A description of each section in the configuration file is as follows:
 #### comments
 - notes/information on the reconstruction configuration 
 
-#### neccessary-inputs
+#### necessary-inputs
 | Flag  | Description |
 | ------------- | ------------- |
 | "path_detections" | path to 2d detections  |
 | "path_cameras"  | path to camera calibration JSON files  |
 | "corresponding_frames"  | initial corresponding frame indicies between camera streams|
 
-### "optional inputs":
+### optional inputs
 | Flag  | Description |
 | ------------- | ------------- |
 | "ground_truth" | path to ground truth trajectory data if available |
