@@ -19,8 +19,8 @@
 
 # Table of Contents
 - [Inputs](#inputs)
-  * [Configuration-JSON-file](#Configuration JSON file)
-    + ["comments"](#"comments")
+  * [Configuration-JSON-file](#configuration JSON file)
+    + ["comments"](#"comments":)
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
     + [Sub-sub-heading](#sub-sub-heading-1)
