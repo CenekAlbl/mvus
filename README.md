@@ -20,7 +20,7 @@
 # Table of Contents
 - [Inputs](#inputs)
   * [Configuration](#configuration-json-file)
-    + ["comments"](#comments")
+    + [comments](#comments)
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
     + [Sub-sub-heading](#sub-sub-heading-1)
