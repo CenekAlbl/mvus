@@ -8,10 +8,14 @@
 
 ## Table of Contents
 - [Inputs](#inputs)
-  * [Configuration-JSON-file](#configuration-json-file)
+  * [Configuration JSON file](#configuration-json-file)
     + [comments](#comments)
-    + [necessary-inputs](#neccessary-inputs)
+    + [necessary inputs](#necessary-inputs)
     + [optional inputs](#optional-inputs)
+    + [settings](#settings)
+  * [Detection Tracks](#detection-tracks)
+  * [Camera Intrinsic Parameters](#Camera-Intrinsic-Parameters)
+
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
     + [Sub-sub-heading](#sub-sub-heading-1)
@@ -20,7 +24,7 @@
 
 # Inputs
 
-### Configuration-JSON-file
+### Configuration JSON file
 The reconstruction configuration file initializes the settings and defines the data regarding the 2D tracks and cameras that are used in the flight reconstruction. The file shall be in json format. An example config file is as follows:
 
 ```
@@ -91,7 +95,7 @@ A description of each section in the configuration file is as follows:
 #### comments
 - notes/information on the reconstruction configuration 
 
-#### necessary-inputs
+#### necessary inputs
 | Flag  | Description |
 | ------------- | ------------- |
 | "path_detections" | path to 2d detections  |
@@ -103,7 +107,7 @@ A description of each section in the configuration file is as follows:
 | ------------- | ------------- |
 | "ground_truth" | path to ground truth trajectory data if available |
 
-### "settings":
+### settings
 | Flag    | Description |
 | ------------- | ------------- |
 | "num_detections": int | maximum number of detections to load from each camera track  |
@@ -128,7 +132,7 @@ A description of each section in the configuration file is as follows:
 | "path output" | path of the saved reconstruction result as a pickle file |
 
 
-### Detection tracks for each Camera
+### Detection Tracks
 text files containing the 2D detections of the target for each camera. The file should contain 
 one detection per row, with each row/detection containing three columns in the following order:
 
@@ -149,8 +153,8 @@ Example *.txt* file:
 520 294 932
 ```
 
-### Camera Intrinsic Parameter json Files
-Each camera in the network should have a corresponding calibration file in json format containing the following information as shown in the example below:
+### Camera Intrinsic Parameters
+Each camera in the network should have a corresponding calibration file in **JSON** format containing the following information as shown in the example below:
 ```
 {
     "comment":["Templete for providing camera information.",
@@ -178,16 +182,14 @@ Each camera in the network should have a corresponding calibration file in json 
         - (cx, cy) is a principal point that is usually at the image center.
         - fx, fy are the focal lengths expressed in pixel units.
 
-- "distCoeff": a vector of [k1,k2,p1,p2[,k3]]
-    
-    where:
+- "distCoeff": a vector of ```[k1,k2,p1,p2[,k3]]``` where:
+
         - k1, k2, k3 are radial distortion coefficients. 
         - p1 and p2 are tangential distortion coefficients. 
 
 - "fps": nominal fixed frame rate of the camera
 
 - "resolution": sensor resolution of the camera
-
 
 
 # Outputs
