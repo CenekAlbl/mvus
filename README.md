@@ -96,23 +96,23 @@ A description of each section in the configuration file is as follows:
 | "num_detections": int | maximum number of detections to load from each camera track  |
 | "opt_calib" : true/false  | determines whether to optimize the intrinsic camera parameters |
 | "cf_exact" : true/false  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
-| "undist_points" : true/false | determines whether to undistort the 2D detections  |
-| "rolling_shutter" : true/false  | determines whether to apply rolling shutter correction  |
-| "init_rs" int [0,1] or float list for each camera | determines initial rolling shutter correction values  |
-| "rs_bounds" : true/false | determines whether to bound rolling shutter read out speed to between 0 and 1 |
-| "motion_reg" : true/false | determines whether to apply motion prior regularization to the reconstruction |
-| "motion_type" : "F" or "KE" | determines whether to apply least force ("F") or least kinetic energy ("KE") regularization |
-| "motion_weights"  | Content Cell  |
+| "undist_points" : *true/false* | determines whether to undistort the 2D detections  |
+| "rolling_shutter" : *true/false* | determines whether to apply rolling shutter correction  |
+| "init_rs": *int [0,1]/float list* | determines initial rolling shutter correction values applied to each camera  |
+| "rs_bounds" : *true/false* | determines whether to bound rolling shutter read out speed to between 0 and 1 |
+| "motion_reg" : *true/false* | determines whether to apply motion prior regularization to the reconstruction |
+| "motion_type" : *"F"* or *"KE"* | determines whether to apply least force (*"F"*) or least kinetic energy (*"KE"*) regularization |
+| "motion_weights" : *int/float*  | weight factor to apply to the motion prior regularization error term  |
 | "cut_detection_second"  | Content Cell  |
-| "camera_sequence"  | Content Cell  |
-| "ref_cam"  | Content Cell  |
+| "camera_sequence": * default [] or optional list*  | optional list to fix the order in which camera detections are added to the reconstruction. The camera detections will be automatically determined based on the number of inlier correspondences in the even an empty list, *[]*, is provided.     |
+| "ref_cam": *int*  | determines which camera in the network to start the reconstruction with  |
 | "thres_Fmatix"  | Content Cell  |
 | "thres_PnP"  | Content Cell  |
 | "thres_outlier" | Content Cell  |
 | "thres_triangulation"  | Content Cell  |
 | "smooth_factor" | Content Cell  |
 | "sampling_rate"  | Content Cell  |
-| "path output" | Content Cell |
+| "path output" | path of the saved output pickle file |
 
 
 ### Detection tracks for each Camera
@@ -120,6 +120,19 @@ text files containing the 2D detections of the target for each camera. The file 
 one detection per row, with each row/detection containing three columns in the following order:
 
 x-coordinate,y-coordinate, frame-id
+
+```
+525 313 923
+526 311 924
+524 309 925
+524 307 926
+523 305 927
+522 303 928
+521 301 929
+521 299 930
+521 297 931
+520 294 932
+```
 
 ### Camera Intrinsic Parameter json Files
 Each camera in the network should have a corresponding calibration file in json format containing the following information as shown in the example below:
