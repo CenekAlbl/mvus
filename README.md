@@ -5,22 +5,12 @@
 <img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
 </p>
 
-- [Heading](#heading)
-  * [Sub-heading](#sub-heading)
-    + [Sub-sub-heading](#sub-sub-heading)
-- [Heading](#heading-1)
-  * [Sub-heading](#sub-heading-1)
-    + [Sub-sub-heading](#sub-sub-heading-1)
-- [Heading](#heading-2)
-  * [Sub-heading](#sub-heading-2)
-    + [Sub-sub-heading](#sub-sub-heading-2)
 
-
-
-# Table of Contents
+## Table of Contents
 - [Inputs](#inputs)
   * [Configuration-JSON-file](#configuration-json-file)
-    + ["comments":](#"comments":)
+    + [comments](#comments)
+    + [neccessary-inputs](#neccessary-inputs)
 - [Outputs](#outputs)
   * [Sub-heading](#sub-heading-1)
     + [Sub-sub-heading](#sub-sub-heading-1)
@@ -97,7 +87,7 @@ The reconstruction configuration file initializes the settings and defines the d
 ```
 A description of each section in the configuration file is as follows:
 
-#### "comments":
+#### comments
 - notes/information on the reconstruction configuration 
 
 #### neccessary-inputs
