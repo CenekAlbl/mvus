@@ -136,7 +136,7 @@ one detection per row, with each row/detection containing three columns in the f
 
 |**x-coordinate**|**y-coordinate**|**frame-id**|
 
-Example *.txt* file:
+**Example**:
 
 ```
 525 313 923
@@ -170,6 +170,8 @@ Each camera in the network should have a corresponding calibration file in **JSO
 
 }
 ```
+#### A description of each section in the calibration file is as follows:
+
 | Flag  | Description |
 | ------------- | ------------- |
 | "K-matrix" | 3*3 matrix of intrinsic camera parameters in the form:
