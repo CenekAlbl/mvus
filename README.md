@@ -181,7 +181,6 @@ Each camera in the network should have a corresponding calibration file in **JSO
         - (cx, cy) is a principal point that is usually at the image center.
         - fx, fy are the focal lengths expressed in pixel units.
 
-| Flag  | Description |
 | ------------- | ------------- |
 | "distCoeff" | a vector of ```[k1,k2,p1,p2[,k3]]``` where k1, k2, k3 are radial distortion coefficients and p1 and p2 are tangential distortion coefficients. |
 | "fps"| nominal fixed frame rate of the camera |
