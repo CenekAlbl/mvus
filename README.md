@@ -5,6 +5,14 @@
 <img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
 </p>
 
+- [Heading](# Inputs)
+  * [Sub-heading](### Configuration JSON file)
+    + [Sub-sub-heading](### "comments")
+- [Heading](# Outputs)
+  * [Sub-heading](#sub-heading-1)
+    + [Sub-sub-heading](#sub-sub-heading-1)
+
+
 # Inputs
 
 ### Configuration JSON file
