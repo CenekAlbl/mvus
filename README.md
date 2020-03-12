@@ -190,6 +190,88 @@ Each camera in the network should have a corresponding calibration file in **JSO
 
 # Outputs
 
+#### The output object of the bundle adjustment procedure contains the following attributes:
+
+| Attribute  | Description |
+| ------------- | ------------- |
+| alpha | optimized nominal frame rate of each network camera|
+| beta  | optimized relative time offset between each camera and the reference camera |
+| beta_after_Fbeta  | initial time offset estimate between each camera and the reference camera as determined by the fundamental matrix/time offset minimal solver|
+| cameras  | optimized [parameters](#cameras) describing each network camera |
+| cf  | initial corresponding frame indicies between camera streams|
+| detections  | 2D detections for each camera with camera time stamps. |
+| detections_global  | 2D detections for each camera with global time stamps relative to the reference camera.|
+| detections_raw  | |
+| find_order: *True/False* | defines whether the order of camera additions were defined automatically or manually|
+| frame_id_all  | combined frame_ids from all network cameras|
+| global_detections  | combined detections from all cameras with global time stamps|
+| global_time_stamps_all | combined global timestamps from all network cameras|
+| global_traj  | a combined set of 3D points interpolated from the global stamps of each camera|
+| gt| *optional* file location and sampling frequency of the ground-truth 3D trajectory for reconstruction accuracy evaluation.|
+| out  | output 3D trajectory transformed to the provided ground-truth. See [out](#out). |
+| ref_cam | index of the camera in the network that is used as the reference camera. Default is 0.|
+| rs  | optimized rolling-shutter read-out speed for each camera|
+| sequence | sequence of camera indexes arranged in the order in which they were added to the reconstruction|
+| settings | initial settings that were applied in the reconstruction as defined in the config JSON file. |
+| spline| time-step interval over which a spline was fit to the trajectory and the spline parameters that describe the spline for each interval.|
+| traj  | set of 3D points sampled from the reconstruction splines|
+| traj_len | number of points in the sample trajectory.|
+| visible  | bool defining whether a given camera detection is visible within a spline interval.|
+
+#### The following output attributes contain the following sub-attributes:
+
+#### cameras
+| Attribute  | Description |
+| ------------- | ------------- |
+| K | path to ground truth trajectory data if available |
+| P | path to ground truth trajectory data if available |
+| R | path to ground truth trajectory data if available |
+| c | path to ground truth trajectory data if available |
+| d | path to ground truth trajectory data if available |
+| fps | path to ground truth trajectory data if available 
+| resolution | path to ground truth trajectory data if available |
+| t | path to ground truth trajectory data if available |
+
+#### out
+| Attribute  | Description |
+| ------------- | ------------- |
+| align_param | path to ground truth trajectory data if available |
+| error | path to ground truth trajectory data if available |
+| gt | path to ground truth trajectory data if available |
+| reconst_tran | path to ground truth trajectory data if available |
+| tran_matrix | path to ground truth trajectory data if available |
+
+### settings
+| Flag    | Description |
+| ------------- | ------------- |
+| "num_detections": int | maximum number of detections to load from each camera track  |
+| "opt_calib" : *true/false*  | determines whether to optimize the intrinsic camera parameters |
+| "cf_exact" : *true/false*  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
+| "undist_points" : *true/false* | determines whether to undistort the 2D detections  |
+| "rolling_shutter" : *true/false* | determines whether to apply rolling shutter correction  |
+| "init_rs": *int/float list* | determines initial rolling shutter correction value applied to each camera  |
+| "rs_bounds" : *true/false* | determines whether to bound rolling shutter read out speed to between 0 and 1 |
+| "motion_reg" : *true/false* | determines whether to apply motion prior regularization to the reconstruction |
+| "motion_type" : *"F"* or *"KE"* | determines whether to apply least force (*"F"*) or least kinetic energy (*"KE"*) regularization |
+| "motion_weights" : *int/float*  | weight factor to apply to the motion prior regularization error term  |
+| "cut_detection_second"  | number of seconds to remove from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view  |
+| "camera_sequence": * default [] or optional list*  | optional list to fix the order in which camera detections are added to the reconstruction. The camera detections will be automatically determined based on the number of inlier correspondences in the even an empty list, *[]*, is provided.     |
+| "ref_cam": *int*  | determines which camera in the network to start the reconstruction with  |
+| "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[cv2 findFundametalMat](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat)  |
+| "thres_PnP"  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[cv2 solvePnPRANSAC, reprojectionError](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat) |
+| "thres_outlier" | Maximum reprojection error in pixels beyond which an associated 2D detection is removed from a given camera track. |
+| "thres_triangulation"  | Maximum reprojection error in pixels below which an associated triangulated 3D point is added to the trajectory.  |
+| "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. These thresholds are used to scale the smoothness factor within the spline function that controls the balance between closeness of fit and smoothness of the spline. See: [scipy.interpolate.splprep](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html)|
+| "sampling_rate": *default 1*  | time step interval at which the set of splines representing the reconstructed trajectory is sampled to obtain a discrete set of 3D points. |
+| "path output" | path of the saved reconstruction result as a pickle file |
+
+### spline
+| Flag    | Description |
+| ------------- | ------------- |
+| int | maximum number of detections to load from each camera track  |
+| tck | determines whether to optimize the intrinsic camera parameters |
+
+
 - A set of splines representing the reconstructed trajectory of the detected object.
  
 
