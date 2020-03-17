@@ -258,11 +258,11 @@ Each camera in the network should have a corresponding calibration file in **JSO
 | "rolling_shutter" : *True/False* | Defines whether rolling shutter distortion correction was applied during the reconstruction  |
 | "rs_bounds" : *True/False* | Defines whether rolling shutter read out speed was bound between 0 and 1 |
 | "sampling_rate": *default 1*  | Time step interval at which the set of splines representing the reconstructed trajectory was sampled to obtain a discrete set of 3D points. |
-| "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. See [Inputs>settings>smooth_factor](#smooth_factor) |
-| "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[Inputs>settings>thres_Fmatix](#thres_Fmatix) |
-| "thres_PnP"  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[Inputs>settings>thres_PnP](#thres_PnP) |
-| "thres_outlier" | Maximum reprojection error in pixels beyond which an associated 2D detection is removed from a given camera track. |
-| "thres_triangulation"  | Maximum reprojection error in pixels below which an associated triangulated 3D point is added to the trajectory.  |
+| "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. See [Inputs>settings>smooth_factor](#settings) |
+| "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[Inputs>settings>thres_Fmatix](#settings) |
+| "thres_PnP"  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[Inputs>settings>thres_PnP](#settings) |
+| "thres_outlier" | Maximum reprojection error in pixels beyond which an associated 2D detection was removed from a given camera track. |
+| "thres_triangulation"  | Maximum reprojection error in pixels below which an associated triangulated 3D point was added to the trajectory.  |
 | "undist_points" : *true/false* | defines whether the 2D detections were undistorted   |
 
 
@@ -272,9 +272,12 @@ Each camera in the network should have a corresponding calibration file in **JSO
 | int |   |
 | tck |  |
 
+### traj
 
-- A set of splines representing the reconstructed trajectory of the detected object.
- 
+### traj_len
+
+### visible
+
 
 
 
