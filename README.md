@@ -235,41 +235,42 @@ Each camera in the network should have a corresponding calibration file in **JSO
 #### out
 | Attribute  | Description |
 | ------------- | ------------- |
-| align_param | path to ground truth trajectory data if available |
-| error | path to ground truth trajectory data if available |
-| gt | path to ground truth trajectory data if available |
-| reconst_tran | path to ground truth trajectory data if available |
-| tran_matrix | path to ground truth trajectory data if available |
+| align_param |  |
+| error |  |
+| gt |  |
+| reconst_tran |  |
+| tran_matrix |  |
 
 ### settings
 | Flag    | Description |
 | ------------- | ------------- |
-| "num_detections": int | maximum number of detections to load from each camera track  |
-| "opt_calib" : *true/false*  | determines whether to optimize the intrinsic camera parameters |
-| "cf_exact" : *true/false*  | determines whether to use the exact corresponding frames offsets provided or to optimize them  |
-| "undist_points" : *true/false* | determines whether to undistort the 2D detections  |
-| "rolling_shutter" : *true/false* | determines whether to apply rolling shutter correction  |
-| "init_rs": *int/float list* | determines initial rolling shutter correction value applied to each camera  |
-| "rs_bounds" : *true/false* | determines whether to bound rolling shutter read out speed to between 0 and 1 |
-| "motion_reg" : *true/false* | determines whether to apply motion prior regularization to the reconstruction |
-| "motion_type" : *"F"* or *"KE"* | determines whether to apply least force (*"F"*) or least kinetic energy (*"KE"*) regularization |
-| "motion_weights" : *int/float*  | weight factor to apply to the motion prior regularization error term  |
-| "cut_detection_second"  | number of seconds to remove from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view  |
-| "camera_sequence": * default [] or optional list*  | optional list to fix the order in which camera detections are added to the reconstruction. The camera detections will be automatically determined based on the number of inlier correspondences in the even an empty list, *[]*, is provided.     |
-| "ref_cam": *int*  | determines which camera in the network to start the reconstruction with  |
+| "camera_sequence": * default [] or optional list*  | List defining the order in which camera detections were added to the reconstruction.|
+| "cf_exact" : *True/False*  | Defines whether the corresponding frame offsets provided in the config file were used in the reconstruction or whether the solved values from the minimal solver were used. |
+| "cut_detection_second"  | Number of seconds that were removed from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view.  |
+| "init_rs": *int/float list* | Defines rolling shutter correction values determined for each camera after the reconstruction.  |
+| motion_reg : *True/False* | Defines whether motion prior regularization was applied to the reconstruction. |
+| "motion_type" : *"F"* or *"KE"* | Defines whether the least force (*"F"*) or least kinetic energy (*"KE"*) regularization was applied in reconstruction |
+| "motion_weights" : *int/float*  | Weight factor applied to the motion prior regularization error term  |
+| "num_detections": int | maximum number of detections loaded from each camera track.  |
+| "opt_calib" : *True/False*  | Defines whether the intrinsic camera parameters were optimized in the reconstruction. |
+| "path output" | Path of the reconstruction result saved as a pickle file |
+| "ref_cam": *int*  | Defines which camera in the network the reconstruction was started with.  |
+| "rolling_shutter" : *True/False* | Defines whether rolling shutter distortion correction was applied during the reconstruction  |
+| "rs_bounds" : *True/False* | Defines whether rolling shutter read out speed was bound between 0 and 1 |
+| "sampling_rate": *default 1*  | Time step interval at which the set of splines representing the reconstructed trajectory was sampled to obtain a discrete set of 3D points. |
+| "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. See [Inputs>settings](#inputs ###settings) These thresholds are used to scale the smoothness factor within the spline function that controls the balance between closeness of fit and smoothness of the spline. See: [scipy.interpolate.splprep](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html)|
 | "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[cv2 findFundametalMat](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat)  |
 | "thres_PnP"  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[cv2 solvePnPRANSAC, reprojectionError](https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#findfundamentalmat) |
 | "thres_outlier" | Maximum reprojection error in pixels beyond which an associated 2D detection is removed from a given camera track. |
 | "thres_triangulation"  | Maximum reprojection error in pixels below which an associated triangulated 3D point is added to the trajectory.  |
-| "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. These thresholds are used to scale the smoothness factor within the spline function that controls the balance between closeness of fit and smoothness of the spline. See: [scipy.interpolate.splprep](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html)|
-| "sampling_rate": *default 1*  | time step interval at which the set of splines representing the reconstructed trajectory is sampled to obtain a discrete set of 3D points. |
-| "path output" | path of the saved reconstruction result as a pickle file |
+| "undist_points" : *true/false* | defines whether the 2D detections were undistorted   |
+
 
 ### spline
 | Flag    | Description |
 | ------------- | ------------- |
-| int | maximum number of detections to load from each camera track  |
-| tck | determines whether to optimize the intrinsic camera parameters |
+| int |   |
+| tck |  |
 
 
 - A set of splines representing the reconstructed trajectory of the detected object.
