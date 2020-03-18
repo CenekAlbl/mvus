@@ -275,12 +275,10 @@ The following parameters are defined for each camera included in the reconstruct
 | Flag    | Description |
 | ------------- | ------------- |
 | int | Time intervals over which the set of splines that describe the trajectory are defined. |
-| tck | A tuple (t,c,k) containing the vector of knots, the B-spline coefficients, and the degree of the spline. See: [scipy.interpolate.splpre](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html) |
+| tck | A tuple (t,c,k) containing the vector of knots, the B-spline coefficients, and the degree of the spline. See: [scipy.interpolate.splprep](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html) |
 
 ### traj
 The set of 3D points that are interpolated from the set of splines that describe the reconstructed trajectory. 
-
-### traj_len
 
 ### visible
 Attribute defining which spline interval a given detection is visible in for each 2D camera track.  
