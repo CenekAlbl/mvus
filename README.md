@@ -223,7 +223,7 @@ Each camera in the network should have a corresponding calibration file in **JSO
 | settings | initial settings that were applied in the reconstruction as defined in the config JSON file. |
 | spline| time-step interval over which a spline was fit to the trajectory and the spline parameters that describe the spline for each interval.|
 | traj  | set of 3D points sampled from the reconstruction splines|
-| traj_len | number of points in the sample trajectory.|
+| traj_len | number of points in the sampled trajectory.|
 | visible  | bool defining whether a given camera detection is visible within a spline interval.|
 
 #### The following output attributes contain the following sub-attributes:
@@ -255,26 +255,26 @@ The following parameters are defined for each camera included in the reconstruct
 ### settings
 | Flag    | Description |
 | ------------- | ------------- |
-| "camera_sequence": * default [] or optional list*  | List defining the order in which camera detections were added to the reconstruction.|
+| "camera_sequence": * optional list*  | List defining the order in which camera detections were added to the reconstruction. *Default [].*| 
 | "cf_exact" : *True/False*  | Defines whether the corresponding frame offsets provided in the config file were used in the reconstruction or whether the solved values from the minimal solver were used. |
-| "cut_detection_second"  | Number of seconds that were removed from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view.  |
+| "cut_detection_second": *int*  | Number of seconds that were removed from each contiguous detection track to reduce influence of misdetections when the object leaves the field of view.  |
 | "init_rs": *int/float list* | Defines rolling shutter correction values determined for each camera after the reconstruction.  |
 | motion_reg : *True/False* | Defines whether motion prior regularization was applied to the reconstruction. |
 | "motion_type" : *"F"* or *"KE"* | Defines whether the least force (*"F"*) or least kinetic energy (*"KE"*) regularization was applied in reconstruction |
 | "motion_weights" : *int/float*  | Weight factor applied to the motion prior regularization error term  |
-| "num_detections": int | maximum number of detections loaded from each camera track.  |
+| "num_detections": *int* | maximum number of detections loaded from each camera track.  |
 | "opt_calib" : *True/False*  | Defines whether the intrinsic camera parameters were optimized in the reconstruction. |
 | "path output" | Path of the reconstruction result saved as a pickle file |
 | "ref_cam": *int*  | Defines which camera in the network the reconstruction was started with.  |
 | "rolling_shutter" : *True/False* | Defines whether rolling shutter distortion correction was applied during the reconstruction  |
 | "rs_bounds" : *True/False* | Defines whether rolling shutter read out speed was bound between 0 and 1 |
-| "sampling_rate": *default 1*  | Time step interval at which the set of splines representing the reconstructed trajectory was sampled to obtain a discrete set of 3D points. |
+| "sampling_rate": *int/float* | Time step interval at which the set of splines representing the reconstructed trajectory was sampled to obtain a discrete set of 3D points. *default 1*|
 | "smooth_factor": *list length 2* | Defines the minimum and maximum ratio between the number of points described by a spline and the number of knots used to parameterize that spline. See [Inputs>settings>smooth_factor](#settings) |
-| "thres_Fmatix"  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[Inputs>settings>thres_Fmatix](#settings) |
-| "thres_PnP"  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[Inputs>settings>thres_PnP](#settings) |
-| "thres_outlier" | Maximum reprojection error in pixels beyond which an associated 2D detection was removed from a given camera track. |
-| "thres_triangulation"  | Maximum reprojection error in pixels below which an associated triangulated 3D point was added to the trajectory.  |
-| "undist_points" : *true/false* | defines whether the 2D detections were undistorted   |
+| "thres_Fmatix": *int/float*  | The maximum distance from a point to an epipolar line in pixels, beyond which the point is considered an outlier and is not used for computing the final fundamental matrix. See:[Inputs>settings>thres_Fmatix](#settings) |
+| "thres_PnP": *int/float*  | Inlier threshold value used by the opencv solvePnPRANSAC procedure. The parameter value is the maximum allowed distance between the observed and computed point projections to consider it an inlier. See:[Inputs>settings>thres_PnP](#settings) |
+| "thres_outlier": *int/float* | Maximum reprojection error in pixels beyond which an associated 2D detection was removed from a given camera track. |
+| "thres_triangulation" : *int/float* | Maximum reprojection error in pixels below which an associated triangulated 3D point was added to the trajectory.  |
+| "undist_points" : *True/False* | defines whether the 2D detections were undistorted   |
 
 
 ### spline
