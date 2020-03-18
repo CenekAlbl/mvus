@@ -221,25 +221,26 @@ Each camera in the network should have a corresponding calibration file in **JSO
 #### The following output attributes contain the following sub-attributes:
 
 #### cameras
+The following parameters are defined for each camera included in the reconstruction:
 | Attribute  | Description |
 | ------------- | ------------- |
-| K | path to ground truth trajectory data if available |
-| P | path to ground truth trajectory data if available |
-| R | path to ground truth trajectory data if available |
-| c | path to ground truth trajectory data if available |
-| d | path to ground truth trajectory data if available |
-| fps | path to ground truth trajectory data if available 
-| resolution | path to ground truth trajectory data if available |
-| t | path to ground truth trajectory data if available |
+| K | 3*3 matrix of optimized intrinsic camera parameters |
+| P | 2D>3D projection matrix |
+| R | rotation matrix. |
+| c | camera center coordinates |
+| d | radial distortion coefficients |
+| fps | nominal fixed frame rate of the camera |
+| resolution | sensor resolution (x,y)  of the camera |
+| t | translation vector of the camera |
 
 #### out
 | Attribute  | Description |
 | ------------- | ------------- |
-| align_param |  |
-| error |  |
-| gt |  |
-| reconst_tran |  |
-| tran_matrix |  |
+| align_param | Array defining the optimized time scale and time offset values determined in the alignment operation between the reconstruction and the ground truth. |
+| error | 3D error (meters) between the reconstructed trajectory points and the provided ground-truth data.  |
+| gt | Set of measured 3D ground truth measurements describing the trajectory. |
+| reconst_tran | Set of transformed reconstructed 3D points used to compare to the ground truth. |
+| tran_matrix | Transformation matrix determined to transform the reconstructed 3D points into the ground truth frame of orientation. |
 
 ### settings
 | Flag    | Description |
@@ -269,14 +270,16 @@ Each camera in the network should have a corresponding calibration file in **JSO
 ### spline
 | Flag    | Description |
 | ------------- | ------------- |
-| int |   |
-| tck |  |
+| int | Time intervals over which the set of splines that describe the trajectory are defined. |
+| tck | A tuple (t,c,k) containing the vector of knots, the B-spline coefficients, and the degree of the spline. See: [scipy.interpolate.splpre](https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html) |
 
 ### traj
+The set of 3D points that are interpolated from the set of splines that describe the reconstructed trajectory. 
 
 ### traj_len
 
 ### visible
+Attribute defining which spline interval a given detection is visible in for each 2D camera track.  
 
 
 
