@@ -225,11 +225,12 @@ Each camera in the network should have a corresponding calibration file in **JSO
 ### Sub-attributes
 #### cameras
 The following parameters are defined for each camera included in the reconstruction:
+
 | Attribute  | Description |
 | ------------- | ------------- |
 | K | 3*3 matrix of optimized intrinsic camera parameters |
-| P | 2D>3D projection matrix |
-| R | rotation matrix. |
+| P | 2D-3D projection matrix |
+| R | camera rotation matrix |
 | c | camera center coordinates |
 | d | radial distortion coefficients |
 | fps | nominal fixed frame rate of the camera |
