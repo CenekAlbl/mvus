@@ -17,6 +17,12 @@
 - [Outputs](#outputs)
   * [Attributes](#attributes)
   * [Sub-attributes](#sub-attributes)
+    + [cameras](#cameras)
+    + [out](#out)
+    + [settings](#setting)
+    + [spline](#spline)
+    + [traj](#traj)
+    + [visible](#visible)
 
 <!-- toc -->
 
