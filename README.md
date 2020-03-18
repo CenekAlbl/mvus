@@ -15,6 +15,8 @@
   * [2D Detection Tracks](#2d-detection-tracks)
   * [Intrinsic Camera Parameters](#intrinsic-camera-parameters)
 - [Outputs](#outputs)
+  * [Attributes](#attributes)
+  * [Sub-attributes](#sub-attributes)
 
 <!-- toc -->
 
@@ -191,7 +193,7 @@ Each camera in the network should have a corresponding calibration file in **JSO
 # Outputs
 
 #### The output object of the bundle adjustment procedure contains the following attributes:
-
+### Attributes
 | Attribute  | Description |
 | ------------- | ------------- |
 | alpha | optimized nominal frame rate of each network camera|
@@ -220,6 +222,7 @@ Each camera in the network should have a corresponding calibration file in **JSO
 
 #### The following output attributes contain the following sub-attributes:
 
+### Sub-attributes
 #### cameras
 The following parameters are defined for each camera included in the reconstruction:
 | Attribute  | Description |
