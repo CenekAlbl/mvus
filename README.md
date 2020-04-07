@@ -1,5 +1,5 @@
 # MultiViewUnsynch
-3D trajectory reconstruction of moving objects using multiple unsynchronized cameras. Requires 2D detections of a moving object in 2+ cameras with sufficient time overlap and reconstructs the objects 3D trajectory along with the camera poses. Only single target currently supported. More details in [our paper](https://arxiv.org/abs/2003.04784).
+3D trajectory reconstruction of moving objects using multiple unsynchronized cameras. Requires 2D detections of a moving object in 2+ cameras with sufficient time overlap and reconstructs the objects 3D trajectory along with the camera poses. Only single target currently supported. More details in [our paper](https://arxiv.org/abs/2003.04784). [Here](https://github.com/CenekAlbl/drone-tracking-datasets) you can find the dataset we used for our experiments.
 
 <p align="center">
 <img src="BA_pipeline.jpg" width="600" alt="Multi-view 3D trajectory reconstruction">
