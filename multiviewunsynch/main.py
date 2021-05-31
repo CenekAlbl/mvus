@@ -52,7 +52,7 @@ while True:
         rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after first BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
-    
+
     flight.remove_outliers(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
 
     # Bundle adjustment after outlier removal
@@ -62,12 +62,12 @@ while True:
         rs_bounds=flight.settings['rs_bounds'])
 
     print('\nMean error of each camera after second BA:    ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
-    
+
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
         break
-    
+
     # Select the next camera if not pre-defined
     flight.select_most_overlap()
 
@@ -84,7 +84,7 @@ while True:
 
 flight.spline_to_traj(sampling_rate=1)
 # Visualize the 3D trajectory
-#vis.show_trajectory_3D(flight.traj[1:],line=False)
+vis.show_trajectory_3D(flight.traj[1:],line=False)
 
 # Align with the ground truth data if available
 flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
