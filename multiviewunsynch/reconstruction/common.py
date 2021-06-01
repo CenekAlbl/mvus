@@ -224,7 +224,7 @@ class Scene:
             vis.draw_detection_matches(self.cameras[t2].img, d2, self.cameras[t1].img, d1)
         
         # add the static part
-        if self.settings['include_static']:
+        if 'include_static' in self.settings.keys() and self.settings['include_static']:
             if debug:
                 # in debug, use static ground truth as 2d featues
                 if self.settings['undist_points']:
@@ -233,7 +233,7 @@ class Scene:
                     pts2 = self.cameras[t1].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
 
                     # plot the ground truth matches
-                    # TODO: check pts_dist == gt_pts
+                    # FIXME: check pts_dist == gt_pts
                     pts1_dist = self.cameras[t1].dist_point2d(pts1.T, method=self.settings['undist_method'])
                     pts2_dist = self.cameras[t2].dist_point2d(pts2.T, method=self.settings['undist_method'])
                     vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
@@ -351,6 +351,96 @@ class Scene:
         self.cameras[t1].decompose()
         self.cameras[t2].decompose()
 
+    def init_static(self, error=10, inlier_only=False, debug=False):
+        t1, t2 = self.sequence[0], self.sequence[1]
+        K1, K2 = self.cameras[t1].K, self.cameras[t2].K
+
+        if debug:
+            # in debug, use static ground truth as 2d featues
+            if self.settings['undist_points']:
+                # undistort the ground truth matches
+                pts1 = self.cameras[t1].undist_point(self.cameras[t1].gt_pts.T, self.settings['undist_method']).T
+                pts2 = self.cameras[t1].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
+
+                # plot the ground truth matches
+                # FIXME: check pts_dist == gt_pts
+                pts1_dist = self.cameras[t1].dist_point2d(pts1.T, method=self.settings['undist_method'])
+                pts2_dist = self.cameras[t2].dist_point2d(pts2.T, method=self.settings['undist_method'])
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
+
+            else:
+                pts1 = self.cameras[t1].gt_pts
+                pts2 = self.cameras[t2].gt_pts
+            
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),pts1.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),pts2.T]))
+
+            # save the matching result, the indices of the ground truth matches are shared across all cameras
+            query_ids = np.arange(self.cameras[t1].gt_pts.shape[0])
+            train_ids = np.arange(self.cameras[t2].gt_pts.shape[0])
+
+            # initialize the matrix for storing matching result
+            match_res1 = -np.ones((self.numCam, self.cameras[t1].gt_pts.shape[0]))
+            match_res2 = -np.ones((self.numCam, self.cameras[t2].gt_pts.shape[0]))
+        
+        else:
+            # Match features
+            pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
+            # draw matches
+            vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
+            # get the valid matches
+            match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+
+            # undistort the matched keypoints
+            if self.settings['undist_points']:
+                pts1 = self.cameras[t1].undist_point(np.array(pts1).T, self.settings['undist_method']).T
+                pts2 = self.cameras[t1].undist_point(np.array(pts2).T, self.settings['undist_method']).T
+
+            # get the valid matches
+            query_ids = np.array([m[0].queryIdx for m in matches])
+            train_ids = np.array([m[0].trainIdx for m in matches])
+            query_ids = query_ids[match_ids]
+            train_ids = train_ids[match_ids]
+
+            # initialize the matrix for storing matching result
+            match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
+            match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
+
+        # save the matching result to feature_dict
+        match_res1[t2,query_ids] = train_ids
+        match_res2[t1,train_ids] = query_ids
+        self.feature_dict[t1] = match_res1
+        self.feature_dict[t2] = match_res2
+
+        # go through the epipolar pipeline for pose estimation and initial scene reconstruction
+        X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
+
+        # save the static part
+        self.static = X[:-1]
+        self.inlier_mask = np.ones(self.static.shape[1])
+
+        # ids of the inliers
+        inlier_ids = np.where(inlier == 1)[0]
+        inlier_ids_masked = inlier_ids[mask]
+
+        # also draw the inlier matches
+        if not debug:
+            matchesMask_inliers = np.zeros((len(matches), 2))
+            match_ids_inliers = match_ids[inlier_ids_masked]
+            matchesMask_inliers[match_ids_inliers] = [1, 0]
+
+            vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+
+        # register these points and store their indices to the cameras
+        self.cameras[t1].index_registered_2d = query_ids[inlier_ids_masked]
+        self.cameras[t1].index_2d_3d = np.arange(self.static.shape[1])
+        self.cameras[t2].index_registered_2d = train_ids[inlier_ids_masked]
+        self.cameras[t2].index_2d_3d = np.arange(self.static.shape[1])
+
+        # construct projections
+        self.cameras[t1].P = np.dot(K1,np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0]]))
+        self.cameras[t2].P = np.dot(K2,P)
+        self.cameras[t1].decompose()
+        self.cameras[t2].decompose()
 
     def traj_to_spline(self,smooth_factor):
         '''
@@ -628,7 +718,7 @@ class Scene:
 
             # if the static part are included, they are added to the beginning of the columns.
             # first parse the pararmeters for the static points
-            if self.settings['include_static']:
+            if 'include_static' in self.settings.keys() and self.settings['include_static']:
                 # the rest of the parameters are the 3d positions of the static scene
                 self.static[:, self.inlier_mask > 0] = x[:num_3d_points * 3].reshape(-1, 3).T
 
@@ -668,7 +758,7 @@ class Scene:
                 error = np.concatenate((error, error_motion_reg))
             
             # also add the errors regarding the static part
-            if self.settings['include_static']:
+            if 'include_static' in self.settings.keys() and self.settings['include_static']:
                 for i in range(numCam):
                     error_each_static = self.error_cam_static(self.sequence[i], mode='each',debug=debug)
                     error = np.concatenate((error, error_each_static))
@@ -841,7 +931,7 @@ class Scene:
         
         # add the static part to BA
         num_3d_points = 0
-        if self.settings['include_static']:
+        if 'include_static' in self.settings.keys() and self.settings['include_static']:
             num_3d_points = self.static[:, self.inlier_mask > 0].shape[1]
             model_static = self.static[:, self.inlier_mask > 0].T.ravel()
             # concatenate the static point_3d to the beginning
@@ -866,7 +956,7 @@ class Scene:
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
         # ignore jac_sparsity matrix for now for the static part
-        if self.settings['include_static']:
+        if 'include_static' in self.settings.keys() and self.settings['include_static']:
             res = least_squares(fn,model,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
         else:
             res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
@@ -874,7 +964,7 @@ class Scene:
         '''After BA'''
         # if the static part are included, they are added to the beginning of the columns.
         # first parse the pararmeters for the static points
-        if self.settings['include_static']:
+        if 'include_static' in self.settings.keys() and self.settings['include_static']:
             # update the 3d positions of the static scene
             self.static[:, self.inlier_mask > 0] = res.x[:num_3d_points * 3].reshape(-1, 3).T
 
@@ -904,7 +994,120 @@ class Scene:
         self.detection_to_global()
 
         return res
+    
+    def BA_static(self, numCam, max_iter=10, debug=False):
+        '''
+        Function:
+            standard BA with static points and camera models
+        '''
 
+        def error_BA(x):
+            '''
+            Function:
+                define the error terms of BA
+            Input:
+                x = parameters to be optimized
+            '''
+            sections = [num_3d_points * 3, numCam * num_camParam]
+            model_static, model_cam = np.split(x, sections)
+
+            # parse the 3d static
+            self.static[:,self.inlier_mask > 0] = model_static.reshape(-1,3).T
+
+            # parse the new camera parameters and poses
+            cams = np.split(model_cam, numCam)
+            for i in range(numCam):
+                self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib'])
+            
+            # compute the error terms
+            error = np.array([])
+            for i in range(numCam):
+                error_static_each = self.error_cam_static(self.sequence[i], mode='each', debug=debug)
+                error = np.concatenate((error, error_static_each))
+            
+            return error
+        
+        def jac_BA():
+            '''
+            Function:
+                define the sparse jaccobian matrix
+            '''
+
+            jac_parts = []
+            num_param = len(model)
+
+            # inlier ids of the static points used for BA
+            inlier_ids = np.where(self.inlier_mask > 0)[0]
+            # loop through all cameras
+            for i in range(numCam):
+                # get camera id
+                cam_id = self.sequence[i]
+                # get the number of registered 2d points in this camera
+                num_pts_2d = self.cameras[cam_id].index_registered_2d.shape[0]
+                # the index of the registered 2d in 3d static points in the inlier set
+                registered_ids = np.in1d(inlier_ids, self.cameras[cam_id].index_2d_3d).nonzeros()[0]
+
+                # initialize the jac mat (the structures of the sparsity matrix are the same in x and y direction)
+                jac_part = lil_matrix((num_pts_2d, num_param))
+
+                # mark all entries relate to this camera as 1 (the first num_3d_points*3 columns are for the static 3d points)
+                start, end = num_3d_points * 3 + i * num_camParam, num_3d_points * 3 + (i+1) * num_camParam
+                jac_part[:, start:end] = 1
+
+                # mark all entries relate to the static 3d points as 1
+                jac_part[np.arange(num_pts_2d), registered_ids] = 1
+                jac_part[np.arange(num_pts_2d), registered_ids + 1] = 1
+                jac_part[np.arange(num_pts_2d), registered_ids + 2] = 1
+
+                # append mat for x direction
+                jac_parts.append(jac_part)
+                # append mat for y direction
+                jac_parts.append(jac_part)
+
+                # FIXME: check if the dimension is the same
+            
+            jac = np.vstack(jac_parts)
+            
+            return jac
+
+        ''' BEFORE BA '''
+        # camera model
+        model_cam = np.array([])
+        num_camParam = 15 if self.settings['opt_calib'] else 6
+        for i in self.sequence[:numCam]:
+            model_cam = np.concatenate((model_cam, self.cameras[i].P2vector(calib=self.settings['opt_calib'])))
+        
+        # 3d static points
+        num_3d_points = self.static[:, self.inlier_mask > 0].shape[1]
+        model_static = self.static[:, self.inlier_mask > 0].T.ravel()
+        # concatenate the static point_3d to the beginning
+        model = np.concatenate((model_static, model_cam))
+
+        print('Number of BA parameters is {}'.format(len(model)))
+
+        ''' BA '''
+        # set the jacobian matrix
+        A = jac_BA()
+        print('Doing BA with {} cameras and {} static points...\n'.format(numCam, num_3d_points))
+
+        # define the error function
+        fn = lambda x: error_BA(x)
+
+        # least-sqaure optimization for BA
+        res = least_squares(fn, model, jac_sparsity=A, tr_solver='lsmr', xtol=1e-12, max_nfev=max_iter, verbose=1)
+
+        ''' AFTER BA '''
+        # parse the result of BA
+        sections = [num_3d_points * 3, numCam * num_camParam]
+        res_static, res_cam = np.split(res.x, sections)
+
+        # update the 3d static points
+        self.static[:, self.inlier_mask > 0] = res_static.reshape(-1,3).T
+
+        # update the camera parameters
+        cams = np.split(res_cam, numCam)
+        for i in range(numCam):
+            self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib'])
 
     def remove_outliers(self, cams, thres=30, verbose=False, debug=False):
         '''
@@ -926,7 +1129,7 @@ class Scene:
                     print('{} out of {} detections are removed for camera {}'.format(sum(error>=thres),sum(error!=0),i))
                 
                 # if the static part is included, also remove outliers in the static part
-                if self.settings['include_static']:
+                if 'include_static' in self.settings.keys() and self.settings['include_static']:
                     # filter out the outliers from the static scene
                     error_static = self.error_cam_static(i, mode='dist', debug=debug)
 
@@ -950,6 +1153,135 @@ class Scene:
                     if verbose:
                         print('{} out of {} static points are removed for camera {}'.format(len(outlier_ids), len(error_static), i))
 
+    def remove_outliers_static(self, cams, thres=30, verbose=False, debug=False):
+        '''
+        Function: 
+            remove the outliers from the static scene
+        '''
+        if thres:
+            for i in cams:
+                # filter out the outliers from the static scene
+                error_static = self.error_cam_static(i, mode='dist', debug=debug)
+
+                # indices of the outliers in the reconstructed 3D points
+                outlier_ids = self.cameras[i].index_2d_3d[error_static >= self.settings['thres_outlier_static']]
+                # maskout these points in the inlier_mask
+                self.inlier_mask[outlier_ids] == 0
+                # remove feature ids corresponds to the outliers from the registered list
+                self.cameras[i].index_registered_2d = self.cameras[i].index_registered_2d[error_static < self.settings['thres_outlier_static']]
+
+                # also update the registered 2d index of the other cameras
+                for j in cams:
+                    if j == i:
+                        continue
+
+                    # find the ids of the outlier in the camera
+                    cond = np.in1d(self.cameras[j].index_2d_3d, outlier_ids)
+                    self.cameras[j].index_2d_3d = self.cameras[j].index_2d_3d[~cond]
+                    self.cameras[j].index_registered_2d = self.cameras[j].index_registered_2d[~cond]
+                
+                if verbose:
+                    print('{} out of {} static points are removed for camera {}'.format(len(outlier_ids), len(error_static), i))
+    
+    def register_new_camera_static(self, cam_id, cams, debug=False):
+        '''
+        Function:
+            find 2d - 3d correspondences between the features in the new camera and existing 3d
+        Input:
+            cam_id = the id of the new camera
+            cams = a sequence of existing cameras
+        Output:
+            pts_2d = the features in the new camera that match the existing 3d points (does not need to undistort the pts, this will be taken care when solving pnp)
+            pts_3d = the matched existing 3d points
+        '''
+        if debug:
+            # use the ground truth matches
+            # initialize the matching result of this new camera to be stored to the dict
+            self.feature_dict[cam_id] = -np.ones((self.numCam, len(self.cameras[cam_id].gt_pts)))
+            # match between the features of this new camera and all other cameras
+            for i in cams:
+                if i == cam_id:
+                    continue
+                # all the ground truth matches are mutually valid, so directly update
+                self.feature_dict[cam_id][i] = np.arange(len(self.cameras[i].gt_pts))
+                self.feature_dict[i][cam_id] = np.arange(len(self.cameras[cam_id].gt_pts))
+
+                # update the registered indices (all ground truth matches share the same indices)
+                self.cameras[cam_id].index_2d_3d = self.cameras[i].index_2d_3d
+                self.cameras[cam_id].index_registered_2d = self.cameras[i].index_registered_2d
+            
+            # add the ground truth
+            pts_2d = self.cameras[cam_id].get_gt_points()
+        else:
+            # get the features and descriptors of the new camera
+            kp1, des1 = self.cameras[cam_id].kp, self.cameras[cam_id].des
+
+            # initilize the matching result of the new camera to be stored in feature_dict
+            match_res = -np.ones((self.numCam, len(kp1)))
+            # loop through all the cameras
+            for i in cams:
+                if i == cam_id:
+                    continue
+                # get the features of the old camera
+                kp2, des2 = self.cameras[i].kp, self.cameras[i].des
+                # match the features of the new camera and the old camera
+                _, _, matches, matchesMask = ep.matching_feature(kp1, kp2, des1, des2, ratio=0.8)
+                # draw matches
+                vis.draw_matches(self.cameras[cam_id].img, self.cameras[cam_id].kp, self.cameras[i].img, self.cameras[i].kp, matches, matchesMask)
+                
+                # get the matched indices
+                query_ids = np.array([m[0].queryIdx for m in matches])
+                train_ids = np.array([m[0].trainIdx for m in matches])
+
+                # save the matching result to feature_dict
+                match_res[i, query_ids] = train_ids
+                self.feature_dict[cam_id] = match_res
+                self.feature_dict[i][cam_id, train_ids] = query_ids
+
+                # find the indices of the old features that has been used
+                _, train_in_ids, registered_ids = np.intersect1d(train_ids, self.cameras[i].index_registered_2d, return_indices=True)
+                # register corresponding query_ids of the new camera
+                self.cameras[cam_id].index_registered_2d = np.union1d(self.cameras[cam_id].index_registered_2d, query_ids[train_in_ids])
+                self.cameras[cam_id].index_2d_3d = np.union1d(self.cameras[cam_id].index_2d_3d, self.cameras[i].index_2d_3d[registered_ids])
+            
+            # get the registered 2d features from the new camera
+            pts_2d = self.cameras[cam_id].get_points()
+        
+        # get the registered 3d static point from the new camera
+        pts_3d = self.static[:, self.cameras[cam_id].index_2d_3d]
+
+        return pts_2d, pts_3d
+    
+    def get_camera_pose_static(self, cam_id, cams, error=8, verbose=0, debug=False):
+        '''
+        Function:
+            solve the PnP to get the pose of the new camera
+            the distortion model is taken care by PnP
+        Input:
+            cam_id = the index of the new camera
+            pts_2d = the matched raw 2d feature positions
+            pts_3d = the matched reconstructed 3d points
+        '''
+        pts_2d, pts_3d = self.register_new_camera_static(cam_id, cams, debug)
+
+        # PnP solution from OpenCV
+        N = pts_3d.shape[1]
+        objectPoints = np.ascontiguousarray(pts_3d.T).reshape((N,1,3))
+        imagePoints  = np.ascontiguousarray(pts_2d.T).reshape((N,1,2))
+        distCoeffs = self.cameras[cam_id].d
+        retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
+
+        # update the indices of the registered 2d features, removing the outliers
+        self.cameras[cam_id].index_registered_2d = self.cameras[cam_id].index_registered_2d[inliers]
+        self.cameras[cam_id].index_2d_3d = self.cameras[cam_id].index_2d_3d[inliers]
+
+        self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
+        self.cameras[cam_id].t = tvec.reshape(-1,)
+        self.cameras[cam_id].compose()
+
+        if verbose:
+            print('{} out of {} points are inliers for PnP'.format(inliers.shape[0], N))
+
     def get_camera_pose(self, cam_id, cams, error=8, verbose=0, debug=False):
         '''
         Get the absolute pose of a camera by solving the PnP problem.
@@ -968,10 +1300,11 @@ class Scene:
             if detect_part.size:
                 detect = np.hstack((detect,detect_part))
                 point_3D = np.hstack((point_3D, np.asarray(interpolate.splev(detect_part[0], tck[i]))))
-        # TODO: SHOULD USE THE RAW DETECTION? INSTEAD OF THE UNDISTORTED ONES??
+        # FIXME: SHOULD USE THE RAW DETECTION? INSTEAD OF THE UNDISTORTED ONES??
         
+        num_detect = detect.shape[1]
         # if the static part is also included, add the static part to the points as well
-        if self.settings['include_static']:
+        if 'include_static' in self.settings.keys() and self.settings['include_static']:
             if debug:
                 # use the ground truth matches
                 # initialize the matching result of this new camera to be stored to the dict
@@ -1037,6 +1370,10 @@ class Scene:
         imagePoints  = np.ascontiguousarray(detect[1:].T).reshape((N,1,2))
         distCoeffs = self.cameras[cam_id].d
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
+
+        # update the index of the registered 2d static points to remove the outliers
+        self.cameras[cam_id].index_registered_2d = self.cameras[cam_id].index_registered_2d[inliers[inliers >= num_detect] - num_detect]
+        self.cameras[cam_id].index_2d_3d = self.cameras[cam_id].index_2d_3d[inliers[inliers >= num_detect] - num_detect]
 
         self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
         self.cameras[cam_id].t = tvec.reshape(-1,)
@@ -1162,6 +1499,8 @@ class Scene:
             added_mask = np.in1d(new_ids, added_cand_ids)
             # assign ids to the points to be added
             ids_3d_new = np.arange(new_ids[~added_mask].shape[0]) + X_new.shape[1] + int(np.sum(self.inlier_mask))
+            if verbose:
+                print('{} new points are added'.format(ids_3d_new.shape[0]))
             
             # registered the points that have not yet been added
             self.cameras[cam_id].index_registered_2d = np.concatenate((self.cameras[cam_id].index_registered_2d, new_ids[~added_mask]))
@@ -1217,7 +1556,6 @@ class Scene:
                 plt.suptitle('Camera {}: undistorted detection (red) vs reprojection (blue)'.format(i))
 
         plt.show()
-
 
     def select_most_overlap(self,init=False):
         '''
@@ -1621,7 +1959,7 @@ class Camera:
         get the registered 2d ground truth points (2, n)
         '''
         return self.gt_pts[self.index_registered_2d].T
-    
+
 def create_scene(path_input):
     '''
     Create a scene from the imput template in json format
@@ -1655,9 +1993,17 @@ def create_scene(path_input):
 
         if len(cam['distCoeff']) == 4:
             cam['distCoeff'].append(0)
+
+        # load camera information
+        camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'], img_path=cam['feature_extractor'])
+        # extract features
+        camera.extract_features(method=flight.settings['feature_extractor'])
+
+        # load the ground truth static matches if given
+        if 'optional inputs' in config.keys() and 'static_ground_truth' in config['optional inputs'].keys():
+            camera.gt_pts = np.loadtxt(config['optional inputs']['static_ground_truth'][i])
         
-        flight.addCamera(Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']),
-                                fps=cam['fps'], resolution=cam['resolution']))
+        flight.addCamera(camera)
 
     #  Load sequence
     flight.ref_cam = config['settings']['ref_cam']
@@ -1676,7 +2022,9 @@ def create_scene(path_input):
         flight.rs = np.asfarray([init_rs for i in range(flight.numCam)])
 
     # Load ground truth setting (optinal)
-    flight.gt = config['optional inputs']['ground_truth']
+    flight.gt = None
+    if 'optional inputs' in config.keys() and 'ground_truth' in config['optional inputs'].keys():
+        flight.gt = config['optional inputs']['ground_truth']
 
     print('Input data are loaded successfully, a scene is created.\n')
     return flight
