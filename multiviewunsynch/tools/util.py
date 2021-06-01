@@ -206,44 +206,6 @@ def umeyama(src, dst, estimate_scale):
 
     return T
 
-def draw_detection_matches(img1, d1, img2, d2):
-    '''
-    Function:
-        Draw the corresponding detections in the camera views
-    Input:
-        img1, img2 = two images
-        d1, d2 = the matched detections
-    '''
-    dp1 = [cv2.KeyPoint(d[1], d[2], 8) for d in d1.T]
-    dp2 = [cv2.KeyPoint(d[1], d[2], 8) for d in d2.T]
-    # print(dp1)
-    # print(dp2)
-    matches = [cv2.DMatch(i, i, 0) for i in range(len(dp1))]
-
-    outimg = cv2.drawMatches(img1, dp1, img2, dp2, matches, None)
-    print(matplotlib.get_backend())
-
-    plt.imshow(outimg), plt.show()
-    cv2.imwrite('detection_mathches.png', outimg)
-
-def draw_matches(img1, kp1, img2, kp2, matches, matchesMask):
-    '''
-    Function:
-        Draw the matching results (FLANN) of the two sets of keypoints
-    Input:
-        img1, img2 = two images
-        kp1, kp2 = two matched keypoints
-        matches = the matcher object returned from FLANN matcher
-        matchesMask = index of good matches
-    '''
-    draw_params = dict(matchColor=(0, 255, 0),
-                    singlePointColor=(255, 0, 0),
-                    matchesMask=matchesMask,
-                    flags=cv2.DrawMatchesFlags_DEFAULT)
-    out_img1 = cv2.drawMatchesKnn(img1, kp1, img2, kp2, matches, None, **draw_params)
-    cv2.imwrite('sift_match.png', out_img1)
-    plt.imshow(out_img1), plt.show()
-
 if __name__ == "__main__":
     R = rotation(0.38,-176.3,100)
     x,y,z = rotation_decompose(R)

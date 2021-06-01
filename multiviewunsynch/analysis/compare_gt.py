@@ -150,6 +150,21 @@ def align_gt(flight, f_gt, gt_path, visualize=False):
 
     return out
 
+def align_gt_static(flight):
+    '''
+    Function:
+        find the transformation between the reconstructed static 3d points and the ground truth static points
+    Input:
+        flight = the scene object
+    Output:
+        gt_static_aligned = the aligned ground truth static points
+    '''
+    # compute the affine transformation between the ground truth static points and the reconstructed ones
+    M = transformation.affine_matrix_from_points(flight.gt_static.T, flight.static[:, flight.inlier_mask > 0], shear=False, scale=True)
+    tran = np.dot(M, util.homogeneous(flight.gt_static.T))
+    tran /= tran[-1]
+
+    return tran[:-1]
 
 if __name__ == "__main__":
 

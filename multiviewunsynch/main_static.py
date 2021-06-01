@@ -7,7 +7,7 @@ import pickle
 from tools import visualization as vis
 from datetime import datetime
 from reconstruction import common
-from analysis.compare_gt import align_gt
+from analysis.compare_gt import align_gt, align_gt_static
 import sys
 
 import cv2
@@ -31,7 +31,7 @@ if args.debug:
 flight = common.create_scene(args.config_file)
 
 # Initialize the static part
-flight.init_static()
+flight.init_static(inlier_only=True, debug=args.debug)
 
 '''---------------Incremental reconstruction----------------'''
 start = datetime.now()
@@ -44,17 +44,17 @@ while True:
 
     print('\nDoing the first BA')
     # Bundle adjustment
-    res = flight.BA(cam_temp, debug=args.debug)
+    res = flight.BA_static(cam_temp, debug=args.debug)
 
     print('\nMean error of the static part in each camera after the first BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 
     # remove outliers
     print('\nRemove outliers after first BA')
-    flight.remove_outliers_static(flight.sequence[:cam_temp],thres=flight.settings['thres_outlier'])
+    flight.remove_outliers_static(flight.sequence[:cam_temp], thres=flight.settings['thres_outlier'], verbose=True, debug=args.debug)
 
     print('\nDoing the second BA')
     # Bundle adjustment after outlier removal
-    res = flight.BA(cam_temp, debug=args.debug)
+    res = flight.BA_static(cam_temp, debug=args.debug)
 
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 
@@ -72,14 +72,35 @@ while True:
     print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
     cam_temp += 1
 
-# Visualize the 3D static points
-vis.show_3D_all(flight.static[flight.inlier_mask > 0], color=False, line=False)
-# vis.show_trajectory_3D(flight.traj[1:],line=False)
+# Align with the ground truth static points if available
+if flight.gt_static is not None:
+    # Transform the ground truth static 3d points
+    static_ref = align_gt_static(flight)
+    # Visualize the reconstructed 3D static points and the ground truth static points
+    vis.show_3D_all(static_ref, flight.static[:, flight.inlier_mask > 0], color=True, line=False)
+    for i, cam in enumerate(flight.cameras):
+        # x_res = cam.projectPoint(flight.static[:, cam.index_2d_3d])[:-1]
+        x_res = cam.dist_point3d(flight.static[:, cam.index_2d_3d])
+        x_ori = cam.get_gt_pts()
+        vis.show_2D_all(x_ori, x_res, title='cam'+str(i), color=True, line=False, bg=cam.img)
+else:
+    # Visualize the 3D static points
+    vis.show_3D_all(flight.static[:, flight.inlier_mask > 0], color=False, line=False)
+    # no ground truth exists, plot the reprojection in 2d
+    for i, cam in enumerate(flight.cameras):
+        x_res = cam.dist_point3d(flight.static[:, cam.index_2d_3d])
+        # x_res = cam.projectPoints(flight.static[:, cam.index_2d_3d])[:-1]
+        x_ori = cam.get_points()
+        vis.show_2D_all(x_ori, x_res, title='cam'+str(i), color=True, line=False, bg=cam.img)
 
 # Align with the ground truth data if available
-if flight.gt is not None:
+if len(flight.gt) > 0:
     flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
 with open(flight.settings['path_output'],'wb') as f:
+    # unpack sift features if used
+    if flight.settings['feature_extractor'] == 'sift':
+        for cam in flight.cameras:
+            cam.unpack_sift_kp()
     pickle.dump(flight, f)
 
 print('Finished!')

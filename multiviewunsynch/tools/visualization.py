@@ -156,14 +156,21 @@ def show_trajectory_3D(*X,title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x,title=None,color=True,line=True,text=False):
+def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
     plt.figure(figsize=(12, 10))
+    # if bg is not None:
+    #     plt.imshow(bg)
     num = len(x)
     for i in range(num):
         # plt.subplot(1,num,i+1)
 
         c = ['r','b']
-        plt.scatter(x[i][0],x[i][1],c=c[i])
+        m = ['o','x']
+        label = ['Raw points', 'Reconstruction points']
+        if color:
+            plt.scatter(x[i][0],x[i][1],c=c[i],marker=m[i],label=label[i])
+        else:
+            plt.scatter(x[i][0],x[i][1],c=c[i])
         # plt.scatter(x[i][0],x[i][1],c=np.arange(x[i].shape[1])*color)
         if line:
             plt.plot(x[i][0],x[i][1])
@@ -179,6 +186,9 @@ def show_2D_all(*x,title=None,color=True,line=True,text=False):
         plt.ylabel('Y')
     if title:
         plt.suptitle(title)
+        plt.savefig(title+'.png')
+    else:
+        plt.savefig('reprojected.png')
     plt.show()
 
 
@@ -217,6 +227,7 @@ def show_3D_all(*X,title=None,color=True,line=True):
     for handle in lgnd.legendHandles:
         handle.set_sizes([100])
     # plt.axis('off')
+    plt.savefig('reconstructed_scene.png')
     plt.show()
 
 
@@ -286,6 +297,43 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
     cbar.ax.tick_params(labelsize=40)
     plt.title(title, fontsize=50)
     plt.show()
+
+def draw_detection_matches(img1, d1, img2, d2):
+    '''
+    Function:
+        Draw the corresponding detections in the camera views
+    Input:
+        img1, img2 = two images
+        d1, d2 = the matched detections
+    '''
+    dp1 = [cv2.KeyPoint(d[1], d[2], 8) for d in d1.T]
+    dp2 = [cv2.KeyPoint(d[1], d[2], 8) for d in d2.T]
+    # print(dp1)
+    # print(dp2)
+    matches = [cv2.DMatch(i, i, 0) for i in range(len(dp1))]
+
+    outimg = cv2.drawMatches(img1, dp1, img2, dp2, matches, None)
+
+    plt.imshow(outimg), plt.show()
+    cv2.imwrite('detection_mathches.png', outimg)    
+
+def draw_matches(img1, kp1, img2, kp2, matches, matchesMask):
+    '''
+    Function:
+        Draw the matching results (FLANN) of the two sets of keypoints
+    Input:
+        img1, img2 = two images
+        kp1, kp2 = two matched keypoints
+        matches = the matcher object returned from FLANN matcher
+        matchesMask = index of good matches
+    '''
+    draw_params = dict(matchColor=(0, 255, 0),
+                    singlePointColor=(255, 0, 0),
+                    matchesMask=matchesMask,
+                    flags=cv2.DrawMatchesFlags_DEFAULT)
+    out_img1 = cv2.drawMatchesKnn(img1, kp1, img2, kp2, matches, None, **draw_params)
+    cv2.imwrite('sift_match.png', out_img1)
+    plt.imshow(out_img1), plt.show()
 
 
 if __name__ == "__main__":
