@@ -221,9 +221,9 @@ class Scene:
             d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
             d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
 
-            vis.draw_detection_matches(self.cameras[t2].img, np.vstack([d2[0], d2_dist]), self.cameras[t1].img, np.vstack([d1[0],d1_dist]))
+            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
         else:
-            vis.draw_detection_matches(self.cameras[t2].img, d2, self.cameras[t1].img, d1)
+            vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
         
         # add the static part
         if 'include_static' in self.settings.keys() and self.settings['include_static']:

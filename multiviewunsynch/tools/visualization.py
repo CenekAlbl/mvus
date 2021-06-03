@@ -7,7 +7,10 @@ import cv2
 from tools import util
 import pickle
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
+from thirdparty.camera_calibration_show_extrinsics import create_camera_model, transform_to_matplotlib_frame
+from .util import homogeneous
 
 def drawlines(img1,img2,lines,pts1,pts2):
     ''' 
@@ -153,6 +156,9 @@ def show_trajectory_3D(*X,title=None,color=True,line=False):
     if title:
         plt.suptitle(title)
     # plt.axis('off')
+        plt.savefig(title+'.png')
+    else:
+        plt.savefig('reconstructed_trajectory.png')
     plt.show()
 
 
@@ -192,7 +198,26 @@ def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
     plt.show()
 
 
-def show_3D_all(*X,title=None,color=True,line=True):
+def draw_camera_extrinsics(flight, ax, scale_focal=40):
+    colors = [ cm.jet(x) for x in 100*np.random.rand(flight.numCam)]
+    # loop through all the cameras
+    for i, cam in enumerate(flight.cameras):
+        # width and height of the camera
+        cam_height, cam_width, _ = cam.img.shape
+        # get the camera frame model
+        X_cam_model = create_camera_model(cam.K, cam_width/2, cam_height/2, scale_focal)
+        cMo = np.eye(4)
+        cMo[:3,:3] = cam.R
+        cMo[:3,-1] = cam.t
+
+        for X_cam_part in X_cam_model:
+            X = np.zeros_like(X_cam_part)
+            for j in range(X_cam_part.shape[1]):
+                X[0:4,j] = transform_to_matplotlib_frame(cMo, X_cam_part[0:4,j], True)
+            ax.plot3D(X[0,:], X[1,:], X[2,:], color=colors[i])
+
+
+def show_3D_all(*X,title=None,color=True,line=True,flight=None):
     fig = plt.figure(figsize=(20, 15))
     num = len(X)
     ax = fig.add_subplot(111,projection='3d')
@@ -215,6 +240,17 @@ def show_3D_all(*X,title=None,color=True,line=True):
             ax.plot(X[i][0],X[i][1],X[i][2])
         plt.xlabel('X')
         plt.ylabel('Y')
+    
+    # if the flight is provided, also draw the cameras and the reconstructed trajectories
+    if flight is not None:
+        draw_camera_extrinsics(flight, ax, scale_focal=1)
+        if color:
+            ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3], c=np.arange(flight.traj.shape[1])*color)
+        else:
+            ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3])
+        if line:
+            ax.plot(flight.traj[1], flight.traj[2], flight.traj[3])
+
     if title:
         plt.suptitle(title)
     
