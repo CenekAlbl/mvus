@@ -158,8 +158,8 @@ def show_trajectory_3D(*X,title=None,color=True,line=False):
 
 def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
     plt.figure(figsize=(12, 10))
-    # if bg is not None:
-    #     plt.imshow(bg)
+    if bg is not None:
+        plt.imshow(bg)
     num = len(x)
     for i in range(num):
         # plt.subplot(1,num,i+1)

@@ -238,7 +238,8 @@ class Scene:
                     # FIXME: check pts_dist == gt_pts
                     pts1_dist = self.cameras[t1].dist_point2d(pts1.T, method=self.settings['undist_method'])
                     pts2_dist = self.cameras[t2].dist_point2d(pts2.T, method=self.settings['undist_method'])
-                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
+                    # vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
+                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),self.cameras[t1].gt_pts.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),self.cameras[t2].gt_pts.T]))
 
                 else:
                     pts1 = self.cameras[t1].gt_pts

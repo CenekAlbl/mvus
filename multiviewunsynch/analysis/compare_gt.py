@@ -166,6 +166,78 @@ def align_gt_static(flight):
 
     return tran[:-1]
 
+def align_detections(flight, visualize=False):
+
+    for i, cam in enumerate(flight.cameras):
+        gt_ori = flight.detections[i]
+
+        if gt_ori.shape[0] == 3 or gt_ori.shape[0] == 4:
+            pass
+        elif gt_ori.shape[1] == 3 or gt_ori.shape[1] == 4:
+            gt_ori = gt_ori.T
+        else:
+            raise Exception('Ground truth data have an invalid shape')
+
+        # Pre-processing
+        alpha = 1
+
+        reconst = flight.spline_to_traj(sampling_rate=alpha)
+        t0 = reconst[0,0]
+        reconst = np.vstack(((reconst[0]-t0)/alpha,reconst[1:]))
+        if gt_ori.shape[0] == 3:
+            gt = np.vstack((np.arange(len(gt_ori[0])),gt_ori))
+        else:
+            gt = np.vstack((gt_ori[0]-gt_ori[0,0],gt_ori[1:]))
+
+        # Coarse search
+        thres = int(reconst[0,-1] / 2)
+        if int(gt[0,-1]-thres) < 0:
+            raise Exception('Ground truth too short!')
+
+        error_min = np.inf
+        for i in range(-thres, int(gt[0,-1]-thres)):
+            reconst_i = np.vstack((reconst[0]+i,reconst[1:]))
+            p1, p2 = util.match_overlap(reconst_i, gt)
+            M = transformation.affine_matrix_from_points(p1[1:], p2[1:], shear=False, scale=True)
+
+            tran = np.dot(M, util.homogeneous(p1[1:]))
+            tran /= tran[-1]
+            error_all = np.sqrt((p2[1]-tran[0])**2 + (p2[2]-tran[1])**2 + (p2[3]-tran[2])**2)
+            error = np.mean(error_all)
+            if error < error_min:
+                error_min = error
+                error_coarse = error_all
+                j = i
+        beta = t0-alpha*j
+
+        # Fine optimization
+        ls, res = optimize(alpha,beta,flight,gt_ori)
+
+        # Remove outliers by relative thresholding
+        thres = 10
+        error_ = res[3]
+        idx = error_ <= thres*np.mean(error_)
+        reconst_, gt_, error_ = res[0][:,idx], res[1][:,idx], error_[idx]
+
+        # Result
+        out = {'align_param':ls.x, 'reconst_tran':reconst_, 'gt':gt_, 'tran_matrix':res[2], 'error':error_}
+        print('The mean error (distance) is {:.5f} meter\n'.format(np.mean(out['error'])))
+        print('The median error (distance) is {:.5f} meter\n'.format(np.median(out['error'])))
+
+        print(ls.x)
+
+        if visualize:
+            # Compare the trajectories
+            vis.show_trajectory_3D(out['reconst_tran'][1:], out['gt'], line=False, title='Reconstruction(left) vs Ground Truth(right)')
+
+            # Error histogram
+            vis.error_hist(out['error'])
+
+            # Error over the trajectory
+            vis.error_traj(out['reconst_tran'][1:], out['error'])
+
+    return out
+
 if __name__ == "__main__":
 
     # Load the reconstructed trajectory
