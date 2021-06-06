@@ -1851,7 +1851,7 @@ class Camera:
         self.compose()
         return self.P
 
-    def undist_point(self, points, method):
+    def undist_point(self, points, method='opencv'):
         '''
         Function:
             A wrapper function for the undistort point function with different models
@@ -1988,7 +1988,10 @@ def create_scene(path_input):
         # load camera information
         camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'], img_path=cam['img_path'])
         # extract features
-        camera.extract_features(method=flight.settings['feature_extractor'])
+        if 'include_static' in config.keys() and config['include_static']:
+            camera.extract_features(method=flight.settings['feature_extractor'])
+        else:
+            camera.read_img()
 
         # load the ground truth static matches if given
         if 'optional inputs' in config.keys() and 'static_ground_truth' in config['optional inputs'].keys():

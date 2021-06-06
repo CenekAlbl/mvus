@@ -170,9 +170,9 @@ def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
     for i in range(num):
         # plt.subplot(1,num,i+1)
 
-        c = ['r','b']
-        m = ['o','x']
-        label = ['Raw points', 'Reconstruction points']
+        c = ['r','b','r','g']
+        m = ['o','x','o','+']
+        label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
         if color:
             plt.scatter(x[i][0],x[i][1],c=c[i],marker=m[i],label=label[i])
         else:
@@ -215,6 +215,11 @@ def draw_camera_extrinsics(flight, ax, scale_focal=40):
             for j in range(X_cam_part.shape[1]):
                 X[0:4,j] = transform_to_matplotlib_frame(cMo, X_cam_part[0:4,j], True)
             ax.plot3D(X[0,:], X[1,:], X[2,:], color=colors[i])
+        
+        C_cam = np.dot(-cam.R.T, cam.t.reshape(-1,1)).ravel()
+
+        ax.scatter3D(C_cam[0], C_cam[1], C_cam[2], c=colors[i])
+        ax.text(C_cam[0], C_cam[1], C_cam[2], 'Camera '+str(i), color=colors[i])
 
 
 def show_3D_all(*X,title=None,color=True,line=True,flight=None):

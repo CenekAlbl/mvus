@@ -228,7 +228,7 @@ def align_detections(flight, visualize=False):
 
         if visualize:
             # Compare the trajectories
-            vis.show_trajectory_3D(out['reconst_tran'][1:], out['gt'], line=False, title='Reconstruction(left) vs Ground Truth(right)')
+            vis.show_trajectory_2D(out['reconst_tran'][1:], out['gt'], line=False, title='Reconstruction(left) vs Ground Truth(right)')
 
             # Error histogram
             vis.error_hist(out['error'])

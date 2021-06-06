@@ -30,7 +30,7 @@ flight.time_shift()
 flight.detection_to_global()
 
 # Initialize the first 3D trajectory
-flight.init_traj(error=flight.settings['thres_Fmatix'])
+flight.init_traj(inlier_only=True, error=flight.settings['thres_Fmatix'])
 
 # Convert discrete trajectory to spline representation
 flight.traj_to_spline(smooth_factor=flight.settings['smooth_factor'])
@@ -87,7 +87,8 @@ flight.spline_to_traj(sampling_rate=1)
 vis.show_trajectory_3D(flight.traj[1:],line=False)
 
 # Align with the ground truth data if available
-flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
+if len(flight.gt) > 0:
+    flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
 with open(flight.settings['path_output'],'wb') as f:
     pickle.dump(flight, f)
 

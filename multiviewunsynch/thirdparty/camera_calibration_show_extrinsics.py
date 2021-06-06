@@ -49,9 +49,9 @@ def create_camera_model(camera_matrix, width, height, scale_focal, draw_frame_ax
 
     # draw triangle above the image plane
     X_triangle = np.ones((4,3))
-    X_triangle[0:3,0] = [-width, -height, f_scale]
-    X_triangle[0:3,1] = [0, -2*height, f_scale]
-    X_triangle[0:3,2] = [width, -height, f_scale]
+    X_triangle[0:3,0] = [-width, height, f_scale]
+    X_triangle[0:3,1] = [0, 2*height, f_scale]
+    X_triangle[0:3,2] = [width, height, f_scale]
 
     # draw camera
     X_center1 = np.ones((4,2))

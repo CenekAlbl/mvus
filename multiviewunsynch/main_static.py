@@ -77,7 +77,7 @@ if flight.gt_static is not None:
     # Transform the ground truth static 3d points
     static_ref = align_gt_static(flight)
     # Visualize the reconstructed 3D static points and the ground truth static points
-    vis.show_3D_all(static_ref, flight.static[:, flight.inlier_mask > 0], color=True, line=False, flight=flight)
+    vis.show_3D_all(static_ref, flight.static[:, flight.inlier_mask > 0], color=True, line=False)
     for i, cam in enumerate(flight.cameras):
         # x_res = cam.projectPoint(flight.static[:, cam.index_2d_3d])[:-1]
         x_res = cam.dist_point3d(flight.static[:, cam.index_2d_3d])
@@ -85,7 +85,7 @@ if flight.gt_static is not None:
         vis.show_2D_all(x_ori, x_res, title='cam'+str(i), color=True, line=False, bg=cam.img)
 else:
     # Visualize the 3D static points
-    vis.show_3D_all(flight.static[:, flight.inlier_mask > 0], color=False, line=False, flight=flight)
+    vis.show_3D_all(flight.static[:, flight.inlier_mask > 0], color=False, line=False)
     # no ground truth exists, plot the reprojection in 2d
     for i, cam in enumerate(flight.cameras):
         x_res = cam.dist_point3d(flight.static[:, cam.index_2d_3d])
