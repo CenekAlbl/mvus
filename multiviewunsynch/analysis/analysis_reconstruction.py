@@ -52,8 +52,12 @@ def reproject_ground_truth(cameras, gt_pts ,n_bins=10, prefix=''):
         plt.savefig(prefix+'repo_cam{}_{}.png'.format(t1, t2))
 
         # plot images
-        vis.show_2D_all(gt_pts_parts[t1].T, gt_repo1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False, bg=cameras[t1].img)
-        vis.show_2D_all(gt_pts_parts[t2].T, gt_repo2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False, bg=cameras[t2].img)
+        if prefix == 'dynamic_only_':
+            vis.show_2D_all(gt_pts_parts[t1].T, gt_repo1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False)
+            vis.show_2D_all(gt_pts_parts[t2].T, gt_repo2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False)
+        else:
+            vis.show_2D_all(gt_pts_parts[t1].T, gt_repo1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False, bg=cameras[t1].img)
+            vis.show_2D_all(gt_pts_parts[t2].T, gt_repo2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False, bg=cameras[t2].img)
 
 def main():
     # Load ground truth
@@ -64,7 +68,7 @@ def main():
     # gt_dynamic = np.loadtxt(gt_dynamic_file, delimiter=' ')
 
     # Load scenes
-    data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_30.pkl'
+    data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_30.pkl'
     data_file_static = '/scratch2/wuti/Repos/mvus/experiments/static/nyc_colmap_static_superglue_30.pkl'
     data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_dynamic/nyc_colmap_static_dynamic_superglue_30.pkl'
 
