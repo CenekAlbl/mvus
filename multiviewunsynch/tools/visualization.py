@@ -25,7 +25,7 @@ def drawlines(img1,img2,lines,pts1,pts2):
             img1 = image1 with lines and circles
             img2 = image2 with circles 
     '''
-    r,c = img1.shape
+    r,c = img1.shape[:2]
 
     # Convert grayscale to BGR if needed
     if len(img1.shape)==2:
@@ -55,6 +55,8 @@ def plotEpiline(img1, img2, pts1, pts2, F):
     Output:
             plot epipolar lines on image pair
     '''
+    img1 = img1.copy()
+    img2 = img2.copy()
     # Find epilines corresponding to points in right image (second image) and
     # drawing its lines on left image
     lines1 = cv2.computeCorrespondEpilines(pts2.reshape(-1,1,2), 2,F)
@@ -68,24 +70,28 @@ def plotEpiline(img1, img2, pts1, pts2, F):
     img5 = drawlines(img2,img1,lines2,pts2,pts1)[0]
 
     # Show results
-    cv2.namedWindow('Epipolar lines in img1',cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Epipolar lines in img1',500,300)
-    cv2.imshow('Epipolar lines in img1',img3)
-    cv2.namedWindow('Epipolar lines in img2',cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Epipolar lines in img2',500,300)
-    cv2.imshow('Epipolar lines in img2',img5)
-    cv2.waitKey(0)
+    # cv2.namedWindow('Epipolar lines in img1',cv2.WINDOW_NORMAL)
+    # cv2.resizeWindow('Epipolar lines in img1',500,300)
+    # cv2.imshow('Epipolar lines in img1',img3)
+    cv2.imwrite('epipolar_lines_img1.png', img3)
+    # cv2.namedWindow('Epipolar lines in img2',cv2.WINDOW_NORMAL)
+    # cv2.resizeWindow('Epipolar lines in img2',500,300)
+    # cv2.imshow('Epipolar lines in img2',img5)
+    cv2.imwrite('epipolar_lines_img2.png', img5)
+
+    # cv2.waitKey(0)
 
 
 def plot_epipolar_line(img1, img2, F, x1, x2):
     '''
     Plot epipolar lines of point correspondences.
     '''
-
+    img1 = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
+    img2 = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
     # pre-steps
     num = x1.shape[1]
-    r1,c1 = img1.shape
-    r2,c2 = img2.shape
+    r1,c1 = img1.shape[:2]
+    r2,c2 = img2.shape[:2]
     x1_coord = np.linspace(0,c1-1,100)
     x2_coord = np.linspace(0,c2-1,100)
 
@@ -95,7 +101,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
 
     # plot epipolar lines in img1, which are calculated using key points in img2
     plt.subplot(121),plt.imshow(img1,cmap='gray')
-    for i in range(num):
+    for i in range(x2.shape[1]):
         line = line2[:,i]
         y1_coord = np.array([(line[2]+line[0]*x)/(-line[1]) for x in x1_coord])
         idx = (y1_coord>=0) & (y1_coord<r1-1)
@@ -104,13 +110,13 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     
     # plot epipolar lines in img2, which are calculated using key points in img1
     plt.subplot(122),plt.imshow(img2,cmap='gray')
-    for i in range(num):
+    for i in range(x1.shape[1]):
         line = line1[:,i]
         y2_coord = np.array([(line[2]+line[0]*x)/(-line[1]) for x in x2_coord])
         idx = (y2_coord>=0) & (y2_coord<r2-1)
         plt.plot(x2_coord[idx],y2_coord[idx])
     plt.scatter(x2[0],x2[1])
-
+    plt.savefig('epipolar_lines.png')
     plt.show()
 
 
@@ -162,10 +168,15 @@ def show_trajectory_3D(*X,title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
+def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None, output_dir=''):
     plt.figure(figsize=(12, 10))
     if bg is not None:
+        bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)
         plt.imshow(bg)
+        h,w,_ = bg.shape
+        plt.xlim([0,w])
+        plt.ylim([h,0])
+
     num = len(x)
     for i in range(num):
         # plt.subplot(1,num,i+1)
@@ -192,9 +203,9 @@ def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None):
         plt.ylabel('Y')
     if title:
         plt.suptitle(title)
-        plt.savefig(title+'.png')
+        plt.savefig(output_dir+title+'.png')
     else:
-        plt.savefig('reprojected.png')
+        plt.savefig(output_dir+'reprojected.png')
     plt.show()
 
 
@@ -222,7 +233,7 @@ def draw_camera_extrinsics(flight, ax, scale_focal=40):
         ax.text(C_cam[0], C_cam[1], C_cam[2], 'Camera '+str(i), color=colors[i])
 
 
-def show_3D_all(*X,title=None,color=True,line=True,flight=None):
+def show_3D_all(*X,title=None,color=True,line=True,flight=None, output_dir=''):
     fig = plt.figure(figsize=(20, 15))
     num = len(X)
     ax = fig.add_subplot(111,projection='3d')
@@ -249,26 +260,34 @@ def show_3D_all(*X,title=None,color=True,line=True,flight=None):
     # if the flight is provided, also draw the cameras and the reconstructed trajectories
     if flight is not None:
         draw_camera_extrinsics(flight, ax, scale_focal=1)
-        if color:
-            ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3], c=np.arange(flight.traj.shape[1])*color)
-        else:
-            ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3])
-        if line:
-            ax.plot(flight.traj[1], flight.traj[2], flight.traj[3])
+        # if exists trajectory, also plot it
+        if len(flight.traj) > 0:
+            if color:
+                ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3], c=np.arange(flight.traj.shape[1])*color)
+            else:
+                ax.scatter3D(flight.traj[1], flight.traj[2], flight.traj[3])
+            if line:
+                ax.plot(flight.traj[1], flight.traj[2], flight.traj[3])
 
     if title:
         plt.suptitle(title)
     
-    ax.set_xlabel('East [m]',fontsize=20)
-    ax.set_ylabel('North [m]',fontsize=20)
-    ax.set_zlabel('Up [m]',fontsize=20)
+    # ax.set_xlabel('East [m]',fontsize=20)
+    # ax.set_ylabel('North [m]',fontsize=20)
+    # ax.set_zlabel('Up [m]',fontsize=20)
+    ax.set_xlabel('X',fontsize=20)
+    ax.set_ylabel('Y',fontsize=20)
+    ax.set_zlabel('Z',fontsize=20)
 
     ax.view_init(elev=30,azim=-50)
     lgnd = ax.legend(loc=1, prop={'size': 30})
     for handle in lgnd.legendHandles:
         handle.set_sizes([100])
     # plt.axis('off')
-    plt.savefig('reconstructed_scene.png')
+    if title:
+        plt.savefig(output_dir+title+'reconstructed_scene')
+    else:
+        plt.savefig(output_dir+'reconstructed_scene.png')
     plt.show()
 
 
@@ -339,7 +358,7 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
     plt.title(title, fontsize=50)
     plt.show()
 
-def draw_detection_matches(img1, d1, img2, d2):
+def draw_detection_matches(img1, d1, img2, d2, title='detection_mathches.png', output_dir=''):
     '''
     Function:
         Draw the corresponding detections in the camera views
@@ -347,6 +366,7 @@ def draw_detection_matches(img1, d1, img2, d2):
         img1, img2 = two images
         d1, d2 = the matched detections
     '''
+    fig = plt.figure()
     dp1 = [cv2.KeyPoint(d[1], d[2], 8) for d in d1.T]
     dp2 = [cv2.KeyPoint(d[1], d[2], 8) for d in d2.T]
     # print(dp1)
@@ -356,7 +376,7 @@ def draw_detection_matches(img1, d1, img2, d2):
     outimg = cv2.drawMatches(img1, dp1, img2, dp2, matches, None)
 
     plt.imshow(outimg), plt.show()
-    cv2.imwrite('detection_mathches.png', outimg)    
+    cv2.imwrite(output_dir+title, outimg)    
 
 def draw_matches(img1, kp1, img2, kp2, matches, matchesMask):
     '''
@@ -368,6 +388,7 @@ def draw_matches(img1, kp1, img2, kp2, matches, matchesMask):
         matches = the matcher object returned from FLANN matcher
         matchesMask = index of good matches
     '''
+    fig = plt.figure()
     draw_params = dict(matchColor=(0, 255, 0),
                     singlePointColor=(255, 0, 0),
                     matchesMask=matchesMask,

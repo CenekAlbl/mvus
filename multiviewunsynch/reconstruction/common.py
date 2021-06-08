@@ -232,7 +232,7 @@ class Scene:
                 if self.settings['undist_points']:
                     # undistort the ground truth matches
                     pts1 = self.cameras[t1].undist_point(self.cameras[t1].gt_pts.T, self.settings['undist_method']).T
-                    pts2 = self.cameras[t1].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
+                    pts2 = self.cameras[t2].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
 
                     # plot the ground truth matches
                     # FIXME: check pts_dist == gt_pts
@@ -258,7 +258,7 @@ class Scene:
                 # undistort the matched keypoints
                 if self.settings['undist_points']:
                     pts1 = self.cameras[t1].undist_point(np.array(pts1).T, self.settings['undist_method']).T
-                    pts2 = self.cameras[t1].undist_point(np.array(pts2).T, self.settings['undist_method']).T
+                    pts2 = self.cameras[t2].undist_point(np.array(pts2).T, self.settings['undist_method']).T
             
             # stack the static features with the detections and use them together for initial pose extraction
             fp1 = np.hstack([np.int32(pts1).T, d1[1:]])
@@ -353,6 +353,70 @@ class Scene:
         self.cameras[t2].P = np.dot(K2,P)
         self.cameras[t1].decompose()
         self.cameras[t2].decompose()
+    
+    def init_traj_from_pose(self):
+        t1, t2 = self.sequence[0], self.sequence[1]
+        E = np.dot(self.cameras[t2].R, ep.skew(self.cameras[t2].t))
+        K1, K2 = self.cameras[t1].K, self.cameras[t2].K
+
+        F = np.dot(np.linalg.inv(K2).T, np.dot(E, np.linalg.inv(K1)))
+        # x1, x2 = util.homogeneous(self.cameras[t1].get_gt_pts()), util.homogeneous(self.cameras[t2].get_gt_pts())
+        # l1 = F.dot(x1).T
+        # # compute distance between l1 and x2
+        # dist12 = np.dot(l1, x2)
+        # dist12 /= np.sqrt(dist12[:,0]**2+dist12[:,1]**2).reshape(-1,1)
+        # matched_ids1 = np.argmin(dist12, axis=0)
+        # total_dist12 = np.mean(dist12[matched_ids1, np.arange(x2.shape[1])])
+
+        # l2 = F.T.dot(x2).T
+        # # compute distance between l1 and x2
+        # dist21 = np.dot(l2, x1)
+        # dist21 /= np.sqrt(dist21[:,0]**2+dist21[:,1]**2).reshape(-1,1)
+        # matched_ids2 = np.argmin(dist21, axis=0)
+        # total_dist12 = np.mean(dist21[matched_ids2, np.arange(x1.shape[1])])
+        # serr = ep.Sampson_error(x1,x2,F)
+        # vis.plot_epipolar_line(self.cameras[t1].img, self.cameras[t2].img, F, util.homogeneous(self.cameras[t1].get_gt_pts()), util.homogeneous(self.cameras[t2].get_gt_pts()))
+        pts1, pts2 = self.cameras[t1].get_gt_pts(), self.cameras[t2].get_gt_pts()
+        if self.settings['undist_points']:
+            # undistort the ground truth matches
+            pts1 = self.cameras[t1].undist_point(pts1, self.settings['undist_method']).T
+            pts2 = self.cameras[t2].undist_point(pts2, self.settings['undist_method']).T
+
+        vis.plotEpiline(self.cameras[t1].img, self.cameras[t2].img, pts1.astype(int), pts2.astype(int), F)
+        # vis.plot_epipolar_line(self.cameras[t1].img, self.cameras[t2].img, F, util.homogeneous(self.detections[t1][1:]), util.homogeneous(self.detections[t2][1:]))
+
+        # synchronization
+        # Truncate detections
+        self.cut_detection(second=self.settings['cut_detection_second'])
+        # Add prior alpha
+        self.init_alpha()
+        # synchronize between detections
+        # self.time_shift_from_F(F)
+        self.time_shift()
+        # convert detection timestamps to global
+        self.detection_to_global()
+
+        # t1, t2 = self.sequence[0], self.sequence[1]
+
+        # Find correspondences
+        if self.cameras[t1].fps > self.cameras[t2].fps:
+            d1, d2 = util.match_overlap(self.detections_global[t1], self.detections_global[t2])
+        else:
+            d2, d1 = util.match_overlap(self.detections_global[t2], self.detections_global[t1])
+
+        # draw matches between dections
+        if self.settings['undist_points']:
+            # the background images are the original ones and are not undistorted, the detections need to be distorted
+            d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
+            d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
+
+            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
+        else:
+            vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
+
+        X, P, inlier, mask = ep.epipolar_pipeline_from_F(d1[1:], d2[1:], K1, K2, F)
+        
+        self.traj = np.vstack((d1[0][inlier==1][mask],X[:-1]))
 
     def init_static(self, error=10, inlier_only=False, debug=False):
         t1, t2 = self.sequence[0], self.sequence[1]
@@ -363,7 +427,7 @@ class Scene:
             if self.settings['undist_points']:
                 # undistort the ground truth matches
                 pts1 = self.cameras[t1].undist_point(self.cameras[t1].gt_pts.T, self.settings['undist_method']).T
-                pts2 = self.cameras[t1].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
+                pts2 = self.cameras[t2].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
 
                 # plot the ground truth matches
                 # FIXME: check pts_dist == gt_pts
@@ -397,7 +461,7 @@ class Scene:
             # undistort the matched keypoints
             if self.settings['undist_points']:
                 pts1 = self.cameras[t1].undist_point(np.array(pts1).T, self.settings['undist_method']).T
-                pts2 = self.cameras[t1].undist_point(np.array(pts2).T, self.settings['undist_method']).T
+                pts2 = self.cameras[t2].undist_point(np.array(pts2).T, self.settings['undist_method']).T
 
             # get the valid matches
             query_ids = np.array([m[0].queryIdx for m in matches])
@@ -419,7 +483,14 @@ class Scene:
         pts2 = np.int32(pts2).T
 
         # go through the epipolar pipeline for pose estimation and initial scene reconstruction
+        # if debug:
+        #     X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, False, self.cameras[t1].img, self.cameras[t2].img)
+        # else:
+        #     X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
+        
+
         X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
+
 
         # save the static part
         self.static = X[:-1]
@@ -1732,7 +1803,34 @@ class Scene:
                 print('Status: {} from {} cam finished'.format(j+1,self.numCam))
             self.beta = beta
             self.beta_after_Fbeta = beta.copy()
+    
+    def time_shift_from_F(self, F):
+        '''
+        This function computes relative time shifts of each camera to the ref camera using the given corresponding frame numbers
 
+        If the given frame indices are precise, then the time shifts are directly transformed from them.
+        '''
+
+        assert len(self.cf)==self.numCam, 'The number of frame indices should equal to the number of cameras'
+
+        if self.settings['cf_exact']:
+            self.beta = self.cf[self.ref_cam] - self.alpha*self.cf
+            print('The given corresponding frames are directly exploited as temporal synchronization\n')
+        else:
+
+            print('Computing temporal synchronization...\n')
+            beta = np.zeros(self.numCam)
+            i = self.ref_cam
+            for j in range(self.numCam):
+                if j==i:
+                    beta[j] = 0
+                else:
+                    beta[j], _ = sync.sync_bf_from_F(self.cameras[i].fps, self.cameras[j].fps,
+                                                    self.detections[i], self.detections[j],
+                                                    self.cf[i], self.cf[j], F)
+                print('Status: {} from {} cam finished'.format(j+1,self.numCam))
+            self.beta = beta
+            self.beta_after_Fbeta = beta.copy()
 
 class Camera:
     """ 
@@ -1913,7 +2011,7 @@ class Camera:
     
     def read_img(self):
         self.img = cv2.imread(self.img_path)
-        self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
+        # self.img = cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB)
 
     def extract_features(self, img=None, method='sift'):
         '''

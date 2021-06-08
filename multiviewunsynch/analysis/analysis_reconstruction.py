@@ -6,11 +6,12 @@ from analysis.compare_gt import align_gt
 from reconstruction import synchronization as sync
 
 from reconstruction import epipolar as ep
-
+from tools.util import match_overlap
 from itertools import combinations
 from matplotlib import pyplot as plt
+import os
 
-def reproject_ground_truth(cameras, gt_pts ,n_bins=10, prefix=''):
+def reproject_ground_truth(cameras, gt_pts, gt_dets, n_bins=10, output_dir='', prefix='', flight=None):
     '''
     Function:
         Compute and plot the reprojection errors of the ground truth matches
@@ -20,55 +21,115 @@ def reproject_ground_truth(cameras, gt_pts ,n_bins=10, prefix=''):
         n_bins = number of bins for plotting the histogram of the errors
     '''
     
-    # split gt_pts into two parts
-    gt_pts_parts = np.split(gt_pts, len(cameras))
-
     combos = combinations(range(len(cameras)),2)
 
-    repo_errors = []
+    repro_errors = []
     # for every pair of cameras, triangulate 3d points and reproject
     for t1, t2 in combos:
         print("triangulate camera pairs: (%d, %d)" %(t1, t2))
         # undistort gt_points
-        gt_un1 = cameras[t1].undist_point(gt_pts_parts[t1].T)
-        gt_un2 = cameras[t2].undist_point(gt_pts_parts[t2].T)
+        gt_un1 = cameras[t1].undist_point(gt_pts[t1].T)
+        gt_un2 = cameras[t2].undist_point(gt_pts[t2].T)
 
         # triangulate
         X_gt = ep.triangulate_matlab(gt_un1, gt_un2, cameras[t1].P, cameras[t2].P)
 
         # backproject the triangulated points on the images
-        gt_repo1 = cameras[t1].dist_point3d(X_gt[:-1].T)
-        gt_repo2 = cameras[t2].dist_point3d(X_gt[:-1].T)
+        gt_repro1 = cameras[t1].dist_point3d(X_gt[:-1].T)
+        gt_repro2 = cameras[t2].dist_point3d(X_gt[:-1].T)
         # compute the error
-        repo_err1 = ep.reprojection_error(gt_un1, cameras[t1].projectPoint(X_gt))
-        repo_err2 = ep.reprojection_error(gt_un2, cameras[t2].projectPoint(X_gt))
-        repo_errors.append([repo_err1, repo_err2])
-        print("mean reprojection error of camera pair (%d, %d) is %f and %f" %(t1, t2, np.mean(repo_err1), np.mean(repo_err2)))
+        repro_err1 = ep.reprojection_error(gt_un1, cameras[t1].projectPoint(X_gt))
+        repro_err2 = ep.reprojection_error(gt_un2, cameras[t2].projectPoint(X_gt))
+        repro_errors.append([repro_err1, repro_err2])
+        print("mean reprojection error of camera pair (%d, %d) is %f and %f" %(t1, t2, np.mean(repro_err1), np.mean(repro_err2)))
 
         # histogram of reprojection error
         fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
-        axs[0].hist(repo_err1, bins=n_bins)
-        axs[1].hist(repo_err2, bins=n_bins)
-        plt.savefig(prefix+'repo_cam{}_{}.png'.format(t1, t2))
+        axs[0].hist(repro_err1, bins=n_bins)
+        axs[0].set_title('cam'+str(t1))
+        axs[1].hist(repro_err2, bins=n_bins)
+        axs[1].set_title('cam'+str(t2))
+        plt.savefig(output_dir+prefix+'repro_cam{}_{}.png'.format(t1, t2))
 
-        # plot images
-        if prefix == 'dynamic_only_':
-            vis.show_2D_all(gt_pts_parts[t1].T, gt_repo1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False)
-            vis.show_2D_all(gt_pts_parts[t2].T, gt_repo2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False)
+        plt.show()
+
+        # evaluate for the dynamic part
+        # match between detections
+        if cameras[t1].fps > cameras[t2].fps:
+            det1, det2 = match_overlap(gt_dets[t1], gt_dets[t2])
         else:
-            vis.show_2D_all(gt_pts_parts[t1].T, gt_repo1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False, bg=cameras[t1].img)
-            vis.show_2D_all(gt_pts_parts[t2].T, gt_repo2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False, bg=cameras[t2].img)
+            det2, det1 = match_overlap(gt_dets[t2], gt_dets[t1])
+
+        vis.draw_detection_matches(cameras[t1].img, det1, cameras[t2].img, det2, title=prefix+'matched_detections.png', output_dir=output_dir)
+        
+        # undistort points
+        det_un1 = cameras[t1].undist_point(det1[1:])
+        det_un2 = cameras[t2].undist_point(det2[1:])
+        # triangulate the detections
+        Traj_gt = ep.triangulate_matlab(det_un1, det_un2, cameras[t1].P, cameras[t2].P)
+        # backproject triangulated detections on the images
+        traj_repro1 = cameras[t1].dist_point3d(Traj_gt[:-1].T)
+        traj_repro2 = cameras[t2].dist_point3d(Traj_gt[:-1].T)
+        vis.draw_detection_matches(cameras[t1].img, np.vstack([det1[0],traj_repro1]), cameras[t2].img, np.vstack([det2[0],traj_repro2]), title=prefix+'reprojected_detections.png', output_dir=output_dir)
+        
+        # compute the reprojection error
+        traj_err1 = ep.reprojection_error(det_un1, cameras[t1].projectPoint(Traj_gt))
+        traj_err2 = ep.reprojection_error(det_un2, cameras[t2].projectPoint(Traj_gt))
+        repro_errors[-1] += [traj_err1, traj_err2]
+        print("mean reprojection error of the trajectories of camera pair (%d, %d) is %f and %f" %(t1, t2, np.mean(traj_err1), np.mean(traj_err2)))
+        # plot the histogram the reprojecton error of the dynamic part
+        fig, axs = plt.subplots(2, 1, sharex=True, tight_layout=True)
+        axs[0].hist(traj_err1, bins=n_bins)
+        axs[0].set_title('cam'+str(t1))
+        axs[1].hist(traj_err2, bins=n_bins)
+        axs[1].set_title('cam'+str(t2))
+        plt.savefig(output_dir+prefix+'repro_traj_cam{}_{}.png'.format(t1, t2))
+
+        plt.show()
+        
+        # plot images
+        vis.show_2D_all(gt_pts[t1].T, gt_repro1, det1[1:], traj_repro1, title=prefix+'cam'+str(t1)+' ground truth reprojection', color=True, line=False, bg=cameras[t1].img, output_dir=output_dir)
+        vis.show_2D_all(gt_pts[t2].T, gt_repro2, det2[1:], traj_repro2, title=prefix+'cam'+str(t2)+' ground truth reprojection', color=True, line=False, bg=cameras[t2].img, output_dir=output_dir)
+
+        # plot 3D reconstructe scene
+        vis.show_3D_all(X_gt, np.empty([3,0]), Traj_gt, np.empty([3,0]), color=False, line=False, flight=flight, output_dir=output_dir+prefix)
+
+def convert_timestamps(gt_dets, alphas, betas):
+    '''
+    Function:
+        convert the detection timestamps into the global timestamps according to the computed alpha, beta
+    Input:
+        cameras = the list of cameras to be evaluated
+        gt_dets = ground truth detections
+    Output:
+        gt_dets_global = the detection pairs in the global time frame
+    '''
+    for gt_det, alpha, beta in zip(gt_dets, alphas, betas):
+        gt_det[0] = alpha * gt_det[0] + beta
+
+    return gt_dets
 
 def main():
-    # Load ground truth
-    gt_static_file = '/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static.txt'
-    # gt_dynamic_file = ''
+    # Output dir
+    output_dir = '/scratch2/wuti/Repos/mvus/experiments/eval_res/'
 
-    gt_static = np.loadtxt(gt_static_file, delimiter=' ')
-    # gt_dynamic = np.loadtxt(gt_dynamic_file, delimiter=' ')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    # Load ground truth
+    gt_static_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam1.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam2.txt']
+    gt_dynamic_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam0_w1574280981_12_CSRT_obj0.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam2_w1587769795_12_CSRT_obj0.txt']
+
+    gt_static = []
+    for gfs in gt_static_file:
+        gt_static.append(np.loadtxt(gfs, delimiter=' '))
+    
+    gt_dynamic = []
+    for gfd in gt_dynamic_file:
+        gt_dynamic.append(np.loadtxt(gfd, usecols=(2,0,1), delimiter=' ').T)
 
     # Load scenes
-    data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_30.pkl'
+    data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_inlier_30.pkl'
     data_file_static = '/scratch2/wuti/Repos/mvus/experiments/static/nyc_colmap_static_superglue_30.pkl'
     data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_dynamic/nyc_colmap_static_dynamic_superglue_30.pkl'
 
@@ -86,13 +147,29 @@ def main():
     print("Plot reprojection error")
     # dynamic only
     print("Reconstructions from dynamic-only setting")
-    reproject_ground_truth(flight_dynamic.cameras, gt_static, prefix='dynamic_only_')
+    # convert dynamic part timestamp
+    gt_dynamic1 = [gt_dynamic[x].copy() for x in flight_dynamic.sequence]
+    gt_dynamic1 = convert_timestamps(gt_dynamic1, flight_dynamic.alpha, flight_dynamic.beta)
+    reproject_ground_truth(flight_dynamic.cameras, gt_static, gt_dynamic1, output_dir=output_dir, prefix='dynamic_only_', flight=flight_dynamic)
+    
     print('\n#################################################################\n')
     print("Reconstructions from static-only setting")
-    reproject_ground_truth(flight_static.cameras, gt_static, prefix='static_only_')
+    gt_dynamic2 = [gt_dynamic[x].copy() for x in flight_static_dynamic.sequence]
+    # no optimization for synchronization, use fps to convert timestamps
+    for i, cam in enumerate(flight_static.cameras):
+        gt_dynamic2[i][0] *= flight_static.cameras[flight_static.ref_cam].fps/cam.fps
+    reproject_ground_truth(flight_static.cameras, gt_static, gt_dynamic2, output_dir=output_dir, prefix='static_only_', flight=flight_static)
+
     print('\n#################################################################\n')
     print("Reconstructions from static-dynamic setting")
-    reproject_ground_truth(flight_static_dynamic.cameras, gt_static, prefix='static_dynamic_')
+    gt_dynamic3 = [gt_dynamic[x].copy() for x in flight_static_dynamic.sequence]
+    gt_dynamic3 = convert_timestamps(gt_dynamic3, flight_static_dynamic.alpha, flight_static_dynamic.beta)
+    reproject_ground_truth(flight_static_dynamic.cameras, gt_static, gt_dynamic3, output_dir=output_dir, prefix='static_dynamic_', flight=flight_static_dynamic)
+
+    print('\n#################################################################\n')
+    print("Reconstructions from static-only setting")
+    reproject_ground_truth(flight_static.cameras, gt_static, gt_dynamic3, output_dir=output_dir, prefix='static_only_sync_', flight=flight_static)
+
 
     print('Finish!')
 

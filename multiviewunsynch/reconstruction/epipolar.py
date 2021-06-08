@@ -700,6 +700,50 @@ def epipolar_pipeline(d1, d2, K1, K2, error, inlier_only, img1, img2):
 
     return X, P, inlier, mask
 
+def epipolar_pipeline_from_F(d1, d2, K1, K2, F, thres=5):
+    '''
+    Function:
+            Basic epipolar pipeline that goes from the matching pairs to the E esitmation and triangulation of 3D points
+    Input:
+            d1, d2: = matched keypoints in two images
+            K1, K2 =  intrinsics of the two cameras
+            error = error threshold for calculating fundamental matrix
+            inlier_only = if only using inliers for fundamental matrix computation
+            img1, img2 = two images
+    Output:
+            X = the triangulated 3D points from the matched pairs
+            P = the projection of the second camera
+            inlier = the inlier mask of the matched pairs used for fundamental matrix computation
+            mask = mask of the 2D keypoints used for triangulation
+    '''
+
+    # Compute sampson error and filter out outliers
+    serr = Sampson_error(util.homogeneous(d1),util.homogeneous(d2),F)
+    # inlier = np.zeros(len(serr))
+    # inlier[serr < thres] = 1
+    inlier = np.ones(len(serr))
+    # print(inlier)
+    E = np.dot(np.dot(K2.T, F), K1)
+
+    x1, x2 = util.homogeneous(d1[:, inlier == 1]), util.homogeneous(d2[:, inlier == 1])
+    # vis.plot_epipolar_line(img1[:,:,0], img2[:,:,0], F, x1, x2)
+
+    # Find corrected corresponding points for optimal triangulation
+    N = d1[:, inlier == 1].shape[1]
+    pts1 = d1[:, inlier == 1].T.reshape(1, -1, 2)
+    pts2 = d2[:, inlier == 1].T.reshape(1, -1, 2)
+    m1, m2 = cv2.correctMatches(F, pts1, pts2)
+    x1, x2 = util.homogeneous(np.reshape(m1, (-1, 2)).T), util.homogeneous(np.reshape(m2, (-1, 2)).T)
+
+    mask = np.logical_not(np.isnan(x1[0]))
+    x1 = x1[:, mask]
+    x2 = x2[:, mask]
+
+    # Triangulte points
+    X, P = triangulate_from_E(E, K1, K2, x1, x2)
+
+    return X, P, inlier, mask
+
 
 if __name__ == "__main__":
 
