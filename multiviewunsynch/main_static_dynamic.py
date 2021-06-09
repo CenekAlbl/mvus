@@ -95,6 +95,9 @@ while True:
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
         break
 
+    # Select the next camera if not pre-defined
+    flight.select_most_overlap()
+    
     # Add the next camera and get its pose
     flight.get_camera_pose(flight.sequence[cam_temp], flight.sequence[:cam_temp], debug=args.debug)
 

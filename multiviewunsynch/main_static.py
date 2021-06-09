@@ -63,6 +63,9 @@ while True:
         print('\nTotal time: {}\n\n\n'.format(datetime.now()-start))
         break
 
+    # find the next camera to be added if not the order is not specified
+    flight.select_next_camera_static(debug=args.debug)
+
     # Add the next camera and get its pose
     flight.get_camera_pose_static(flight.sequence[cam_temp], flight.sequence[:cam_temp], debug=args.debug)
 

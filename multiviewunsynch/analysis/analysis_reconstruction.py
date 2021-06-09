@@ -111,7 +111,7 @@ def convert_timestamps(gt_dets, alphas, betas):
 
 def main():
     # Output dir
-    output_dir = '/scratch2/wuti/Repos/mvus/experiments/eval_res/'
+    output_dir = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/eval_res_calibrated_10/'
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
@@ -119,6 +119,9 @@ def main():
     # Load ground truth
     gt_static_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam1.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam2.txt']
     gt_dynamic_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam0_w1574280981_12_CSRT_obj0.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam2_w1587769795_12_CSRT_obj0.txt']
+    
+    # gt_static_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam1_undistort_div.txt', '/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam2_undistort_div.txt']
+    # gt_dynamic_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam0_w1574280981_12_CSRT_obj0_undistort_div.txt', '/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam2_w1587769795_12_CSRT_obj0_undistort_div.txt']
 
     gt_static = []
     for gfs in gt_static_file:
@@ -129,12 +132,40 @@ def main():
         gt_dynamic.append(np.loadtxt(gfd, usecols=(2,0,1), delimiter=' ').T)
 
     # Load scenes
-    data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_inlier_30.pkl'
-    data_file_static = '/scratch2/wuti/Repos/mvus/experiments/static/nyc_colmap_static_superglue_30.pkl'
-    data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_dynamic/nyc_colmap_static_dynamic_superglue_30.pkl'
+    # COLMAP GUESS
+    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_inlier_30.pkl'
+    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/static/nyc_colmap_static_superglue_colmap2_30.pkl'
+    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
+    # data_file_static_then_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_then_dynamic/nyc_colmap_static_then_dynamic_superglue_30.pkl'
+    
+    # COLMAP GUESS 0
+    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_dynamic/nyc_colmap_dynamic_ori_inlier_calibrated_30.pkl'
+    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap2_static/nyc_colmap_static_superglue_colmap2_30.pkl'
+    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap2_static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
 
-    with open(data_file_dynamic, 'rb') as file:
-        flight_dynamic = pickle.load(file)
+    # COLMAP GUESS 0
+    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_dynamic/nyc_colmap_dynamic_ori_inlier_calibrated_30.pkl'
+    data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap3_static/nyc_colmap_static_superglue_colmap2_30.pkl'
+    data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap3_static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
+
+    # CALIBRATED
+    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_dynamic/nyc_colmap_dynamic_ori_inlier_calibrated_30.pkl'
+    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static/nyc_colmap_static_superglue_calibrated_30.pkl'
+    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static_dynamic/nyc_colmap_static_dynamic_superglue_calibrated_30.pkl'
+
+    # CALIBRATED F10
+    data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static_10/nyc_colmap_static_superglue_calibrated_10.pkl'
+    data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static_dynamic_10/nyc_colmap_static_dynamic_superglue_calibrated_10.pkl'
+
+
+    # UNDISTORT
+    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/undistort_dynamic/nyc_colmap_dynamic_ori_inlier_undistort_30.pkl'
+    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/undistort_static/nyc_colmap_static_superglue_undistort_30.pkl'
+    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/undistort_static_dynamic/nyc_colmap_static_dynamic_superglue_undistort_30.pkl'
+    # data_file_static_then_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_then_dynamic/nyc_colmap_static_then_dynamic_superglue_30.pkl'
+    
+    # with open(data_file_dynamic, 'rb') as file:
+    #     flight_dynamic = pickle.load(file)
 
     with open(data_file_static, 'rb') as file:
         flight_static = pickle.load(file)
@@ -142,15 +173,19 @@ def main():
     with open(data_file_static_dynamic, 'rb') as file:
         flight_static_dynamic = pickle.load(file)
 
+    # with open(data_file_static_then_dynamic, 'rb') as file:
+    #     flight_static_then_dynamic = pickle.load(file)
+
     # Analysis
     # 2D reprojection error
     print("Plot reprojection error")
-    # dynamic only
-    print("Reconstructions from dynamic-only setting")
-    # convert dynamic part timestamp
-    gt_dynamic1 = [gt_dynamic[x].copy() for x in flight_dynamic.sequence]
-    gt_dynamic1 = convert_timestamps(gt_dynamic1, flight_dynamic.alpha, flight_dynamic.beta)
-    reproject_ground_truth(flight_dynamic.cameras, gt_static, gt_dynamic1, output_dir=output_dir, prefix='dynamic_only_', flight=flight_dynamic)
+    
+    # # dynamic only
+    # print("Reconstructions from dynamic-only setting")
+    # # convert dynamic part timestamp
+    # gt_dynamic1 = [gt_dynamic[x].copy() for x in flight_dynamic.sequence]
+    # gt_dynamic1 = convert_timestamps(gt_dynamic1, flight_dynamic.alpha, flight_dynamic.beta)
+    # reproject_ground_truth(flight_dynamic.cameras, gt_static, gt_dynamic1, output_dir=output_dir, prefix='dynamic_only_', flight=flight_dynamic)
     
     print('\n#################################################################\n')
     print("Reconstructions from static-only setting")
@@ -170,6 +205,11 @@ def main():
     print("Reconstructions from static-only setting")
     reproject_ground_truth(flight_static.cameras, gt_static, gt_dynamic3, output_dir=output_dir, prefix='static_only_sync_', flight=flight_static)
 
+    # print('\n#################################################################\n')
+    # print("Reconstructions from static-then-dynamic setting")
+    # gt_dynamic4 = [gt_dynamic[x].copy() for x in flight_static_then_dynamic.sequence]
+    # gt_dynamic4 = convert_timestamps(gt_dynamic4, flight_static_then_dynamic.alpha, flight_static_then_dynamic.beta)
+    # reproject_ground_truth(flight_static_then_dynamic.cameras, gt_static, gt_dynamic4, output_dir=output_dir, prefix='static_then_dynamic_', flight=flight_static_then_dynamic)
 
     print('Finish!')
 

@@ -356,10 +356,15 @@ class Scene:
     
     def init_traj_from_pose(self):
         t1, t2 = self.sequence[0], self.sequence[1]
+        c1, c2 = -np.dot(self.cameras[t1].R.T, self.cameras[t1].t.reshape(-1,1)), -np.dot(self.cameras[t2].R.T, self.cameras[t2].t.reshape(-1,1))
+        R12 = np.dot(self.cameras[t1].R.T, self.cameras[t2].R)
+        t12 = -np.dot(R12, c2-c1).ravel()
         E = np.dot(self.cameras[t2].R, ep.skew(self.cameras[t2].t))
+        E1 = np.dot(R12, ep.skew(t12))
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
         F = np.dot(np.linalg.inv(K2).T, np.dot(E, np.linalg.inv(K1)))
+
         # x1, x2 = util.homogeneous(self.cameras[t1].get_gt_pts()), util.homogeneous(self.cameras[t2].get_gt_pts())
         # l1 = F.dot(x1).T
         # # compute distance between l1 and x2
@@ -392,6 +397,7 @@ class Scene:
         self.init_alpha()
         # synchronize between detections
         # self.time_shift_from_F(F)
+        # self.time_shift_from_pose()
         self.time_shift()
         # convert detection timestamps to global
         self.detection_to_global()
@@ -414,11 +420,15 @@ class Scene:
         else:
             vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
 
+        # X, P, inlier, mask = ep.epipolar_pipeline_from_E(d1[1:], d2[1:], K1, K2, E)
         X, P, inlier, mask = ep.epipolar_pipeline_from_F(d1[1:], d2[1:], K1, K2, F)
         
         self.traj = np.vstack((d1[0][inlier==1][mask],X[:-1]))
 
     def init_static(self, error=10, inlier_only=False, debug=False):
+        
+        self.select_next_camera_static(init=True, debug=debug)
+        
         t1, t2 = self.sequence[0], self.sequence[1]
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
@@ -488,9 +498,7 @@ class Scene:
         # else:
         #     X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
         
-
         X, P, inlier, mask = ep.epipolar_pipeline(pts1, pts2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
-
 
         # save the static part
         self.static = X[:-1]
@@ -1308,53 +1316,81 @@ class Scene:
         '''
         if debug:
             # use the ground truth matches
-            # initialize the matching result of this new camera to be stored to the dict
-            self.feature_dict[cam_id] = -np.ones((self.numCam, len(self.cameras[cam_id].gt_pts)))
-            # match between the features of this new camera and all other cameras
+            # if have not yet initialize the cam_id in the feature dict, do so
+            if cam_id not in self.feature_dict.keys():
+                # initialize the matching result of this new camera to be stored to the dict
+                self.feature_dict[cam_id] = -np.ones((self.numCam, len(self.cameras[cam_id].gt_pts)))
+                # match between the features of this new camera and all other cameras
+                for i in cams:
+                    if i == cam_id:
+                        continue
+                    # all the ground truth matches are mutually valid, so directly update
+                    self.feature_dict[cam_id][i] = np.arange(len(self.cameras[i].gt_pts))
+                    self.feature_dict[i][cam_id] = np.arange(len(self.cameras[cam_id].gt_pts))
+            
+            # get the registered indices based on matches in feature dict
             for i in cams:
                 if i == cam_id:
                     continue
-                # all the ground truth matches are mutually valid, so directly update
-                self.feature_dict[cam_id][i] = np.arange(len(self.cameras[i].gt_pts))
-                self.feature_dict[i][cam_id] = np.arange(len(self.cameras[cam_id].gt_pts))
-
                 # update the registered indices (all ground truth matches share the same indices)
                 self.cameras[cam_id].index_2d_3d = self.cameras[i].index_2d_3d
                 self.cameras[cam_id].index_registered_2d = self.cameras[i].index_registered_2d
-            
             # add the ground truth
             pts_2d = self.cameras[cam_id].get_gt_points()
+
         else:
             # get the features and descriptors of the new camera
             kp1, des1 = self.cameras[cam_id].kp, self.cameras[cam_id].des
 
-            # initilize the matching result of the new camera to be stored in feature_dict
-            match_res = -np.ones((self.numCam, len(kp1)))
-            # loop through all the cameras
+            # if have not yet initialize cam_id in feature_dict, do so
+            if cam_id not in self.feature_dict.keys():
+                # initilize the matching result of the new camera to be stored in feature_dict
+                match_res = -np.ones((self.numCam, len(kp1)))
+                # loop through all the cameras
+                for i in cams:
+                    if i == cam_id:
+                        continue
+                    # get the features of the old camera
+                    kp2, des2 = self.cameras[i].kp, self.cameras[i].des
+                    # match the features of the new camera and the old camera
+                    _, _, matches, matchesMask = ep.matching_feature(kp1, kp2, des1, des2, ratio=0.8)
+                    # draw matches
+                    vis.draw_matches(self.cameras[cam_id].img, self.cameras[cam_id].kp, self.cameras[i].img, self.cameras[i].kp, matches, matchesMask)
+                    
+                    # get the matched indices
+                    query_ids = np.array([m[0].queryIdx for m in matches])
+                    train_ids = np.array([m[0].trainIdx for m in matches])
+
+                    # get the valid matches
+                    match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+                    query_ids = query_ids[match_ids]
+                    train_ids = train_ids[match_ids]
+
+                    # save the matching result to feature_dict
+                    match_res[i, query_ids] = train_ids
+                    self.feature_dict[cam_id] = match_res
+                    self.feature_dict[i][cam_id, train_ids] = query_ids
+
+            # otherwise get the matching results from feature dict
             for i in cams:
                 if i == cam_id:
                     continue
-                # get the features of the old camera
-                kp2, des2 = self.cameras[i].kp, self.cameras[i].des
-                # match the features of the new camera and the old camera
-                _, _, matches, matchesMask = ep.matching_feature(kp1, kp2, des1, des2, ratio=0.8)
-                # draw matches
-                vis.draw_matches(self.cameras[cam_id].img, self.cameras[cam_id].kp, self.cameras[i].img, self.cameras[i].kp, matches, matchesMask)
                 
-                # get the matched indices
-                query_ids = np.array([m[0].queryIdx for m in matches])
-                train_ids = np.array([m[0].trainIdx for m in matches])
-
-                # save the matching result to feature_dict
-                match_res[i, query_ids] = train_ids
-                self.feature_dict[cam_id] = match_res
-                self.feature_dict[i][cam_id, train_ids] = query_ids
-
+                # get the matching results between cam_id and i
+                match_res = self.feature_dict[cam_id][i]
+                train_ids = match_res[match_res >= 0]
+                query_ids = np.where(match_res >= 0)[0]
                 # find the indices of the old features that has been used
                 _, train_in_ids, registered_ids = np.intersect1d(train_ids, self.cameras[i].index_registered_2d, return_indices=True)
-                # register corresponding query_ids of the new camera
-                self.cameras[cam_id].index_registered_2d = np.union1d(self.cameras[cam_id].index_registered_2d, query_ids[train_in_ids])
-                self.cameras[cam_id].index_2d_3d = np.union1d(self.cameras[cam_id].index_2d_3d, self.cameras[i].index_2d_3d[registered_ids])
+                
+                # # register corresponding query_ids of the new camera
+                # self.cameras[cam_id].index_registered_2d = np.union1d(self.cameras[cam_id].index_registered_2d, query_ids[train_in_ids]).astype(int)
+                # self.cameras[cam_id].index_2d_3d = np.union1d(self.cameras[cam_id].index_2d_3d, self.cameras[i].index_2d_3d[registered_ids]).astype(int)
+                
+                # find the indices of the point that has not been added
+                newids = np.isin(self.cameras[i].index_2d_3d[registered_ids], self.cameras[cam_id].index_2d_3d, invert=True)
+                self.cameras[cam_id].index_2d_3d = np.concatenate([self.cameras[cam_id].index_2d_3d, self.cameras[i].index_2d_3d[registered_ids[newids]]]).astype(int)
+                self.cameras[cam_id].index_registered_2d = np.concatenate([self.cameras[cam_id].index_registered_2d, query_ids[train_in_ids[newids]]]).astype(int)
             
             # get the registered 2d features from the new camera
             pts_2d = self.cameras[cam_id].get_points()
@@ -1384,8 +1420,8 @@ class Scene:
         retval, rvec, tvec, inliers = cv2.solvePnPRansac(objectPoints, imagePoints, self.cameras[cam_id].K, distCoeffs, reprojectionError=error)
 
         # update the indices of the registered 2d features, removing the outliers
-        self.cameras[cam_id].index_registered_2d = self.cameras[cam_id].index_registered_2d[inliers]
-        self.cameras[cam_id].index_2d_3d = self.cameras[cam_id].index_2d_3d[inliers]
+        self.cameras[cam_id].index_registered_2d = self.cameras[cam_id].index_registered_2d[inliers.ravel()]
+        self.cameras[cam_id].index_2d_3d = self.cameras[cam_id].index_2d_3d[inliers.ravel()]
 
         self.cameras[cam_id].R = cv2.Rodrigues(rvec)[0]
         self.cameras[cam_id].t = tvec.reshape(-1,)
@@ -1521,16 +1557,17 @@ class Scene:
         cand_ids = all_ids[~np.in1d(all_ids, self.cameras[cam_id].index_registered_2d)]
 
         X_new = np.empty([3, 0])
-        added_cand_ids = np.empty([0])
+        added_cand_ids = np.empty(0)
         # loop through all old cameras, and triangulate the matched features
         for i in cams:
             if i == cam_id:
                 continue
             # get the matched features in this camera
             new_ids, matched_ids, _ = np.intersect1d(self.feature_dict[i][cam_id], cand_ids, return_indices=True)
+            new_ids = new_ids.astype(int)
             # get the 2d points from the two cameras
-            pts1 = self.cameras[cam_id].get_points()[:,new_ids]
-            pts2 = self.cameras[i].get_points()[:, matched_ids]
+            pts1 = self.cameras[cam_id].get_points(new_ids)
+            pts2 = self.cameras[i].get_points(matched_ids)
             
             # undistort the 2d points if needed
             if self.settings['undist_points']:
@@ -1563,22 +1600,22 @@ class Scene:
             
             # registered the points that have not yet been added
             self.cameras[cam_id].index_registered_2d = np.concatenate((self.cameras[cam_id].index_registered_2d, new_ids[~added_mask]))
-            self.cameras[cam_id].index_2d_3d = np.concatenate((self.cameras[cam_id], ids_3d_new))
+            self.cameras[cam_id].index_2d_3d = np.concatenate((self.cameras[cam_id].index_2d_3d, ids_3d_new))
 
             # register the new points in the old camera
             # first add the points which have previously been added
             self.cameras[i].index_registered_2d = np.concatenate((self.cameras[i].index_registered_2d, matched_ids[added_mask]))
             # get the corresponding 3d point indices
-            ids_3d_old = np.in1d(add_cand_ids, new_ids).nonzeros()[0] + int(np.sum(self.inlier_mask))
+            ids_3d_old = np.in1d(added_cand_ids, new_ids).nonzero()[0] + int(np.sum(self.inlier_mask))
             self.cameras[i].index_2d_3d = np.concatenate((self.cameras[i].index_2d_3d, ids_3d_old))
             # then add the points which have not yet been added
             self.cameras[i].index_registered_2d = np.concatenate((self.cameras[i].index_registered_2d, matched_ids[~added_mask]))
             self.cameras[i].index_2d_3d = np.concatenate((self.cameras[i].index_2d_3d, ids_3d_new))
             
             # keep a track of the new ids 
-            add_cand_ids = np.concatenate((add_cand_ids, new_ids[~added_mask]))
+            add_cand_ids = np.concatenate((added_cand_ids, new_ids[~added_mask]))
             # add the new points to the record
-            X_new = np.hstack([X_new, X_i[:, ~added_mask]])
+            X_new = np.hstack([X_new, X_i[:-1, ~added_mask]])
         
         # add these new points to the static scene
         self.static = np.hstack([self.static, X_new])
@@ -1650,7 +1687,91 @@ class Scene:
                     overlap_max = len(overlap)
                     next_cam = i
             self.sequence.append(next_cam)
+    
+    def select_next_camera_static(self, init=False, debug=False):
+        '''
+        Function:
+            find to the next camera to be registered based on the static part only
+        Input:
+            init = whether in the initialization or not
+        '''
 
+        assert self.numCam >= 2
+
+        if not self.find_order:
+            return
+        
+        if init:
+            # take the first two cameras as initial pairs
+            self.sequence = [0,1]
+        else:
+            # get the candidate new cameras
+            candidate = []
+            for i in range(self.numCam):
+                if self.cameras[i].P is None:
+                    candidate.append(i)
+            
+            # find the next camera with the largest overlap
+            max_overlap = 0
+            for cam_id in candidate:
+                num_overlap = 0
+                overlap_ids = np.empty(0)
+                # initialize feature_dict
+                if debug:
+                    # use the ground truth matches
+                    # initialize the matching result of this new camera to be stored to the dict
+                    self.feature_dict[cam_id] = -np.ones((self.numCam, len(self.cameras[cam_id].gt_pts)))
+                    # match between the features of this new camera and all other cameras
+                    for i in self.sequence:
+                        # all ground truth matches are mutually valid, directly populate with indices
+                        self.feature_dict[cam_id][i] = np.arange(len(self.cameras[i].gt_pts))
+                        self.feature_dict[i][cam_id] = np.arange(len(self.cameras[cam_id].gt_pts))
+
+                        # get the registered indices in 3d
+                        overlap_ids = np.union1d(overlap_ids,self.cameras[i].index_2d_3d)
+                        # sum the number of registered indices
+                        num_overlap = len(overlap_ids)
+                else:
+                    # get the features and descriptors of the new camera
+                    kp1, des1 = self.cameras[cam_id].kp, self.cameras[cam_id].des
+
+                    # initilize the matching result of the new camera to be stored in feature_dict
+                    match_res = -np.ones((self.numCam, len(kp1)))
+                    # loop through all the cameras
+                    for i in self.sequence:
+                        # get the features of the old camera
+                        kp2, des2 = self.cameras[i].kp, self.cameras[i].des
+                        # match the features of the new camera and the old camera
+                        _, _, matches, matchesMask = ep.matching_feature(kp1, kp2, des1, des2, ratio=0.8)
+                        # draw matches
+                        vis.draw_matches(self.cameras[cam_id].img, self.cameras[cam_id].kp, self.cameras[i].img, self.cameras[i].kp, matches, matchesMask)
+
+                        # get the matched indices
+                        query_ids = np.array([m[0].queryIdx for m in matches])
+                        train_ids = np.array([m[0].trainIdx for m in matches])
+
+                        # get the valid matches
+                        match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+                        query_ids = query_ids[match_ids]
+                        train_ids = train_ids[match_ids]
+
+                        # save the matching result to feature_dict
+                        match_res[i, query_ids] = train_ids
+                        self.feature_dict[cam_id] = match_res
+                        self.feature_dict[i][cam_id, train_ids] = query_ids
+
+                        # find the indices of the old features that has been used
+                        _, _, registered_ids = np.intersect1d(train_ids, self.cameras[i].index_registered_2d, return_indices=True)
+                        # find the corresponding indices in 3D points
+                        overlap_ids = np.union1d(overlap_ids, self.cameras[i].index_2d_3d[registered_ids])
+                        num_overlap = len(overlap_ids)
+                    
+                if num_overlap > max_overlap:
+                    next_cam = cam_id
+
+            # add the next cam to the sequence
+            self.sequence.append(next_cam)
+            
 
     def all_detect_to_traj(self,*cam):
         #global_traj = np.empty()
@@ -1800,6 +1921,7 @@ class Scene:
                     beta[j], _ = sync_fun(self.cameras[i].fps, self.cameras[j].fps,
                                                     self.detections[i], self.detections[j],
                                                     self.cf[i], self.cf[j])
+# FIXME: threshold=20
                 print('Status: {} from {} cam finished'.format(j+1,self.numCam))
             self.beta = beta
             self.beta_after_Fbeta = beta.copy()
@@ -1831,6 +1953,29 @@ class Scene:
                 print('Status: {} from {} cam finished'.format(j+1,self.numCam))
             self.beta = beta
             self.beta_after_Fbeta = beta.copy()
+    
+    def time_shift_from_pose(self):
+        '''
+        This function computes relative time shifts of each camera to the ref camera using the given corresponding frame numbers
+
+        If the given frame indices are precise, then the time shifts are directly transformed from them.
+        '''
+
+        assert len(self.cf)==self.numCam, 'The number of frame indices should equal to the number of cameras'
+
+        print('Computing temporal synchronization...\n')
+        beta = np.zeros(self.numCam)
+        i = self.ref_cam
+        for j in range(self.numCam):
+            if j==i:
+                beta[j] = 0
+            else:
+                beta[j], _ = sync.sync_bf_from_pose(self.cameras[i].fps, self.cameras[j].fps,
+                                                self.detections[i], self.detections[j],
+                                                self.cf[i], self.cf[j], self.cameras[i], self.cameras[j])
+            print('Status: {} from {} cam finished'.format(j+1,self.numCam))
+        self.beta = beta
+        self.beta_after_Fbeta = beta.copy()
 
 class Camera:
     """ 
@@ -2029,11 +2174,13 @@ class Camera:
             print("extract features from given img")
             self.kp, self.des = ep.extract_SIFT_feature(img)
 
-    def get_points(self):
+    def get_points(self, indices=None):
         '''
         get the registered 2d points (2, n)
         '''
         point_2d = np.empty([2, 0])
+        if indices is not None:
+            return np.hstack([point_2d, np.array([self.kp[idx].pt for idx in indices]).T.reshape(2,-1)])
         return np.hstack([
             point_2d,
             np.array([self.kp[idx].pt
@@ -2086,7 +2233,7 @@ def create_scene(path_input):
         # load camera information
         camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'], img_path=cam['img_path'])
         # extract features
-        if 'include_static' in config.keys() and config['include_static']:
+        if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
             camera.extract_features(method=flight.settings['feature_extractor'])
         else:
             camera.read_img()

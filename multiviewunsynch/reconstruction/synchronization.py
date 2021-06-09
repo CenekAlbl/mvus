@@ -218,6 +218,60 @@ def sync_bf_from_F(fps1, fps2, detect1, detect2, frame1, frame2, F, r=10):
 
     return beta, overlap_second
 
+def sync_bf_from_pose(fps1, fps2, detect1, detect2, frame1, frame2, cam1, cam2, r=10):
+    '''
+    Brute-force method for temporal synchronization of two series of detections
+
+    r is the half length of the search interval in unit second
+
+    Function returns both the time shift (beta) and the temporal overlap of the two series of detections in unit second
+    '''
+
+
+    def search(beta_list, thres=5):
+        maxInlier = 0
+        beta_est = 0
+        minErr = np.inf
+        for beta in beta_list:
+            detect2_temp = np.vstack((detect2[0]+beta,detect2[1:]))
+            pts1, pts2 = util.match_overlap(detect1_temp, detect2_temp)
+
+            X = epipolar.triangulate_matlab(pts1[1:], pts2[1:], cam1.P, cam2.P)
+
+            err1 = epipolar.reprojection_error(pts1[1:], cam1.projectPoint(X))
+            err2 = epipolar.reprojection_error(pts2[1:], cam2.projectPoint(X))
+
+
+            # serr = epipolar.Sampson_error(util.homogeneous(pts1[1:]), util.homogeneous(pts2[1:]), F)
+            
+            # inlier = np.sum((err1 < thres) & (err2 < thres))
+
+            # if inlier > maxInlier:
+            #     maxInlier = inlier
+            #     beta_est = beta
+            mean_err = np.mean(err1)+np.mean(err2)
+            if mean_err < minErr:
+                best_est = beta
+
+        return beta_est, maxInlier
+
+
+    # Pre-processing
+    alpha = fps1 / fps2
+    detect1_temp = np.vstack((detect1[0]/alpha,detect1[1:]))
+    beta_prior = frame1/alpha - frame2
+
+    # Two-stage search
+    beta_coarse = np.arange(beta_prior-r*fps2, beta_prior+r*fps2, fps2)
+    beta_est, _ = search(beta_coarse)
+    beta_fine = np.arange(beta_est-fps2/2, beta_est+fps2/2, fps2/1000)
+    beta_est, numInlier  = search(beta_fine)
+
+    # Result
+    beta = beta_est * alpha
+    overlap_second = numInlier/fps1
+
+    return beta, overlap_second
 
 if __name__ == "__main__":
 

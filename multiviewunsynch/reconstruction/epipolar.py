@@ -700,7 +700,7 @@ def epipolar_pipeline(d1, d2, K1, K2, error, inlier_only, img1, img2):
 
     return X, P, inlier, mask
 
-def epipolar_pipeline_from_F(d1, d2, K1, K2, F, thres=5):
+def epipolar_pipeline_from_F(d1, d2, K1, K2, F, inlier_only=False,thres=5):
     '''
     Function:
             Basic epipolar pipeline that goes from the matching pairs to the E esitmation and triangulation of 3D points
@@ -718,12 +718,15 @@ def epipolar_pipeline_from_F(d1, d2, K1, K2, F, thres=5):
     '''
 
     # Compute sampson error and filter out outliers
-    serr = Sampson_error(util.homogeneous(d1),util.homogeneous(d2),F)
-    # inlier = np.zeros(len(serr))
-    # inlier[serr < thres] = 1
-    inlier = np.ones(len(serr))
+    if inlier_only:
+        serr = Sampson_error(util.homogeneous(d1),util.homogeneous(d2),F)
+        inlier = np.zeros(len(serr))
+        inlier[serr < thres] = 1
+    else:
+        inlier = np.ones(d1.shape[1])
     # print(inlier)
     E = np.dot(np.dot(K2.T, F), K1)
+    # F = np.dot(np.linalg.inv(K2).T, np.dot(E, np.linalg.inv(K1)))
 
     x1, x2 = util.homogeneous(d1[:, inlier == 1]), util.homogeneous(d2[:, inlier == 1])
     # vis.plot_epipolar_line(img1[:,:,0], img2[:,:,0], F, x1, x2)
