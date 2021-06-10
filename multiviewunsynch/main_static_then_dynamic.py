@@ -9,6 +9,7 @@ from datetime import datetime
 from reconstruction import common
 from analysis.compare_gt import align_gt, align_gt_static
 import sys
+from tools.util import unpack_sift_kp
 
 import cv2
 from reconstruction import epipolar as ep
@@ -212,9 +213,9 @@ if len(flight.gt) > 0:
     flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
 with open(flight.settings['path_output'],'wb') as f:
     # unpack sift features if used
-    if flight.settings['feature_extractor'] == 'sift':
+    if flight.settings['include_static']:
         for cam in flight.cameras:
-            cam.unpack_sift_kp()
+            cam.kp = unpack_sift_kp(cam.kp)
     pickle.dump(flight, f)
 
 print('Finished!')

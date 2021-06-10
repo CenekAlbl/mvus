@@ -432,63 +432,70 @@ class Scene:
         t1, t2 = self.sequence[0], self.sequence[1]
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
-        if debug:
-            # in debug, use static ground truth as 2d featues
-            if self.settings['undist_points']:
-                # undistort the ground truth matches
-                pts1 = self.cameras[t1].undist_point(self.cameras[t1].gt_pts.T, self.settings['undist_method']).T
-                pts2 = self.cameras[t2].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
-
-                # plot the ground truth matches
-                # FIXME: check pts_dist == gt_pts
-                pts1_dist = self.cameras[t1].dist_point2d(pts1.T, method=self.settings['undist_method'])
-                pts2_dist = self.cameras[t2].dist_point2d(pts2.T, method=self.settings['undist_method'])
-                # vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
-                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),self.cameras[t1].gt_pts.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),self.cameras[t2].gt_pts.T]))
-
-            else:
-                pts1 = self.cameras[t1].gt_pts
-                pts2 = self.cameras[t2].gt_pts
+        # if feature_dict is empty
+        if self.feature_dict:
+            if debug:
+                # in debug, use static ground truth as 2d featues
+                pts1 = self.cameras[t1].gt_pts.T
+                pts2 = self.cameras[t2].gt_pts.T
             
-                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),pts1.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),pts2.T]))
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),pts2]))
 
-            # save the matching result, the indices of the ground truth matches are shared across all cameras
-            query_ids = np.arange(self.cameras[t1].gt_pts.shape[0])
-            train_ids = np.arange(self.cameras[t2].gt_pts.shape[0])
+                # save the matching result, the indices of the ground truth matches are shared across all cameras
+                query_ids = np.arange(self.cameras[t1].gt_pts.shape[0])
+                train_ids = np.arange(self.cameras[t2].gt_pts.shape[0])
 
-            # initialize the matrix for storing matching result
-            match_res1 = -np.ones((self.numCam, self.cameras[t1].gt_pts.shape[0]))
-            match_res2 = -np.ones((self.numCam, self.cameras[t2].gt_pts.shape[0]))
+                # initialize the matrix for storing matching result
+                match_res1 = -np.ones((self.numCam, self.cameras[t1].gt_pts.shape[0]))
+                match_res2 = -np.ones((self.numCam, self.cameras[t2].gt_pts.shape[0]))
+            
+            else:
+                # Match features with sift
+                if settings['feature_method'][0] == 'sift':
+                    pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
+                    # draw matches
+                    vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
+                    # get the valid matches
+                    match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+
+                    # get the valid matches
+                    query_ids = np.array([m[0].queryIdx for m in matches])
+                    train_ids = np.array([m[0].trainIdx for m in matches])
+                    query_ids = query_ids[match_ids]
+                    train_ids = train_ids[match_ids]
+
+                    # initialize the matrix for storing matching result
+                    match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
+                    match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
+
+                    pts1, pts2 = np.array(pts1).T, np.array(pts2).T
+                else:
+                    raise Exception("Superglue matches are not properly loaded.")
+
+            # save the matching result to feature_dict
+            match_res1[t2,query_ids] = train_ids
+            match_res2[t1,train_ids] = query_ids
+            self.feature_dict[t1] = match_res1
+            self.feature_dict[t2] = match_res2
         
+        # if feature_dict is already specified, get the corresponding pts
         else:
-            # Match features
-            pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
-            # draw matches
-            vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
-            # get the valid matches
-            match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+            match_res = self.feature_dict[t1][t2]
+            query_ids = np.where(match_res > -1)[0]
+            train_ids = match_res[match_res > -1]
 
-            # undistort the matched keypoints
-            if self.settings['undist_points']:
-                pts1 = self.cameras[t1].undist_point(np.array(pts1).T, self.settings['undist_method']).T
-                pts2 = self.cameras[t2].undist_point(np.array(pts2).T, self.settings['undist_method']).T
+            # create the matches, and matchesMask for visualization (all the matches specify here are valid matches)
+            matches = [cv2.DMatch(i, i, 0) for i in range(len(query_ids))]
+            matchesMask = [[1,0] for i in range(len(query_ids))]
 
-            # get the valid matches
-            query_ids = np.array([m[0].queryIdx for m in matches])
-            train_ids = np.array([m[0].trainIdx for m in matches])
-            query_ids = query_ids[match_ids]
-            train_ids = train_ids[match_ids]
+            pts1 = self.cameras[t1].get_points(indices=query_ids)
+            pts2 = self.cameras[t2].get_points(indices=train_ids)
 
-            # initialize the matrix for storing matching result
-            match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
-            match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
+        # undistort the matched keypoints
+        if self.settings['undist_points']:
+            pts1 = self.cameras[t1].undist_point(pts1, self.settings['undist_method']).T
+            pts2 = self.cameras[t2].undist_point(pts2, self.settings['undist_method']).T
 
-        # save the matching result to feature_dict
-        match_res1[t2,query_ids] = train_ids
-        match_res2[t1,train_ids] = query_ids
-        self.feature_dict[t1] = match_res1
-        self.feature_dict[t2] = match_res2
-        
         pts1 = np.int32(pts1).T
         pts2 = np.int32(pts2).T
 
@@ -1339,11 +1346,14 @@ class Scene:
             pts_2d = self.cameras[cam_id].get_gt_points()
 
         else:
-            # get the features and descriptors of the new camera
-            kp1, des1 = self.cameras[cam_id].kp, self.cameras[cam_id].des
-
             # if have not yet initialize cam_id in feature_dict, do so
             if cam_id not in self.feature_dict.keys():
+
+                # this only happens when using sift extractor
+                assert self.settings['feature_method'][0] == 'sift', 'Currently only support sift, and Superglue; however, the Superglue matches are not properly loaded'
+
+                # get the features and descriptors of the new camera
+                kp1, des1 = self.cameras[cam_id].kp, self.cameras[cam_id].des
                 # initilize the matching result of the new camera to be stored in feature_dict
                 match_res = -np.ones((self.numCam, len(kp1)))
                 # loop through all the cameras
@@ -1702,8 +1712,19 @@ class Scene:
             return
         
         if init:
-            # take the first two cameras as initial pairs
-            self.sequence = [0,1]
+            # if already have matching results, pick the pair of cameras that have most matches
+            if self.feature_dict:
+                max_num_matches = 0
+                for k, v in self.feature_dict.items():
+                    match_res = self.feature_dict[k]
+                    num_matches = np.count_nonzero(match_res+1,axis=1)
+                    k2 = np.argmax(num_matches)
+                    if num_matches[k2] > max_num_matches:
+                        max_num_matches = num_matches[k2]
+                        self.sequence = [k, k2]
+            else:
+                # take the first two cameras as initial pairs
+                self.sequence = [0,1]
         else:
             # get the candidate new cameras
             candidate = []
@@ -2192,9 +2213,6 @@ class Camera:
         get the registered 2d ground truth points (2, n)
         '''
         return self.gt_pts[self.index_registered_2d].T
-    
-    def unpack_sift_kp(self):
-        self.kp = np.array([kp.pt for kp in self.kp])
 
 def create_scene(path_input):
     '''
@@ -2217,6 +2235,18 @@ def create_scene(path_input):
     for i in path_detect:
         detect = np.loadtxt(i,usecols=(2,0,1))[:flight.settings['num_detections']].T
         flight.addDetection(detect)
+    
+    # Load superglue matches or ground truth
+    if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
+        feature_method = config['necessary inputs']['feature_method']
+        # if use superglue, load the preprocessed superpoints and matching result
+        if feature_method[0] == 'superglue':
+            try:
+                with open(feature_method[-1], 'rb') as f:
+                    flight.feature_dict = pickle.load(f)
+                    kpt_list = pickle.load(f)
+            except:
+                raise Exception('Failed to read superglue matching results')
 
     # Load cameras
     path_cam = config['necessary inputs']['path_cameras']
@@ -2234,7 +2264,13 @@ def create_scene(path_input):
         camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'], img_path=cam['img_path'])
         # extract features
         if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
-            camera.extract_features(method=flight.settings['feature_extractor'])
+            # if using sift as feature_method, also extract sift features
+            if feature_method[0] == 'sift':
+                camera.extract_features(method=flight.settings['feature_extractor'])
+            elif feature_method[0] == 'superglue':
+                camera.kp = util.convert_kpts(kpt_list[i])
+            else:
+                raise Exception("Unsupported feature extraction and matching method")
         else:
             camera.read_img()
 
