@@ -120,7 +120,7 @@ def plot_epipolar_line(img1, img2, F, x1, x2):
     plt.show()
 
 
-def show_trajectory_2D(*x,title=None,color=True,line=False,text=False):
+def show_trajectory_2D(*x, title=None,color=True,line=False,text=False):
     plt.figure(figsize=(12, 10))
     num = len(x)
     for i in range(num):
@@ -143,7 +143,7 @@ def show_trajectory_2D(*x,title=None,color=True,line=False,text=False):
     plt.show()
 
 
-def show_trajectory_3D(*X,title=None,color=True,line=False):
+def show_trajectory_3D(*X, title=None,color=True,line=False):
     fig = plt.figure(figsize=(12, 10))
     num = len(X)
     for i in range(num):
@@ -168,7 +168,7 @@ def show_trajectory_3D(*X,title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x,title=None,color=True,line=True,text=False, bg=None, output_dir=''):
+def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir=''):
     plt.figure(figsize=(12, 10))
     if bg is not None:
         bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)
@@ -233,7 +233,7 @@ def draw_camera_extrinsics(flight, ax, scale_focal=40):
         ax.text(C_cam[0], C_cam[1], C_cam[2], 'Camera '+str(i), color=colors[i])
 
 
-def show_3D_all(*X,title=None,color=True,line=True,flight=None, output_dir=''):
+def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir=''):
     fig = plt.figure(figsize=(20, 15))
     num = len(X)
     ax = fig.add_subplot(111,projection='3d')
@@ -291,7 +291,7 @@ def show_3D_all(*X,title=None,color=True,line=True,flight=None, output_dir=''):
     plt.show()
 
 
-def show_spline(*spline,title=None):
+def show_spline(*spline, title=None):
 
     num = len(spline)
     for i in range(num):

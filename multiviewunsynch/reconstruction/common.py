@@ -18,6 +18,7 @@ from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from tools import visualization as vis
 from tools import util 
+import pickle
 
 
 class Scene:
@@ -433,13 +434,13 @@ class Scene:
         K1, K2 = self.cameras[t1].K, self.cameras[t2].K
 
         # if feature_dict is empty
-        if self.feature_dict:
+        if not self.feature_dict:
             if debug:
                 # in debug, use static ground truth as 2d featues
                 pts1 = self.cameras[t1].gt_pts.T
                 pts2 = self.cameras[t2].gt_pts.T
             
-                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),pts2]))
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[1]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[1]),pts2]))
 
                 # save the matching result, the indices of the ground truth matches are shared across all cameras
                 query_ids = np.arange(self.cameras[t1].gt_pts.shape[0])
@@ -451,7 +452,7 @@ class Scene:
             
             else:
                 # Match features with sift
-                if settings['feature_method'][0] == 'sift':
+                if self.settings['feature_method'][0] == 'sift':
                     pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
                     # draw matches
                     vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
@@ -482,22 +483,35 @@ class Scene:
         else:
             match_res = self.feature_dict[t1][t2]
             query_ids = np.where(match_res > -1)[0]
-            train_ids = match_res[match_res > -1]
+            train_ids = match_res[match_res > -1].astype(int)
 
-            # create the matches, and matchesMask for visualization (all the matches specify here are valid matches)
-            matches = [cv2.DMatch(i, i, 0) for i in range(len(query_ids))]
-            matchesMask = [[1,0] for i in range(len(query_ids))]
+            # # create the matches, and matchesMask for visualization (all the matches specify here are valid matches)
+            # matches = [cv2.DMatch(i, i, 0) for i in range(len(self.cameras[t1].kp))]
+            # matchesMask = [[0,0] for i in range(len(self.cameras[t1].kp))]
+
+            # for q, t in zip(query_ids, train_ids):
+            #     matches[q] = cv2.DMatch(q, t, 0)
+            #     matchesMask[q] = [1,0]
+
+            # # matchesMask = [[1,0] for i in range(len(query_ids))]
 
             pts1 = self.cameras[t1].get_points(indices=query_ids)
             pts2 = self.cameras[t2].get_points(indices=train_ids)
 
+            # draw matches
+            # vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
+
+            # draw matches
+            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[1]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[1]),pts2]))
+
+
         # undistort the matched keypoints
         if self.settings['undist_points']:
-            pts1 = self.cameras[t1].undist_point(pts1, self.settings['undist_method']).T
-            pts2 = self.cameras[t2].undist_point(pts2, self.settings['undist_method']).T
+            pts1 = self.cameras[t1].undist_point(pts1, self.settings['undist_method'])
+            pts2 = self.cameras[t2].undist_point(pts2, self.settings['undist_method'])
 
-        pts1 = np.int32(pts1).T
-        pts2 = np.int32(pts2).T
+        pts1 = np.int32(pts1)
+        pts2 = np.int32(pts2)
 
         # go through the epipolar pipeline for pose estimation and initial scene reconstruction
         # if debug:
@@ -516,12 +530,17 @@ class Scene:
         inlier_ids_masked = inlier_ids[mask]
 
         # also draw the inlier matches
-        if not debug:
+        if self.settings['feature_method'][0] == 'sift':
             matchesMask_inliers = np.zeros((len(matches), 2))
             match_ids_inliers = match_ids[inlier_ids_masked]
             matchesMask_inliers[match_ids_inliers] = [1, 0]
-
             vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+        
+        elif self.settings['feature_method'][0] == 'superglue':
+            pts1_inlier = pts1[:,inlier_ids_masked]
+            pts2_inlier = pts2[:,inlier_ids_masked]
+
+            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]),pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]),pts2_inlier]))
 
         # register these points and store their indices to the cameras
         self.cameras[t1].index_registered_2d = query_ids[inlier_ids_masked]
@@ -1731,14 +1750,24 @@ class Scene:
             for i in range(self.numCam):
                 if self.cameras[i].P is None:
                     candidate.append(i)
-            
+
             # find the next camera with the largest overlap
             max_overlap = 0
             for cam_id in candidate:
                 num_overlap = 0
                 overlap_ids = np.empty(0)
+
+                # in case of superglue, find next camera based on the pre-computed matching result
+                if cam_id in self.feature_dict.keys():
+                    for i in self.sequence:
+                        match_res = self.feature_dict[cam_id][i]
+                        train_ids = match_res[match_res > -1]
+                        _, registered_ids, _ = np.intersect1d(train_ids, self.cameras[i].index_registered_2d, return_indices=True)
+
+                        overlap_ids = np.union1d(overlap_ids, self.cameras[i].index_2d_3d[registered_ids])
+                        num_overlap = len(overlap_ids)
                 # initialize feature_dict
-                if debug:
+                elif debug:
                     # use the ground truth matches
                     # initialize the matching result of this new camera to be stored to the dict
                     self.feature_dict[cam_id] = -np.ones((self.numCam, len(self.cameras[cam_id].gt_pts)))
@@ -2238,7 +2267,7 @@ def create_scene(path_input):
     
     # Load superglue matches or ground truth
     if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
-        feature_method = config['necessary inputs']['feature_method']
+        feature_method = config['settings']['feature_method']
         # if use superglue, load the preprocessed superpoints and matching result
         if feature_method[0] == 'superglue':
             try:
@@ -2266,8 +2295,9 @@ def create_scene(path_input):
         if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
             # if using sift as feature_method, also extract sift features
             if feature_method[0] == 'sift':
-                camera.extract_features(method=flight.settings['feature_extractor'])
+                camera.extract_features(method=feature_method[0])
             elif feature_method[0] == 'superglue':
+                camera.read_img()
                 camera.kp = util.convert_kpts(kpt_list[i])
             else:
                 raise Exception("Unsupported feature extraction and matching method")
