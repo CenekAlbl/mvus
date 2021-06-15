@@ -168,7 +168,7 @@ def show_trajectory_3D(*X, title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir=''):
+def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir='', label=[]):
     plt.figure(figsize=(12, 10))
     if bg is not None:
         bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)
@@ -183,7 +183,8 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
 
         c = ['r','b','r','g']
         m = ['o','x','o','+']
-        label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
+        if len(label) == 0:
+            label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
         if color:
             plt.scatter(x[i][0],x[i][1],c=c[i],marker=m[i],label=label[i])
         else:
@@ -206,7 +207,8 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
         plt.savefig(output_dir+title+'.png')
     else:
         plt.savefig(output_dir+'reprojected.png')
-    plt.show()
+    plt.legend(loc=1, prop={'size': 10})
+    # plt.show()
 
 
 def draw_camera_extrinsics(flight, ax, scale_focal=40):
@@ -233,20 +235,22 @@ def draw_camera_extrinsics(flight, ax, scale_focal=40):
         ax.text(C_cam[0], C_cam[1], C_cam[2], 'Camera '+str(i), color=colors[i])
 
 
-def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir=''):
+def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir='',label=[]):
     fig = plt.figure(figsize=(20, 15))
     num = len(X)
     ax = fig.add_subplot(111,projection='3d')
 
     for i in range(num):
         if color:
-            c = ['r','g']
-            m = ['o','x']
-            label = ['RTK ground truth', 'Reconstruction Spline']
+            c = ['r','b','r','g']
+            m = ['o','x','o','+']
+            if len(label) == 0:
+                label = ['RTK ground truth', 'Reconstruction Spline']
             if i is 0:
-                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker='o',label=label[i])
+                # ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker='o',label=label[i])
+                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i%len(c)],marker=m[i%len(m)],label=label[i%len(label)])
             else:
-                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i],marker=m[i],label=label[i])
+                ax.scatter3D(X[i][0],X[i][1],X[i][2],s=60,c=c[i%len(c)],marker=m[i%len(m)],label=label[i%len(label)])
                 # ax.plot(X[i][0],X[i][1],X[i][2],c=c[i])
 
         else:
@@ -259,7 +263,7 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir=''):
     
     # if the flight is provided, also draw the cameras and the reconstructed trajectories
     if flight is not None:
-        draw_camera_extrinsics(flight, ax, scale_focal=1)
+        draw_camera_extrinsics(flight, ax, scale_focal=.5)
         # if exists trajectory, also plot it
         if len(flight.traj) > 0:
             if color:
@@ -280,7 +284,7 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir=''):
     ax.set_zlabel('Z',fontsize=20)
 
     ax.view_init(elev=30,azim=-50)
-    lgnd = ax.legend(loc=1, prop={'size': 30})
+    lgnd = ax.legend(loc=1, prop={'size': 15})
     for handle in lgnd.legendHandles:
         handle.set_sizes([100])
     # plt.axis('off')
@@ -288,7 +292,7 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir=''):
         plt.savefig(output_dir+title+'reconstructed_scene')
     else:
         plt.savefig(output_dir+'reconstructed_scene.png')
-    plt.show()
+    # plt.show()
 
 
 def show_spline(*spline, title=None):
@@ -357,6 +361,21 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
     cbar.ax.tick_params(labelsize=40)
     plt.title(title, fontsize=50)
     plt.show()
+
+def error_boxplot(err, labels=[], title=None, ax=None):
+    assert len(labels) == len(err), "The length of labels should be consistent with the length of the err vector"
+
+    if ax is None:
+        fig, ax = plt.subplots(sharey=True)
+    
+    ax.boxplot(err, labels=labels)
+    
+    if title is not None:
+        ax.set_title(title)
+    
+    return ax
+    
+
 
 def draw_detection_matches(img1, d1, img2, d2, title='detection_mathches.png', output_dir=''):
     '''

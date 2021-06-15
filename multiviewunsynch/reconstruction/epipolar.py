@@ -509,6 +509,32 @@ def triangulate_matlab(x1,x2,P1,P2):
         X[:,i] = V[-1]/V[-1,-1]
     
     return X
+
+def triangulate_matlab_mv(xs, Ps):
+    '''
+    triangulate multiple points in multiple views
+    Input:
+        xs = (nViews*2)xN
+        Ps = a vector of projection matrices
+    '''
+    num_views = len(Ps)
+    X = np.zeros((4, xs.shape[1]))
+    for i in range(xs.shape[1]):
+        pts = np.split(xs[:,i], num_views)
+        A = []
+        for j, pt in enumerate(pts):
+            P = Ps[j]
+            r1 = pt[0]*P[2] - P[0]
+            r2 = pt[1]*P[2] - P[1]
+            A.append(r1)
+            A.append(r2)
+        A = np.vstack(A)
+        U,S,V = np.linalg.svd(A)
+        X[:,i] = V[-1]/V[-1,-1]
+    
+    return X
+
+
     
 
 def compute_Rt_from_E(E):
