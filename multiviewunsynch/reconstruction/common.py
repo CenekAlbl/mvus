@@ -228,83 +228,129 @@ class Scene:
         
         # add the static part
         if 'include_static' in self.settings.keys() and self.settings['include_static']:
-            if debug:
-                # in debug, use static ground truth as 2d featues
-                if self.settings['undist_points']:
-                    # undistort the ground truth matches
-                    pts1 = self.cameras[t1].undist_point(self.cameras[t1].gt_pts.T, self.settings['undist_method']).T
-                    pts2 = self.cameras[t2].undist_point(self.cameras[t2].gt_pts.T, self.settings['undist_method']).T
+            # if feature_dict is empty
+            if not self.feature_dict:
+                if debug:
+                    # in debug, use static ground truth as 2d featues
+                    pts1 = self.cameras[t1].gt_pts.T
+                    pts2 = self.cameras[t2].gt_pts.T
+                
+                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[1]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[1]),pts2]))
 
-                    # plot the ground truth matches
-                    # FIXME: check pts_dist == gt_pts
-                    pts1_dist = self.cameras[t1].dist_point2d(pts1.T, method=self.settings['undist_method'])
-                    pts2_dist = self.cameras[t2].dist_point2d(pts2.T, method=self.settings['undist_method'])
-                    # vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_dist.shape[1]),pts1_dist]), self.cameras[t2].img, np.vstack([np.zeros(pts2_dist.shape[1]),pts2_dist]))
-                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),self.cameras[t1].gt_pts.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),self.cameras[t2].gt_pts.T]))
+                    # save the matching result, the indices of the ground truth matches are shared across all cameras
+                    query_ids = np.arange(self.cameras[t1].gt_pts.shape[0])
+                    train_ids = np.arange(self.cameras[t2].gt_pts.shape[0])
 
+                    # initialize the matrix for storing matching result
+                    match_res1 = -np.ones((self.numCam, self.cameras[t1].gt_pts.shape[0]))
+                    match_res2 = -np.ones((self.numCam, self.cameras[t2].gt_pts.shape[0]))
+                
                 else:
-                    pts1 = self.cameras[t1].gt_pts
-                    pts2 = self.cameras[t2].gt_pts
-                
-                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[0]),pts1.T]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[0]),pts2.T]))
-            else:
-                
-                # sp1, sp2 = util.match_features(self.cameras[t1].img, self.cameras[t2].img, 'sift', 'bf', 0.7)
+                    # Match features with sift
+                    if self.settings['feature_method'][0] == 'sift':
+                        pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
+                        # draw matches
+                        vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
+                        # get the valid matches
+                        match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
 
-                # Match features
-                pts1, pts2, matches, matchesMask = ep.matching_feature(self.cameras[t1].kp, self.cameras[t2].kp, self.cameras[t1].des, self.cameras[t2].des, ratio=0.8)
-                # draw matches
-                vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask)
-                
-                # undistort the matched keypoints
-                if self.settings['undist_points']:
-                    pts1 = self.cameras[t1].undist_point(np.array(pts1).T, self.settings['undist_method']).T
-                    pts2 = self.cameras[t2].undist_point(np.array(pts2).T, self.settings['undist_method']).T
+                        # get the valid matches
+                        query_ids = np.array([m[0].queryIdx for m in matches])
+                        train_ids = np.array([m[0].trainIdx for m in matches])
+                        query_ids = query_ids[match_ids]
+                        train_ids = train_ids[match_ids]
+
+                        # initialize the matrix for storing matching result
+                        match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
+                        match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
+
+                        pts1, pts2 = np.array(pts1).T, np.array(pts2).T
+                    else:
+                        raise Exception("Superglue matches are not properly loaded.")
+
+                # save the matching result to feature_dict
+                match_res1[t2,query_ids] = train_ids
+                match_res2[t1,train_ids] = query_ids
+                self.feature_dict[t1] = match_res1
+                self.feature_dict[t2] = match_res2
             
+            # if feature_dict is already specified, get the corresponding pts
+            else:
+                match_res = self.feature_dict[t1][t2]
+                query_ids = np.where(match_res > -1)[0]
+                train_ids = match_res[match_res > -1].astype(int)
+
+                pts1 = self.cameras[t1].get_points(indices=query_ids)
+                pts2 = self.cameras[t2].get_points(indices=train_ids)
+
+                # draw matches
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1.shape[1]),pts1]), self.cameras[t2].img, np.vstack([np.zeros(pts2.shape[1]),pts2]))
+
+
+            # undistort the matched keypoints
+            if self.settings['undist_points']:
+                pts1 = self.cameras[t1].undist_point(pts1, self.settings['undist_method'])
+                pts2 = self.cameras[t2].undist_point(pts2, self.settings['undist_method'])
+
             # stack the static features with the detections and use them together for initial pose extraction
-            fp1 = np.hstack([np.int32(pts1).T, d1[1:]])
-            fp2 = np.hstack([np.int32(pts2).T, d2[1:]])
+            fp1 = np.hstack([np.int32(pts1), d1[1:]])
+            fp2 = np.hstack([np.int32(pts2), d2[1:]])
 
             X, P, inlier, mask = ep.epipolar_pipeline(fp1, fp2, K1, K2, error, inlier_only, self.cameras[t1].img, self.cameras[t2].img)
             
             # split into traj and static
             idx = np.where(inlier == 1)[0]
             idx_mask = idx[mask]
-            inlier_static = idx_mask[idx_mask < len(pts1)]
-            inlier_traj = idx_mask[idx_mask >= len(pts1)] - len(pts1)
+            inlier_static = idx_mask[idx_mask < pts1.shape[1]]
+            inlier_traj = idx_mask[idx_mask >= pts1.shape[1]] - pts1.shape[1]
 
             # save static part
-            self.static = X[:-1, idx_mask < len(pts1)]
+            self.static = X[:-1, idx_mask < pts1.shape[1]]
             self.inlier_mask = np.ones(self.static.shape[1])
 
-            # get the matching indices
-            if debug:
-                # query_ids -- the index of the features in cam1
-                query_ids = np.arange(len(pts1)) 
-                # train_ids -- index of the features in cam2
-                train_ids = np.arange(len(pts2))
-
-                # initialize the matching result to be stored to the dict
-                match_res1 = -np.ones((self.numCam, len(pts1)))
-                match_res2 = -np.ones((self.numCam, len(pts2)))
-            else:
-                query_ids = np.array([m[0].queryIdx for m in matches])
-                train_ids = np.array([m[0].trainIdx for m in matches])
-
-                # draw matches
+            # also draw the inlier matches
+            if self.settings['feature_method'][0] == 'sift':
                 matchesMask_inliers = np.zeros((len(matches), 2))
-                match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
                 match_ids_inliers = match_ids[inlier_static]
                 matchesMask_inliers[match_ids_inliers] = [1, 0]
-
                 vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+            
+            elif self.settings['feature_method'][0] == 'superglue':
+                # pts1_inlier = pts1[:,inlier_static]
+                # pts2_inlier = pts2[:,inlier_static]
+                pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_static])
+                pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_static])
 
-                query_ids = query_ids[match_ids]
-                train_ids = train_ids[match_ids]
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]), pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]), pts2_inlier]))
+            
+            # # get the matching indices
+            # if debug:
+            #     # query_ids -- the index of the features in cam1
+            #     query_ids = np.arange(len(pts1)) 
+            #     # train_ids -- index of the features in cam2
+            #     train_ids = np.arange(len(pts2))
 
-                # initialize the matching result to be stored to the dict
-                match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
-                match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
+            #     # initialize the matching result to be stored to the dict
+            #     match_res1 = -np.ones((self.numCam, len(pts1)))
+            #     match_res2 = -np.ones((self.numCam, len(pts2)))
+            # else:
+            #     query_ids = np.array([m[0].queryIdx for m in matches])
+            #     train_ids = np.array([m[0].trainIdx for m in matches])
+
+            #     # draw matches
+            #     matchesMask_inliers = np.zeros((len(matches), 2))
+            #     match_ids = np.where(np.array(matchesMask)[:, 0] == 1)[0]
+            #     match_ids_inliers = match_ids[inlier_static]
+            #     matchesMask_inliers[match_ids_inliers] = [1, 0]
+
+            #     vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+
+            #     query_ids = query_ids[match_ids]
+            #     train_ids = train_ids[match_ids]
+
+            #     # initialize the matching result to be stored to the dict
+            #     match_res1 = -np.ones((self.numCam, len(self.cameras[t1].kp)))
+            #     match_res2 = -np.ones((self.numCam, len(self.cameras[t2].kp)))
         
             # save static 2d to cameras
             self.cameras[t1].index_registered_2d = query_ids[inlier_static]
@@ -312,14 +358,14 @@ class Scene:
             self.cameras[t2].index_registered_2d = train_ids[inlier_static]
             self.cameras[t2].index_2d_3d = np.arange(self.static.shape[1])
 
-            match_res1[t2, query_ids] = train_ids
-            match_res2[t1, train_ids] = query_ids
+            # match_res1[t2, query_ids] = train_ids
+            # match_res2[t1, train_ids] = query_ids
 
-            self.feature_dict[t1] = match_res1
-            self.feature_dict[t2] = match_res2
+            # self.feature_dict[t1] = match_res1
+            # self.feature_dict[t2] = match_res2
 
             # save trajectory
-            self.traj = np.vstack((d1[0][inlier_traj], X[:-1, idx_mask >= len(pts1)]))
+            self.traj = np.vstack((d1[0][inlier_traj], X[:-1, idx_mask >= pts1.shape[1]]))
         
         # only uses the detections for pose estimation
         else:

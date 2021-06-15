@@ -117,8 +117,8 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
 
     # Load ground truth
-    gt_static_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam1.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam2.txt']
-    gt_dynamic_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam0_w1574280981_12_CSRT_obj0.txt','/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam2_w1587769795_12_CSRT_obj0.txt']
+    gt_static_file = ['../experiments/croatia_set3/static_gt/static_cam0.txt','../experiments/croatia_set3/static_gt/static_cam1.txt']
+    gt_dynamic_file = ['../experiments/croatia_set3/det_gt/cam0_3_det_gt.txt','../experiments/croatia_set3/det_gt/cam1_3_det_gt.txt']
     
     # gt_static_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam1_undistort_div.txt', '/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/static_gt/static_cam2_undistort_div.txt']
     # gt_dynamic_file = ['/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam0_w1574280981_12_CSRT_obj0_undistort_div.txt', '/scratch2/wuti/Repos/3D-Object-Trajectory-Reconstruction-Webcam/multiviewunsynch/webcam-datasets/nyc-datasets/20210413_1000_3min/det_opencv/set12/obj1/cam2_w1587769795_12_CSRT_obj0_undistort_div.txt']

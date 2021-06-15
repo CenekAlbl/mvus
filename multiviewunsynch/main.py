@@ -9,6 +9,7 @@ from datetime import datetime
 from reconstruction import common
 from analysis.compare_gt import align_gt
 import sys
+import os
 
 if len(sys.argv) < 2:
     print( "Please provide a path to a proper config file")
@@ -87,6 +88,8 @@ flight.spline_to_traj(sampling_rate=1)
 vis.show_trajectory_3D(flight.traj[1:],line=False)
 # save the 2d trajectories
 if 'save_2d' in flight.settings.keys() and flight.settings['save_2d']:
+    if not os.path.exists(os.path.dirname(flight.settings['save_2d_path'])):
+        os.makedirs(os.path.dirname(flight.settings['save_2d_path']))
     for i, cam in enumerate(flight.cameras):
         x_res = cam.dist_point3d(flight.traj[1:])
         x_ori = flight.detections[i][1:]

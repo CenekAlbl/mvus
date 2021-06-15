@@ -115,6 +115,9 @@ while True:
 flight.spline_to_traj(sampling_rate=1)
 # save the 2d trajectories
 if 'save_2d' in flight.settings.keys() and flight.settings['save_2d']:
+    if not os.path.exists(os.path.dirname(flight.settings['save_2d_path'])):
+        os.makedirs(os.path.dirname(flight.settings['save_2d_path']))
+
     for i, cam in enumerate(flight.cameras):
         x_res = cam.dist_point3d(flight.traj[1:])
         x_ori = flight.detections[i][1:]

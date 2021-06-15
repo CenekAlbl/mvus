@@ -103,6 +103,10 @@ else:
 # Align with the ground truth data if available
 if len(flight.gt) > 0:
     flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
+
+if not os.path.exists(os.path.dirname(flight.settings['path_output'])):
+    os.makedirs(os.path.dirname(flight.settings['path_output']), exist_ok=True)
+    
 with open(flight.settings['path_output'],'wb') as f:
     # unpack sift features if used
     if flight.settings['include_static']:
