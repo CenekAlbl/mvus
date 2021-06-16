@@ -83,10 +83,15 @@ def create_camera_model(camera_matrix, width, height, scale_focal, draw_frame_ax
     X_frame3[0:3,0] = [0, 0, 0]
     X_frame3[0:3,1] = [0, 0, f_scale/2]
 
+    # if draw_frame_axis:
+    #     return [X_img_plane, X_triangle, X_center1, X_center2, X_center3, X_center4, X_frame1, X_frame2, X_frame3]
+    # else:
+    #     return [X_img_plane, X_triangle, X_center1, X_center2, X_center3, X_center4]
+    
     if draw_frame_axis:
-        return [X_img_plane, X_triangle, X_center1, X_center2, X_center3, X_center4, X_frame1, X_frame2, X_frame3]
+        return [X_img_plane, X_center1, X_center2, X_center3, X_center4, X_frame1, X_frame2, X_frame3]
     else:
-        return [X_img_plane, X_triangle, X_center1, X_center2, X_center3, X_center4]
+        return [X_img_plane, X_center1, X_center2, X_center3, X_center4]
 
 def create_board_model(extrinsics, board_width, board_height, square_size, draw_frame_axis=False):
     width = board_width*square_size

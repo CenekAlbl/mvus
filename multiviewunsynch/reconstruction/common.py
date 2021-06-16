@@ -583,8 +583,10 @@ class Scene:
             vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
         
         elif self.settings['feature_method'][0] == 'superglue':
-            pts1_inlier = pts1[:,inlier_ids_masked]
-            pts2_inlier = pts2[:,inlier_ids_masked]
+            # pts1_inlier = pts1[:,inlier_ids_masked]
+            # pts2_inlier = pts2[:,inlier_ids_masked]
+            pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_ids_masked])
+            pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_ids_masked])
 
             vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]),pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]),pts2_inlier]))
 

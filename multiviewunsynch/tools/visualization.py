@@ -218,16 +218,25 @@ def draw_camera_extrinsics(flight, ax, scale_focal=40):
         # width and height of the camera
         cam_height, cam_width, _ = cam.img.shape
         # get the camera frame model
-        X_cam_model = create_camera_model(cam.K, cam_width/2, cam_height/2, scale_focal)
+        X_cam_model = create_camera_model(cam.K, cam_width/2, cam_height/2, scale_focal, draw_frame_axis=True)
         cMo = np.eye(4)
         cMo[:3,:3] = cam.R
         cMo[:3,-1] = cam.t
 
-        for X_cam_part in X_cam_model:
+        # print(len(X_cam_model))
+
+        for k, X_cam_part in enumerate(X_cam_model):
             X = np.zeros_like(X_cam_part)
             for j in range(X_cam_part.shape[1]):
                 X[0:4,j] = transform_to_matplotlib_frame(cMo, X_cam_part[0:4,j], True)
-            ax.plot3D(X[0,:], X[1,:], X[2,:], color=colors[i])
+            if len(X_cam_model) == 8 and k == 5:
+                ax.plot3D(X[0,:], X[1,:], X[2,:], color='r')
+            elif len(X_cam_model) == 8 and k == 6:
+                ax.plot3D(X[0,:], X[1,:], X[2,:], color='g')
+            elif len(X_cam_model) == 8 and k == 7:
+                ax.plot3D(X[0,:], X[1,:], X[2,:], color='b')
+            else:
+                ax.plot3D(X[0,:], X[1,:], X[2,:], color=colors[i])
         
         C_cam = np.dot(-cam.R.T, cam.t.reshape(-1,1)).ravel()
 
@@ -284,7 +293,7 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir='',l
     ax.set_zlabel('Z',fontsize=20)
 
     ax.view_init(elev=30,azim=-50)
-    lgnd = ax.legend(loc=1, prop={'size': 15})
+    lgnd = ax.legend(loc=8, prop={'size': 15})
     for handle in lgnd.legendHandles:
         handle.set_sizes([100])
     # plt.axis('off')
@@ -292,7 +301,7 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir='',l
         plt.savefig(output_dir+title+'reconstructed_scene')
     else:
         plt.savefig(output_dir+'reconstructed_scene.png')
-    # plt.show()
+    plt.show()
 
 
 def show_spline(*spline, title=None):
@@ -362,16 +371,35 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
     plt.title(title, fontsize=50)
     plt.show()
 
-def error_boxplot(err, labels=[], title=None, ax=None):
+def error_boxplot(err, labels=[], title=None, ax=None, show_outliers=False):
     assert len(labels) == len(err), "The length of labels should be consistent with the length of the err vector"
 
     if ax is None:
         fig, ax = plt.subplots(sharey=True)
     
-    ax.boxplot(err, labels=labels)
+    ax.boxplot(err, labels=labels, showfliers=show_outliers)
     
     if title is not None:
         ax.set_title(title)
+    
+    return ax
+
+def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40):
+    assert len(labels) == len(errs), "The length of labels should be consistent with the length of the err vector"
+
+    if ax is None:
+        fig, ax = plt.subplots(sharex=True, sharey=True)
+    
+    bins = np.arange(0,xlim,1)
+
+    for err, label in zip(errs,labels):
+        print(label)
+        ax.hist(err, bins=bins, label=label, alpha=0.5)
+    
+    if title is not None:
+        ax.set_title(title)
+    
+    ax.legend()
     
     return ax
     
