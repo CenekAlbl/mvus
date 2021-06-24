@@ -94,7 +94,7 @@ if 'save_2d' in flight.settings.keys() and flight.settings['save_2d']:
         x_res = cam.dist_point3d(flight.traj[1:])
         x_ori = flight.detections[i][1:]
         # visualize the reprojection of the reconstructed trajectories
-        vis.show_2D_all(x_ori, x_res, title='cam'+str(i)+' trajectories', color=True, line=False, bg=cam.img)
+        vis.show_2D_all(x_ori, x_res, title='cam'+str(i)+' trajectories', color=True, line=False, bg=cam.img, label=['extracted dynamic features', 'reconstructed trajectories'])
 
         # # align with the raw detection
         # _ =  align_detections(flight, visualize=True)

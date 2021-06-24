@@ -181,7 +181,7 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
     for i in range(num):
         # plt.subplot(1,num,i+1)
 
-        c = ['r','b','r','g']
+        c = ['r','b','orange','g']
         m = ['o','x','o','+']
         if len(label) == 0:
             label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
@@ -202,12 +202,14 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
 
         plt.xlabel('X')
         plt.ylabel('Y')
+    
+    plt.legend(loc=1)
+
     if title:
         plt.suptitle(title)
         plt.savefig(output_dir+title+'.png')
     else:
         plt.savefig(output_dir+'reprojected.png')
-    plt.legend(loc=1, prop={'size': 10})
     # plt.show()
 
 
@@ -249,9 +251,13 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir='',l
     num = len(X)
     ax = fig.add_subplot(111,projection='3d')
 
+    # ax.set_zlim(-10,10)
+    # ax.set_xlim(-10,10)
+    # ax.set_ylim(-10,10)
+
     for i in range(num):
         if color:
-            c = ['r','b','r','g']
+            c = ['r','b','orange','g']
             m = ['o','x','o','+']
             if len(label) == 0:
                 label = ['RTK ground truth', 'Reconstruction Spline']
@@ -371,37 +377,69 @@ def error_traj(traj,error,thres=0.5,title=None,colormap='Wistia',size=100, text=
     plt.title(title, fontsize=50)
     plt.show()
 
-def error_boxplot(err, labels=[], title=None, ax=None, show_outliers=False):
+def error_boxplot(err, labels=[], title=None, ax=None, show_outliers=False, output_dir=''):
     assert len(labels) == len(err), "The length of labels should be consistent with the length of the err vector"
 
     if ax is None:
-        fig, ax = plt.subplots(sharey=True)
+        fig, ax = plt.subplots(figsize=(50,15),sharey=True)
     
     ax.boxplot(err, labels=labels, showfliers=show_outliers)
     
     if title is not None:
         ax.set_title(title)
-    
+        plt.savefig(output_dir+title)
+    else:
+        plt.savefig(output_dir+'error_boxplot.png')
     return ax
 
-def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40):
+def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40, ylim=350, bin_width=0.1):
     assert len(labels) == len(errs), "The length of labels should be consistent with the length of the err vector"
 
     if ax is None:
-        fig, ax = plt.subplots(sharex=True, sharey=True)
+        fig, ax = plt.subplots(sharex=True, sharey=True, dpi=300)
     
-    bins = np.arange(0,xlim,1)
+    # if xlim > 100:
+    #     bins = np.arange(0,100,1)
+    #     bins[-1] = xlim
+    # else:
+    #     bins = np.arange(0,np.ceil(xlim),1)
 
-    for err, label in zip(errs,labels):
-        print(label)
-        ax.hist(err, bins=bins, label=label, alpha=0.5)
+    # for err, label in zip(errs,labels):
+    #     print(label)
+    #     ax.hist(err, bins=bins, label=label, alpha=0.5)
+    #     # if ax.get_ylim()[-1] < np.max(n):
+    #     #     ax.set_ylim([0,np.max(n)+0.75])
+
+    bins = np.arange(0, xlim+1, 1)
+    
+    for i, (err, label) in enumerate(zip(errs, labels)):
+        h, _ = np.histogram(np.clip(err, bins[0], bins[-1]), bins=bins)
+        ax.bar(bins[:-1]+(i-1)*bin_width, h, bin_width, label=label, align='center')
+    # h, bins, patches = ax.hist([np.clip(err, bins[0], bins[-1]) for err in errs], bins=bins, range=(0,80), label=labels, alpha=.8)
+    # ax.set_ylim([0,0.8])
+
+
+    # xlabels = bins[1:].astype(str)
+    # xlabels[-1] += '+'
+    # ax.set_xlim([0,xlim])
+    # ax.set_xticks(np.arange(len(xlabels))+0.5)
+    # ax.set_xticklabels(xlabels)
+
+    # ax.set_xlim([0, xlim])
+    # loc = ax.get_xticks()
+    # xlabels = ["{:.0f}".format(x) for x in loc]
+    # loc[-1] = xlim+0.5
+    # xlabels[-1] = "{:.0f}+".format(xlim)
+    # xlabels.append(str(xlim)+'+')
+    # ax.set_xticks(loc)
+    # ax.set_xticklabels(xlabels)
     
     if title is not None:
         ax.set_title(title)
     
     ax.legend()
     
-    return ax
+    return ax, bins[:-1]
     
 
 

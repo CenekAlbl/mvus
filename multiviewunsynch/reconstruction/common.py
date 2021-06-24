@@ -13,7 +13,7 @@ from reconstruction import synchronization as sync
 from datetime import datetime
 from scipy.optimize import least_squares
 from scipy import interpolate
-from scipy.sparse import lil_matrix, vstack
+from scipy.sparse import lil_matrix, vstack, hstack
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from tools import visualization as vis
@@ -309,20 +309,21 @@ class Scene:
             self.inlier_mask = np.ones(self.static.shape[1])
 
             # also draw the inlier matches
-            if self.settings['feature_method'][0] == 'sift':
-                matchesMask_inliers = np.zeros((len(matches), 2))
-                match_ids_inliers = match_ids[inlier_static]
-                matchesMask_inliers[match_ids_inliers] = [1, 0]
-                vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
-            
-            elif self.settings['feature_method'][0] == 'superglue':
-                # pts1_inlier = pts1[:,inlier_static]
-                # pts2_inlier = pts2[:,inlier_static]
-                pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_static])
-                pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_static])
+            if not debug:
+                if self.settings['feature_method'][0] == 'sift':
+                    matchesMask_inliers = np.zeros((len(matches), 2))
+                    match_ids_inliers = match_ids[inlier_static]
+                    matchesMask_inliers[match_ids_inliers] = [1, 0]
+                    vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+                
+                elif self.settings['feature_method'][0] == 'superglue':
+                    # pts1_inlier = pts1[:,inlier_static]
+                    # pts2_inlier = pts2[:,inlier_static]
+                    pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_static])
+                    pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_static])
 
-                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]), pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]), pts2_inlier]))
-            
+                    vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]), pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]), pts2_inlier]))
+                
             # # get the matching indices
             # if debug:
             #     # query_ids -- the index of the features in cam1
@@ -576,19 +577,20 @@ class Scene:
         inlier_ids_masked = inlier_ids[mask]
 
         # also draw the inlier matches
-        if self.settings['feature_method'][0] == 'sift':
-            matchesMask_inliers = np.zeros((len(matches), 2))
-            match_ids_inliers = match_ids[inlier_ids_masked]
-            matchesMask_inliers[match_ids_inliers] = [1, 0]
-            vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
-        
-        elif self.settings['feature_method'][0] == 'superglue':
-            # pts1_inlier = pts1[:,inlier_ids_masked]
-            # pts2_inlier = pts2[:,inlier_ids_masked]
-            pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_ids_masked])
-            pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_ids_masked])
+        if not debug:
+            if self.settings['feature_method'][0] == 'sift':
+                matchesMask_inliers = np.zeros((len(matches), 2))
+                match_ids_inliers = match_ids[inlier_ids_masked]
+                matchesMask_inliers[match_ids_inliers] = [1, 0]
+                vis.draw_matches(self.cameras[t1].img, self.cameras[t1].kp, self.cameras[t2].img, self.cameras[t2].kp, matches, matchesMask_inliers)
+            
+            elif self.settings['feature_method'][0] == 'superglue':
+                # pts1_inlier = pts1[:,inlier_ids_masked]
+                # pts2_inlier = pts2[:,inlier_ids_masked]
+                pts1_inlier = self.cameras[t1].get_points(indices=query_ids[inlier_ids_masked])
+                pts2_inlier = self.cameras[t2].get_points(indices=train_ids[inlier_ids_masked])
 
-            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]),pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]),pts2_inlier]))
+                vis.draw_detection_matches(self.cameras[t1].img, np.vstack([np.zeros(pts1_inlier.shape[1]),pts1_inlier]), self.cameras[t2].img, np.vstack([np.zeros(pts2_inlier.shape[1]),pts2_inlier]))
 
         # register these points and store their indices to the cameras
         self.cameras[t1].index_registered_2d = query_ids[inlier_ids_masked]
@@ -746,7 +748,7 @@ class Scene:
         # get the 3D static points reconstructed from this camera
         point_3D = np.empty([3, 0])
         point_3D = np.hstack([point_3D, self.static[:, self.cameras[cam_id].index_2d_3d]])
-        X = util.homogeneous(point_3D)
+        X = util.homogeneous(point_3D)            
         
         # get the corresponding 2d static points
         if debug:
@@ -756,11 +758,14 @@ class Scene:
             # use the extracted static features
             x = self.cameras[cam_id].get_points()
         
-        if self.settings['undist_points']:
-            # undistort 2d points
-            x = self.cameras[cam_id].undist_point(x, self.settings['undist_method'])
-        
-        x_cal = self.cameras[cam_id].projectPoint(X)
+        if X.shape[1] > 0:
+            if self.settings['undist_points']:
+                # undistort 2d points
+                x = self.cameras[cam_id].undist_point(x, self.settings['undist_method'])
+            
+            x_cal = self.cameras[cam_id].projectPoint(X)
+        else:
+            x_cal = np.empty([3,0])
 
         # # distort point
         # x_cal = self.cameras[cam_id].dist_point3d(point_3D, self.settings['undist_method'])
@@ -864,7 +869,7 @@ class Scene:
             self.visible.append(visible)
 
 
-    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False,rs_bounds=False, debug=False):
+    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False,rs_bounds=False, debug=False, sync=True):
         '''
         Bundle Adjustment with multiple splines
 
@@ -928,7 +933,8 @@ class Scene:
 
         def jac_BA(near=3,motion_offset=10):
 
-            num_param = len(model)
+            # exclude the parts regarding the static points for now
+            num_param = len(model) - 3*num_3d_points
             self.compute_visibility()
 
             jac = lil_matrix((1, num_param),dtype=int)
@@ -1058,10 +1064,10 @@ class Scene:
                     registered_ids = np.in1d(inlier_ids, self.cameras[cam_id].index_2d_3d).nonzero()[0]
 
                     # initialize the jac mat (the structures of the sparsity matrix are the same in x and y direction)
-                    jac_part = lil_matrix((num_pts_2d, num_param))
+                    jac_part = lil_matrix((num_pts_2d, len(model)))
 
                     # mark all entries relate to this camera as 1 (the first num_3d_points*3 columns are for the static 3d points)
-                    start, end = num_3d_points * 3 + i * num_camParam, num_3d_points * 3 + (i+1) * num_camParam
+                    start, end = num_3d_points * 3 + 3*numCam + i * num_camParam, num_3d_points * 3 + 3*numCam + (i+1) * num_camParam
                     jac_part[:, start:end] = 1
 
                     # mark all entries relate to the static 3d points as 1
@@ -1076,6 +1082,8 @@ class Scene:
                     # FIXME: check if the dimension is the same
                 
                 jac_static = vstack(jac_parts)
+                static_empty = lil_matrix((jac.shape[0], 3*num_3d_points))
+                jac = hstack((static_empty, jac))
                 jac = vstack((jac, jac_static))
             # fix the first camera
             # jac[:,[0,numCam]], jac[:,2*numCam+4:2*numCam+10] = 0, 0
@@ -1150,10 +1158,10 @@ class Scene:
         print('Doing BA with {} cameras...\n'.format(numCam))
         fn = lambda x: error_BA(x)
         # ignore jac_sparsity matrix for now for the static part
-        if 'include_static' in self.settings.keys() and self.settings['include_static']:
-            res = least_squares(fn,model,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
-        else:
-            res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
+        # if 'include_static' in self.settings.keys() and self.settings['include_static']:
+            # res = least_squares(fn,model,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
+        # else:
+        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
 
         '''After BA'''
         # if the static part are included, they are added to the beginning of the columns.
@@ -1410,7 +1418,7 @@ class Scene:
                 self.cameras[cam_id].index_2d_3d = self.cameras[i].index_2d_3d
                 self.cameras[cam_id].index_registered_2d = self.cameras[i].index_registered_2d
             # add the ground truth
-            pts_2d = self.cameras[cam_id].get_gt_points()
+            pts_2d = self.cameras[cam_id].get_gt_pts()
 
         else:
             # if have not yet initialize cam_id in feature_dict, do so
@@ -1533,7 +1541,7 @@ class Scene:
             pts_2d, pts_3d = self.register_new_camera_static(cam_id, cams, debug)
 
             # stack the static points with the detections
-            detect = np.hstack([detect, pts_2d])
+            detect = np.hstack([detect, np.vstack([np.zeros(pts_2d.shape[1]),pts_2d])])
             point_3D = np.hstack([point_3D, pts_3d])
 
         # PnP solution from OpenCV
