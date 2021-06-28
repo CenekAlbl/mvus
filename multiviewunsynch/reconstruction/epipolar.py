@@ -7,6 +7,7 @@ import math
 import cv2
 from tools import ransac
 from tools import visualization as vis
+from tools import util
 from scipy.optimize import least_squares, root
 
 
@@ -508,6 +509,32 @@ def triangulate_matlab(x1,x2,P1,P2):
         X[:,i] = V[-1]/V[-1,-1]
     
     return X
+
+def triangulate_matlab_mv(xs, Ps):
+    '''
+    triangulate multiple points in multiple views
+    Input:
+        xs = (nViews*2)xN
+        Ps = a vector of projection matrices
+    '''
+    num_views = len(Ps)
+    X = np.zeros((4, xs.shape[1]))
+    for i in range(xs.shape[1]):
+        pts = np.split(xs[:,i], num_views)
+        A = []
+        for j, pt in enumerate(pts):
+            P = Ps[j]
+            r1 = pt[0]*P[2] - P[0]
+            r2 = pt[1]*P[2] - P[1]
+            A.append(r1)
+            A.append(r2)
+        A = np.vstack(A)
+        U,S,V = np.linalg.svd(A)
+        X[:,i] = V[-1]/V[-1,-1]
+    
+    return X
+
+
     
 
 def compute_Rt_from_E(E):
@@ -638,6 +665,113 @@ def undistort(x_homo,coeff):
 
 def reprojection_error(x,x_p):
     return np.sqrt((x[0]-x_p[0])**2 + (x[1]-x_p[1])**2)
+
+def epipolar_pipeline(d1, d2, K1, K2, error, inlier_only, img1, img2):
+    '''
+    Function:
+            Basic epipolar pipeline that goes from the matching pairs to the E esitmation and triangulation of 3D points
+    Input:
+            d1, d2: = matched keypoints in two images
+            K1, K2 =  intrinsics of the two cameras
+            error = error threshold for calculating fundamental matrix
+            inlier_only = if only using inliers for fundamental matrix computation
+            img1, img2 = two images
+    Output:
+            X = the triangulated 3D points from the matched pairs
+            P = the projection of the second camera
+            inlier = the inlier mask of the matched pairs used for fundamental matrix computation
+            mask = mask of the 2D keypoints used for triangulation
+    '''
+
+    # Compute fundamental matrix with the given error theshold
+    F, inlier = computeFundamentalMat(d1, d2, error=error)
+
+    # use very small error threshold
+    # F, inlier = computeFundamentalMat(d1, d2, error=1)
+
+    # use 8-point algorithm
+    # F, inlier = computeFundamentalMat(d1, d2, error=error, method=cv2.FM_8POINT)
+
+    # use least square on all points
+    # F = compute_fundamental(d1, d2)
+    # inlier = np.ones(d1.shape[1])
+
+    # print(inlier)
+    E = np.dot(np.dot(K2.T, F), K1)
+
+    if not inlier_only:
+        inlier = np.ones(len(inlier))
+    x1, x2 = util.homogeneous(d1[:, inlier == 1]), util.homogeneous(
+        d2[:, inlier == 1])
+    # vis.plot_epipolar_line(img1[:,:,0], img2[:,:,0], F, x1, x2)
+
+    # Find corrected corresponding points for optimal triangulation
+    N = d1[:, inlier == 1].shape[1]
+    pts1 = d1[:, inlier == 1].T.reshape(1, -1, 2)
+    pts2 = d2[:, inlier == 1].T.reshape(1, -1, 2)
+    m1, m2 = cv2.correctMatches(F, pts1, pts2)
+    x1, x2 = util.homogeneous(np.reshape(m1, (-1, 2)).T), util.homogeneous(
+        np.reshape(m2, (-1, 2)).T)
+
+    mask = np.logical_not(np.isnan(x1[0]))
+    x1 = x1[:, mask]
+    x2 = x2[:, mask]
+
+    # print(img1[:,:,0].shape)
+
+    # vis.plotEpiline(img1[:,:,0], img2[:,:,0], np.int32(d1[:,inlier==1]).T, np.int32(d2[:,inlier==1]).T, F)
+
+    # Triangulte points
+    X, P = triangulate_from_E(E, K1, K2, x1, x2)
+
+    return X, P, inlier, mask
+
+def epipolar_pipeline_from_F(d1, d2, K1, K2, F, inlier_only=False,thres=5):
+    '''
+    Function:
+            Basic epipolar pipeline that goes from the matching pairs to the E esitmation and triangulation of 3D points
+    Input:
+            d1, d2: = matched keypoints in two images
+            K1, K2 =  intrinsics of the two cameras
+            error = error threshold for calculating fundamental matrix
+            inlier_only = if only using inliers for fundamental matrix computation
+            img1, img2 = two images
+    Output:
+            X = the triangulated 3D points from the matched pairs
+            P = the projection of the second camera
+            inlier = the inlier mask of the matched pairs used for fundamental matrix computation
+            mask = mask of the 2D keypoints used for triangulation
+    '''
+
+    # Compute sampson error and filter out outliers
+    if inlier_only:
+        serr = Sampson_error(util.homogeneous(d1),util.homogeneous(d2),F)
+        inlier = np.zeros(len(serr))
+        inlier[serr < thres] = 1
+    else:
+        inlier = np.ones(d1.shape[1])
+    # print(inlier)
+    E = np.dot(np.dot(K2.T, F), K1)
+    # F = np.dot(np.linalg.inv(K2).T, np.dot(E, np.linalg.inv(K1)))
+
+    x1, x2 = util.homogeneous(d1[:, inlier == 1]), util.homogeneous(d2[:, inlier == 1])
+    # vis.plot_epipolar_line(img1[:,:,0], img2[:,:,0], F, x1, x2)
+
+    # Find corrected corresponding points for optimal triangulation
+    N = d1[:, inlier == 1].shape[1]
+    pts1 = d1[:, inlier == 1].T.reshape(1, -1, 2)
+    pts2 = d2[:, inlier == 1].T.reshape(1, -1, 2)
+    m1, m2 = cv2.correctMatches(F, pts1, pts2)
+    x1, x2 = util.homogeneous(np.reshape(m1, (-1, 2)).T), util.homogeneous(np.reshape(m2, (-1, 2)).T)
+
+    mask = np.logical_not(np.isnan(x1[0]))
+    x1 = x1[:, mask]
+    x2 = x2[:, mask]
+
+    # Triangulte points
+    X, P = triangulate_from_E(E, K1, K2, x1, x2)
+
+    return X, P, inlier, mask
 
 
 if __name__ == "__main__":

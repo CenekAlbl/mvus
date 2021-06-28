@@ -7,6 +7,7 @@ import numpy as np
 from scipy import interpolate
 from thirdparty import transformation
 from tools import ransac
+import cv2
 # from numba import jit
 
 
@@ -205,6 +206,23 @@ def umeyama(src, dst, estimate_scale):
 
     return T
 
+def convert_kpts(kpts):
+    '''
+    Function:
+        convert superglue keypoints to cv.KeyPoint format
+    Input:
+        kpts = a numpy array of superglue keypoints (n,2)
+    Output:
+        kpts_cv = a list of cv.KeyPoint features
+    '''
+    return [cv2.KeyPoint(k[0],k[1],8) for k in kpts]
+
+def unpack_sift_kp(kpts):
+    '''
+    Function:
+        unpack sift keypoints
+    '''
+    return np.array([kp.pt for kp in kpts])
 
 if __name__ == "__main__":
     R = rotation(0.38,-176.3,100)

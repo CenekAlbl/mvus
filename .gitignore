@@ -125,3 +125,5 @@ dmypy.json
 
 # Datas
 data/
+experiments/
+multiviewunsynch/*.png
