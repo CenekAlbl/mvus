@@ -1222,7 +1222,9 @@ def create_scene(path_input):
         flight.rs = np.asfarray([init_rs for i in range(flight.numCam)])
 
     # Load ground truth setting (optinal)
-    flight.gt = config['optional inputs']['ground_truth']
+    if 'optional inputs' in config:
+        if 'ground_truth' in config['optional inputs']:
+            flight.gt = config['optional inputs']['ground_truth']
 
     print('Input data are loaded successfully, a scene is created.\n')
     return flight

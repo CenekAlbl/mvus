@@ -60,6 +60,7 @@ def sync_iter(fps1, fps2, detect1, detect2, frame1, frame2, maxIter=200, thresho
     def ransac(d, maxIter, threshold):
         InliersMax = 0
         numSample = min(detect1.shape[1], detect2.shape[1])
+        result = np.zeros((10))
         for i in range(maxIter):
             sampleIdx = np.random.choice(np.arange(numSample-2*abs(d)), size=9, replace=False)
             timestamp = detect2[0,sampleIdx]

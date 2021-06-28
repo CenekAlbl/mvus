@@ -85,9 +85,11 @@ while True:
 flight.spline_to_traj(sampling_rate=1)
 # Visualize the 3D trajectory
 #vis.show_trajectory_3D(flight.traj[1:],line=False)
-
+flight.out  = {'reconst_tran' : flight.traj[1:]}
 # Align with the ground truth data if available
-flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
+if flight.gt:
+    flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
+
 with open(flight.settings['path_output'],'wb') as f:
     pickle.dump(flight, f)
 
