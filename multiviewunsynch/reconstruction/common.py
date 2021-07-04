@@ -2346,10 +2346,12 @@ def create_scene(path_input):
             cam['distCoeff'].append(0)
 
         # load camera information
-        camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'], img_path=cam['img_path'])
+        camera = Camera(K=np.asfarray(cam['K-matrix']), d=np.asfarray(cam['distCoeff']), fps=cam['fps'], resolution=cam['resolution'])
         # extract features
         if 'include_static' in config['settings'].keys() and config['settings']['include_static']:
             # if using sift as feature_method, also extract sift features
+            assert 'img_path' in cam.keys(), "Please specify the path to images"
+            camera.img_path = cam['img_path']
             if feature_method[0] == 'sift':
                 camera.extract_features(method=feature_method[0])
             elif feature_method[0] == 'superglue':
@@ -2357,7 +2359,7 @@ def create_scene(path_input):
                 camera.kp = util.convert_kpts(kpt_list[i])
             else:
                 raise Exception("Unsupported feature extraction and matching method")
-        else:
+        elif 'img_path' in cam.keys():
             camera.read_img()
 
         # load the ground truth static matches if given

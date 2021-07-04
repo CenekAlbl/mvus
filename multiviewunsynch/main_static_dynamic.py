@@ -45,9 +45,6 @@ flight.time_shift()
 # Convert raw detections into the global timeline
 flight.detection_to_global()
 
-# # Initialize with the static part
-# flight.init_static(inlier_only=True, debug=args.debug)
-
 # Initialize the first 3D trajectory
 flight.init_traj(error=flight.settings['thres_Fmatix'], inlier_only=True, debug=args.debug)
 
@@ -113,26 +110,6 @@ while True:
 
 # Discretize trajectory
 flight.spline_to_traj(sampling_rate=1)
-# save the 2d trajectories
-if 'save_2d' in flight.settings.keys() and flight.settings['save_2d']:
-    if not os.path.exists(os.path.dirname(flight.settings['save_2d_path'])):
-        os.makedirs(os.path.dirname(flight.settings['save_2d_path']))
-
-    for i, cam in enumerate(flight.cameras):
-        x_res = cam.dist_point3d(flight.traj[1:])
-        x_ori = flight.detections[i][1:]
-        # visualize the reprojection of the reconstructed trajectories
-        vis.show_2D_all(x_ori, x_res, title='cam'+str(i)+' trajectories', color=True, line=False, bg=cam.img, label=['extracted dynamic features', 'reconstructed trajectories'])
-
-        # # align with the raw detection
-        # _ =  align_detections(flight, visualize=True)
-
-        # save the reprojected trajectories
-        traj_res = np.vstack([x_res, flight.traj[0]]).T
-        # save the raw detection (replace the timestamp to the global timestamp)
-        det_ori_global = np.vstack([x_ori, flight.detections_global[i][0]]).T
-        np.savetxt(flight.settings['save_2d_path'].replace('.txt', '_cam'+str(i)+'.txt'), traj_res, delimiter=' ')
-        np.savetxt(flight.settings['save_2d_path'].replace('.txt', '_det_ori_global_cam'+str(i)+'.txt'), det_ori_global, delimiter=' ')
 
 # Visualize the 3D trajectory
 vis.show_trajectory_3D(flight.traj[1:],line=False)
