@@ -168,7 +168,7 @@ def show_trajectory_3D(*X, title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir='', label=[], cam_center=[]):
+def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir='', label=[], cam_center=None):
     plt.figure(figsize=(12, 10))
     if bg is not None:
         bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)
@@ -195,9 +195,6 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
         if text:
             for j in range(len(x[i][0])):
                 plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
-        if len(cam_center) == 2:
-            # plot camera position
-            plt.scatter(cam_center[0], cam_center[1], c='c',marker='*')
 
         # plt.gca().set_xlim([0,1920])
         # plt.gca().set_ylim([0,1080])
@@ -206,6 +203,10 @@ def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_
         plt.xlabel('X')
         plt.ylabel('Y')
     
+    if cam_center is not None and cam_center.shape[0] == 2 and cam_center.shape[1] > 0:
+        # plot camera position
+        plt.scatter(cam_center[0], cam_center[1], c='r',marker='*', label='Camera center')
+            
     plt.legend(loc=1)
 
     if title:
