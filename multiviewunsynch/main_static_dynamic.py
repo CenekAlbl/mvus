@@ -97,7 +97,7 @@ while True:
     flight.select_most_overlap()
     
     # Add the next camera and get its pose
-    flight.get_camera_pose(flight.sequence[cam_temp], flight.sequence[:cam_temp], debug=args.debug)
+    flight.get_camera_pose(flight.sequence[cam_temp], debug=args.debug)
 
     # Triangulate new points and update the 3D spline
     flight.triangulate(flight.sequence[cam_temp], flight.sequence[:cam_temp], thres=flight.settings['thres_triangulation'], factor_t2s=flight.settings['smooth_factor'], factor_s2t=flight.settings['sampling_rate'])

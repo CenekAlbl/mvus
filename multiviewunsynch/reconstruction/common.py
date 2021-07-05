@@ -144,7 +144,8 @@ class Scene:
 
         for i in cams:
             timestamp = self.alpha[i] * (self.detections[i][0] + self.rs[i] * self.detections[i][2] / self.cameras[i].resolution[1]) + self.beta[i] 
-            detect = self.cameras[i].undist_point(self.detections[i][1:], self.settings['undist_method']) if self.settings['undist_points'] else self.detections[i][1:]
+            method = self.settings['undist_method'] if 'unidst_method' in self.settings.keys() else 'opencv'
+            detect = self.cameras[i].undist_point(self.detections[i][1:], method) if self.settings['undist_points'] else self.detections[i][1:]
             self.detections_global[i] = np.vstack((timestamp, detect))
 
             if motion_prior:
@@ -216,15 +217,15 @@ class Scene:
         else:
             d2, d1 = util.match_overlap(self.detections_global[t2], self.detections_global[t1])
         
-        # draw matches between dections
-        if self.settings['undist_points']:
-            # the background images are the original ones and are not undistorted, the detections need to be distorted
-            d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
-            d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
+        # # draw matches between dections
+        # if self.settings['undist_points']:
+        #     # the background images are the original ones and are not undistorted, the detections need to be distorted
+        #     d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
+        #     d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
 
-            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
-        else:
-            vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
+        #     vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
+        # else:
+        #     vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
         
         # add the static part
         if 'include_static' in self.settings.keys() and self.settings['include_static']:
@@ -1515,7 +1516,7 @@ class Scene:
         if verbose:
             print('{} out of {} points are inliers for PnP'.format(inliers.shape[0], N))
 
-    def get_camera_pose(self, cam_id, cams, error=8, verbose=0, debug=False):
+    def get_camera_pose(self, cam_id, error=8, verbose=0, debug=False):
         '''
         Get the absolute pose of a camera by solving the PnP problem.
 
@@ -1538,7 +1539,7 @@ class Scene:
         num_detect = detect.shape[1]
         # if the static part is also included, add the static part to the points as well
         if 'include_static' in self.settings.keys() and self.settings['include_static']:
-            pts_2d, pts_3d = self.register_new_camera_static(cam_id, cams, debug)
+            pts_2d, pts_3d = self.register_new_camera_static(cam_id, self.sequence[:cam_id], debug)
 
             # stack the static points with the detections
             detect = np.hstack([detect, np.vstack([np.zeros(pts_2d.shape[1]),pts_2d])])
