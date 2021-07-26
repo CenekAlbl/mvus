@@ -22,6 +22,7 @@ import os
 a = argparse.ArgumentParser()
 a.add_argument("--config_file", type=str, help="path to the proper config file", required=True)
 a.add_argument("--debug", action="store_true", help="debug mode: run with ground truth)")
+a.add_argument("--scale", action="store_true", help="scale variable in BA")
 
 args = a.parse_args()
 
@@ -67,7 +68,7 @@ while True:
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'],\
-        rs_bounds=flight.settings['rs_bounds'],debug=args.debug)
+        rs_bounds=flight.settings['rs_bounds'],debug=args.debug,scaling=args.scale)
 
     print('\nMean error of each camera after the first BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     print('\nMean error of the static part in each camera after the first BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
@@ -83,7 +84,7 @@ while True:
     res = flight.BA(cam_temp, rs=flight.settings['rolling_shutter'],\
         motion_reg=flight.settings['motion_reg'],\
         motion_weights=flight.settings['motion_weights'],\
-        rs_bounds=flight.settings['rs_bounds'],debug=args.debug)
+        rs_bounds=flight.settings['rs_bounds'],debug=args.debug, scaling=args.scale)
 
     print('\nMean error of each camera after the second BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))

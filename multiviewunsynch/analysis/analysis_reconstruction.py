@@ -137,6 +137,7 @@ def undistort_image(cam, output_dir = '', title=None):
 def main():
     # Output dir
     output_dir = '../experiments/croatia_set3/eval_res_calibrated_30_new/'
+    output_dir = '../experiments/croatia_set3/eval_res_calibrated_30_scale/'
     # output_dir = '../experiments/croatia_set3/eval_res_undistorted_30/'
 
     # output_dir = '../experiments/nyc_set12/eval_res_calibrated_30/'
@@ -174,33 +175,19 @@ def main():
     gt_dynamic = []
     for gfd in gt_dynamic_file:
         gt_dynamic.append(np.loadtxt(gfd, usecols=(2,0,1), delimiter=' ').T)
-    
-    # gt_dynamic[0][0] += 10910
-    # gt_dynamic[1][0] += 9001
 
     # Load scenes
-    # COLMAP GUESS
-    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/dynamic/nyc_colmap_dynamic_ori_inlier_30.pkl'
-    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/static/nyc_colmap_static_superglue_colmap2_30.pkl'
-    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
-    # data_file_static_then_dynamic = '/scratch2/wuti/Repos/mvus/experiments/static_then_dynamic/nyc_colmap_static_then_dynamic_superglue_30.pkl'
-    
-    # COLMAP GUESS 0
-    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_dynamic/nyc_colmap_dynamic_ori_inlier_calibrated_30.pkl'
-    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap2_static/nyc_colmap_static_superglue_colmap2_30.pkl'
-    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap2_static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
-
-    # COLMAP GUESS 0
-    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_dynamic/nyc_colmap_dynamic_ori_inlier_calibrated_30.pkl'
-    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap3_static/nyc_colmap_static_superglue_colmap2_30.pkl'
-    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/colmap3_static_dynamic/nyc_colmap_static_dynamic_superglue_colmap2_30.pkl'
 
     # CALIBRATED
     # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
-    data_file_static = '../experiments/croatia_set3/static/croatia_static_superglue_30.pkl'
-    data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic/croatia_static_dynamic_superglue_30.pkl'
-    data_file_static_dynamic_no_sync = '../experiments/croatia_set3/static_dynamic_no_sync/croatia_static_dynamic_no_sync_superglue_30.pkl'
-
+    # data_file_static = '../experiments/croatia_set3/static/croatia_static_superglue_30.pkl'
+    # data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic/croatia_static_dynamic_superglue_30.pkl'
+    # data_file_static_dynamic_no_sync = '../experiments/croatia_set3/static_dynamic_no_sync/croatia_static_dynamic_no_sync_superglue_30.pkl'
+    
+    data_file_static = '../experiments/croatia_set3/static/croatia_static_superglue_scale_30.pkl'
+    data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic/croatia_static_dynamic_superglue_scale_30.pkl'
+    data_file_static_dynamic_no_sync = '../experiments/croatia_set3/static_dynamic_no_sync/croatia_static_dynamic_no_sync_superglue_scale_30.pkl'
+    
     # data_file_static = '../experiments/nyc_set17/static/nyc_static_superglue_10.pkl'
     # data_file_static_dynamic = '../experiments/nyc_set17/static_dynamic/nyc_static_dynamic_superglue_10.pkl'
     # data_file_static_dynamic_no_sync = '../experiments/nyc_set17/static_dynamic_no_sync/nyc_static_dynamic_no_sync_superglue_10.pkl'
@@ -213,19 +200,13 @@ def main():
     # data_file_static_dynamic = '../experiments/nyc_set17/static_dynamic_4CA/nyc_static_dynamic_superglue_10.pkl'
     # data_file_static_dynamic_no_sync = '../experiments/nyc_set17/static_dynamic_no_sync_4CA/nyc_static_dynamic_no_sync_superglue_10.pkl'
     
-
-    # CALIBRATED F10
-    # data_file_static = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static_10/nyc_colmap_static_superglue_calibrated_10.pkl'
-    # data_file_static_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/calibrated_static_dynamic_10/nyc_colmap_static_dynamic_superglue_calibrated_10.pkl'
-
-
     # UNDISTORT
     # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/undistort_dynamic/nyc_colmap_dynamic_ori_inlier_undistort_30.pkl'
     # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
     # data_file_static = '../experiments/croatia_set3/static_un/croatia_static_un_superglue_30.pkl'
     # data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic_un/croatia_static_dynamic_un_superglue_30.pkl'
 
-# data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
+    # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
     # data_file_static = '../experiments/nyc_set12/static/nyc_static_superglue_30.pkl'
     # data_file_static_dynamic = '../experiments/nyc_set12/static_dynamic/nyc_static_dynamic_superglue_30.pkl'
 
@@ -346,11 +327,11 @@ def main():
     vis.error_boxplot(traj_repro_errs2, traj_repro_labels2, title='reprojection_error_dynamic2.png', output_dir=output_dir)
 
     # plot error histograms
-    width = 0.2
+    width = 1
     fig_gt_hist, gt_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(gt_repro_errs))
     for i, (cam_err1, cam_label1, cam_err2, cam_label2, cam_err3, cam_label3) in enumerate(zip(gt_err1, gt_label1, gt_err2, gt_label2, gt_err2, gt_label3)):
-        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=gt_hist_axs[i],title='cam '+str(i),xlim=80, bin_width=width)
+        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=gt_hist_axs[i],title='cam '+str(i),xlim=80, num_bins=20, bin_width=width)
     # loc2 = loc[1:-1]+0.5
     # l2 = ["{:.0f}".format(x) for x in loc[1:-1]]
     xticks = np.arange(0,90,10)
@@ -367,7 +348,7 @@ def main():
     fig_traj_hist, traj_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(traj_repro_errs))
     for i, (cam_err1, cam_label1, cam_err2, cam_label2, cam_err3, cam_label3) in enumerate(zip(traj_err1, traj_label1, traj_err2, traj_label2, traj_err3, traj_label3)):
-        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=traj_hist_axs[i],title='cam '+str(i),xlim=80, bin_width=width)
+        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=traj_hist_axs[i],title='cam '+str(i),xlim=80, num_bins=20, bin_width=width)
     traj_hist_axs[0].set_xticks(loc2)
     traj_hist_axs[1].set_xticks(loc2)
     traj_hist_axs[1].set_xticklabels(l2)
@@ -378,7 +359,7 @@ def main():
     fig_match_hist, match_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(match_repro_errs))
     for i, (cam_err1, cam_label1, cam_err2, cam_label2, cam_err3, cam_label3) in enumerate(zip(match_err1, match_label1, match_err2, match_label2, match_err3, match_label3)):
-        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=match_hist_axs[i],title='cam '+str(i),xlim=80, bin_width=width)
+        vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=match_hist_axs[i],title='cam '+str(i),xlim=80, num_bins=20, bin_width=width)
     match_hist_axs[0].set_xticks(loc2)
     match_hist_axs[1].set_xticks(loc2)
     match_hist_axs[1].set_xticklabels(l2)

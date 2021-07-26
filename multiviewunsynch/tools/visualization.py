@@ -396,7 +396,7 @@ def error_boxplot(err, labels=[], title=None, ax=None, show_outliers=False, outp
         plt.savefig(output_dir+'error_boxplot.png')
     return ax
 
-def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40, ylim=350, bin_width=0.1):
+def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40, num_bins=40, ylim=350, bin_width=0.1):
     assert len(labels) == len(errs), "The length of labels should be consistent with the length of the err vector"
 
     if ax is None:
@@ -414,7 +414,7 @@ def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40, 
     #     # if ax.get_ylim()[-1] < np.max(n):
     #     #     ax.set_ylim([0,np.max(n)+0.75])
 
-    bins = np.arange(0, xlim+1, 1)
+    bins = np.arange(0, xlim+1, (xlim+1)//num_bins)
     
     for i, (err, label) in enumerate(zip(errs, labels)):
         h, _ = np.histogram(np.clip(err, bins[0], bins[-1]), bins=bins)

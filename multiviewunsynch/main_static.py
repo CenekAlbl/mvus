@@ -20,7 +20,7 @@ import os
 a = argparse.ArgumentParser()
 a.add_argument("--config_file", type=str, help="path to the proper config file", required=True)
 a.add_argument("--debug", action="store_true", help="debug mode: run with ground truth)")
-
+a.add_argument("--scale", action="store_true", help="scale variable in BA")
 args = a.parse_args()
 
 print('Reconstruct with only static part of the scene.\n')
@@ -45,7 +45,7 @@ while True:
 
     print('\nDoing the first BA')
     # Bundle adjustment
-    res = flight.BA_static(cam_temp, debug=args.debug)
+    res = flight.BA_static(cam_temp, debug=args.debug, scaling=args.scale)
 
     print('\nMean error of the static part in each camera after the first BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 
@@ -55,7 +55,7 @@ while True:
 
     print('\nDoing the second BA')
     # Bundle adjustment after outlier removal
-    res = flight.BA_static(cam_temp, debug=args.debug)
+    res = flight.BA_static(cam_temp, debug=args.debug, scaling=args.scale)
 
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 

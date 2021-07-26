@@ -748,7 +748,8 @@ class Scene:
         '''
         # get the 3D static points reconstructed from this camera
         point_3D = np.empty([3, 0])
-        point_3D = np.hstack([point_3D, self.static[:, self.cameras[cam_id].index_2d_3d]])
+        if len(self.cameras[cam_id].index_2d_3d) > 0:
+            point_3D = np.hstack([point_3D, self.static[:, self.cameras[cam_id].index_2d_3d]])
         X = util.homogeneous(point_3D)            
         
         # get the corresponding 2d static points
@@ -870,7 +871,7 @@ class Scene:
             self.visible.append(visible)
 
 
-    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False,rs_bounds=False, debug=False, sync=True):
+    def BA(self, numCam, max_iter=10, rs=False, motion_prior=False,motion_reg=False,motion_weights=1,norm=False,rs_bounds=False, debug=False, sync=True, scaling=False):
         '''
         Bundle Adjustment with multiple splines
 
@@ -1162,7 +1163,11 @@ class Scene:
         # if 'include_static' in self.settings.keys() and self.settings['include_static']:
             # res = least_squares(fn,model,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
         # else:
-        res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
+        if scaling:
+            print('apply x_scaling during BA')
+            res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',x_scale='jac',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
+        else:
+            res = least_squares(fn,model,jac_sparsity=A,tr_solver='lsmr',xtol=1e-12,max_nfev=max_iter,verbose=1,bounds=bounds_rs)
 
         '''After BA'''
         # if the static part are included, they are added to the beginning of the columns.
@@ -1198,7 +1203,7 @@ class Scene:
 
         return res
     
-    def BA_static(self, numCam, max_iter=10, debug=False):
+    def BA_static(self, numCam, max_iter=10, debug=False, scaling=True):
         '''
         Function:
             standard BA with static points and camera models
@@ -1295,7 +1300,11 @@ class Scene:
 
         # least-sqaure optimization for BA
         # res = least_squares(fn, model, tr_solver='lsmr', xtol=1e-12, max_nfev=max_iter, verbose=1)
-        res = least_squares(fn, model, jac_sparsity=A, tr_solver='lsmr', xtol=1e-12, max_nfev=max_iter, verbose=1)
+        if scaling:
+            print('apply x_scaling during BA')
+            res = least_squares(fn, model, jac_sparsity=A, tr_solver='lsmr', x_scale='jac', xtol=1e-12, max_nfev=max_iter, verbose=1)
+        else:
+            res = least_squares(fn, model, jac_sparsity=A, tr_solver='lsmr', xtol=1e-12, max_nfev=max_iter, verbose=1)
 
         ''' AFTER BA '''
         # parse the result of BA
@@ -1309,6 +1318,7 @@ class Scene:
         for i in range(numCam):
             self.cameras[self.sequence[i]].vector2P(cams[i], calib=self.settings['opt_calib'])
             print(self.cameras[self.sequence[i]].K)
+            print(self.cameras[self.sequence[i]].d)
     
     def remove_outliers(self, cams, thres=30, verbose=False, debug=False):
         '''
@@ -1482,7 +1492,10 @@ class Scene:
             pts_2d = self.cameras[cam_id].get_points()
         
         # get the registered 3d static point from the new camera
-        pts_3d = self.static[:, self.cameras[cam_id].index_2d_3d]
+        if len(self.cameras[cam_id].index_2d_3d) == 0:
+            pts_3d = np.empty((3,0))
+        else:
+            pts_3d = self.static[:, self.cameras[cam_id].index_2d_3d]
 
         return pts_2d, pts_3d
     
@@ -2121,9 +2134,9 @@ class Camera:
         self.kp = []
         self.des = []
         # the indices of the features used for 3D static point reconstruction
-        self.index_registered_2d = np.empty(0)
+        self.index_registered_2d = np.empty(0, dtype=int)
         # the indices of the 3D static points that corresponds to the used feautures
-        self.index_2d_3d = np.empty(0)
+        self.index_2d_3d = np.empty(0, dtype=int)
         # ground truth static matches for debugging
         self.gt_pts = None
 
