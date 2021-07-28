@@ -40,6 +40,9 @@ np.set_printoptions(precision=4)
 
 cam_temp = 2
 while True:
+    # print('\nRemove outliers far away from the center')
+    # flight.remove_outliers_3d(flight.sequence[:cam_temp], mode='camera', verbose=True, debug=args.debug)
+
     print('\n----------------- Bundle Adjustment with {} cameras -----------------'.format(cam_temp))
     print('\nMean error of the static part in each camera before BA:   ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 
@@ -53,11 +56,17 @@ while True:
     print('\nRemove outliers after first BA')
     flight.remove_outliers_static(flight.sequence[:cam_temp], thres=flight.settings['thres_outlier'], verbose=True, debug=args.debug)
 
+    # print('\nRemove outliers far away from the center')
+    # flight.remove_outliers_3d(flight.sequence[:cam_temp], mode='camera', verbose=True, debug=args.debug)
+
     print('\nDoing the second BA')
     # Bundle adjustment after outlier removal
     res = flight.BA_static(cam_temp, debug=args.debug, scaling=args.scale)
 
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
+
+    print('\nRemove outliers far away from the center')
+    flight.remove_outliers_3d(flight.sequence[:cam_temp], mode='camera', verbose=True, debug=args.debug)
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:

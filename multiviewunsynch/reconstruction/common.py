@@ -217,15 +217,15 @@ class Scene:
         else:
             d2, d1 = util.match_overlap(self.detections_global[t2], self.detections_global[t1])
         
-        # # draw matches between dections
-        # if self.settings['undist_points']:
-        #     # the background images are the original ones and are not undistorted, the detections need to be distorted
-        #     d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
-        #     d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
+        # draw matches between dections
+        if self.settings['undist_points']:
+            # the background images are the original ones and are not undistorted, the detections need to be distorted
+            d1_dist = self.cameras[t1].dist_point2d(d1[1:], method=self.settings['undist_method'])
+            d2_dist = self.cameras[t2].dist_point2d(d2[1:], method=self.settings['undist_method'])
 
-        #     vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
-        # else:
-        #     vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
+            vis.draw_detection_matches(self.cameras[t1].img, np.vstack([d1[0], d1_dist]), self.cameras[t2].img, np.vstack([d2[0],d2_dist]))
+        else:
+            vis.draw_detection_matches(self.cameras[t1].img, d1, self.cameras[t2].img, d2)
         
         # add the static part
         if 'include_static' in self.settings.keys() and self.settings['include_static']:
@@ -1341,29 +1341,30 @@ class Scene:
                 
                 # if the static part is included, also remove outliers in the static part
                 if 'include_static' in self.settings.keys() and self.settings['include_static']:
-                    # filter out the outliers from the static scene
-                    error_static = self.error_cam_static(i, mode='dist', debug=debug)
+                    self.remove_outliers_static(cams, thres=thres, verbose=verbose, debug=debug)
+                    # # filter out the outliers from the static scene
+                    # error_static = self.error_cam_static(i, mode='dist', debug=debug)
 
-                    # indices of the outliers in the reconstructed 3D points
-                    outlier_ids = self.cameras[i].index_2d_3d[error_static >= self.settings['thres_outlier_static']]
-                    # maskout these points in the inlier_mask
-                    self.inlier_mask[outlier_ids] == 0
-                    # remove feature ids corresponds to the outliers from the registered list
-                    self.cameras[i].index_2d_3d = self.cameras[i].index_2d_3d[error_static < self.settings['thres_outlier_static']]
-                    self.cameras[i].index_registered_2d = self.cameras[i].index_registered_2d[error_static < self.settings['thres_outlier_static']]
+                    # # indices of the outliers in the reconstructed 3D points
+                    # outlier_ids = self.cameras[i].index_2d_3d[error_static >= self.settings['thres_outlier_static']]
+                    # # maskout these points in the inlier_mask
+                    # self.inlier_mask[outlier_ids] = 0
+                    # # remove feature ids corresponds to the outliers from the registered list
+                    # self.cameras[i].index_2d_3d = self.cameras[i].index_2d_3d[error_static < self.settings['thres_outlier_static']]
+                    # self.cameras[i].index_registered_2d = self.cameras[i].index_registered_2d[error_static < self.settings['thres_outlier_static']]
 
-                    # also update the registered 2d index of the other cameras
-                    for j in cams:
-                        if j == i:
-                            continue
+                    # # also update the registered 2d index of the other cameras
+                    # for j in cams:
+                    #     if j == i:
+                    #         continue
 
-                        # find the ids of the outlier in the camera
-                        cond = np.in1d(self.cameras[j].index_2d_3d, outlier_ids)
-                        self.cameras[j].index_2d_3d = self.cameras[j].index_2d_3d[~cond]
-                        self.cameras[j].index_registered_2d = self.cameras[j].index_registered_2d[~cond]
+                    #     # find the ids of the outlier in the camera
+                    #     cond = np.in1d(self.cameras[j].index_2d_3d, outlier_ids)
+                    #     self.cameras[j].index_2d_3d = self.cameras[j].index_2d_3d[~cond]
+                    #     self.cameras[j].index_registered_2d = self.cameras[j].index_registered_2d[~cond]
                     
-                    if verbose:
-                        print('{} out of {} static points are removed for camera {}'.format(len(outlier_ids), len(error_static), i))
+                    # if verbose:
+                    #     print('{} out of {} static points are removed for camera {}'.format(len(outlier_ids), len(error_static), i))
 
     def remove_outliers_static(self, cams, thres=30, verbose=False, debug=False):
         '''
@@ -1378,7 +1379,7 @@ class Scene:
                 # indices of the outliers in the reconstructed 3D points
                 outlier_ids = self.cameras[i].index_2d_3d[error_static >= self.settings['thres_outlier_static']]
                 # maskout these points in the inlier_mask
-                self.inlier_mask[outlier_ids] == 0
+                self.inlier_mask[outlier_ids] = 0
                 # remove feature ids corresponds to the outliers from the registered list
                 self.cameras[i].index_2d_3d = self.cameras[i].index_2d_3d[error_static < self.settings['thres_outlier_static']]
                 self.cameras[i].index_registered_2d = self.cameras[i].index_registered_2d[error_static < self.settings['thres_outlier_static']]
@@ -1395,6 +1396,37 @@ class Scene:
                 
                 if verbose:
                     print('{} out of {} static points are removed for camera {}'.format(len(outlier_ids), len(error_static), i))
+    
+    def remove_outliers_3d(self, cams, mode='center', thres=100, verbose=False, debug=False):
+        '''
+        Function: 
+            remove the outliers from the static scene
+        '''
+        if mode == 'camera':
+            cam_centers = [-self.cameras[i].R.T @ self.cameras[i].t.reshape((-1,1)) for i in cams]
+            origin = np.mean(np.hstack(cam_centers),axis=1).reshape(-1)
+        else:
+            # remove points far from point center
+            origin = np.mean(self.static[:, self.inlier_mask > 0], axis=1)
+        inlier_ids = np.where(self.inlier_mask > 0)[0]
+        distance = np.linalg.norm(self.static[:, self.inlier_mask > 0].T - origin, axis=1)
+
+        # mask = distance > np.mean(distance) + sigma*np.std(distance)
+        mask = distance > thres
+
+        # mask out point outside range
+        outlier_ids = inlier_ids[mask]
+        self.inlier_mask[outlier_ids] = 0
+        
+        for i in cams:
+            id_mask = np.isin(self.cameras[i].index_2d_3d, outlier_ids, invert=True)
+            self.cameras[i].index_2d_3d = self.cameras[i].index_2d_3d[id_mask]
+            self.cameras[i].index_registered_2d = self.cameras[i].index_registered_2d[id_mask]
+        
+        if verbose:
+                print('{} out of {} static points are removed from the scene'.format(np.sum(mask), len(inlier_ids)))
+                
+                
     
     def register_new_camera_static(self, cam_id, cams, debug=False):
         '''

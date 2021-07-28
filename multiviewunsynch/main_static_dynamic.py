@@ -58,6 +58,9 @@ np.set_printoptions(precision=4)
 
 cam_temp = 2
 while True:
+    # print('\nRemove outliers far away from the center')
+    # flight.remove_outliers_3d(flight.sequence[:cam_temp], verbose=True, debug=args.debug)
+
     print('\n----------------- Bundle Adjustment with {} cameras -----------------'.format(cam_temp))
     print('\nMean error of each camera before BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     print('\nMean error of the static part in each camera before BA:   ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
@@ -78,6 +81,9 @@ while True:
     # flight.remove_outliers_static(flight.sequence[:cam_temp], thres=flight.settings['thres_outlier'], verbose=True, debug=args.debug)
     flight.remove_outliers(flight.sequence[:cam_temp], thres=flight.settings['thres_outlier'], verbose=True, debug=args.debug)
     
+    print('\nRemove outliers far away from the center')
+    flight.remove_outliers_3d(flight.sequence[:cam_temp], verbose=True, debug=args.debug)
+
     print('\nDoing the second BA')
     # Bundle adjustment after outlier removal
     # res = flight.BA_static(cam_temp, debug=args.debug)
@@ -88,6 +94,9 @@ while True:
 
     print('\nMean error of each camera after the second BA:   ', np.asarray([np.mean(flight.error_cam(x)) for x in flight.sequence[:cam_temp]]))
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
+
+    print('\nRemove outliers far away from the center')
+    flight.remove_outliers_3d(flight.sequence[:cam_temp], verbose=True, debug=args.debug)
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:
@@ -144,6 +153,8 @@ else:
 # Align with the ground truth data if available
 if len(flight.gt) > 0:
     flight.out = align_gt(flight, flight.gt['frequency'], flight.gt['filepath'], visualize=False)
+if not os.path.exists(os.path.dirname(flight.settings['path_output'])):
+    os.makedirs(os.path.dirname(flight.settings['path_output']), exist_ok=True)
 with open(flight.settings['path_output'],'wb') as f:
     # unpack sift features if used
     if flight.settings['include_static']:

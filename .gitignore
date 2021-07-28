@@ -126,4 +126,6 @@ dmypy.json
 # Datas
 data/
 experiments/
+multiviewunsynch/drone-tracking-datasets
 multiviewunsynch/*.png
+multiviewunsynch/*-datasets.png
