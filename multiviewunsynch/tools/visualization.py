@@ -11,6 +11,7 @@ from matplotlib import cm
 from mpl_toolkits.mplot3d import Axes3D
 from thirdparty.camera_calibration_show_extrinsics import create_camera_model, transform_to_matplotlib_frame
 from .util import homogeneous
+import os
 
 def drawlines(img1,img2,lines,pts1,pts2):
     ''' 
@@ -168,52 +169,66 @@ def show_trajectory_3D(*X, title=None,color=True,line=False):
     plt.show()
 
 
-def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir='', label=[], cam_center=None):
-    plt.figure(figsize=(12, 10))
+def show_2D_all(*x, title=None,color=True,line=True,text=False, bg=None, output_dir='', label=[], cam_center=None, vec=0):
+    # plt.figure(figsize=(12, 10))
+    plt.figure()
     if bg is not None:
         bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGB)
         plt.imshow(bg)
         h,w,_ = bg.shape
         plt.xlim([0,w])
         plt.ylim([h,0])
+    
+    # c = ['r','b','orange','g']
+    c = ['lime', 'r', 'lime', 'r']
+    m = ['o','x','o','+']
 
     num = len(x)
-    for i in range(num):
-        # plt.subplot(1,num,i+1)
-
-        c = ['r','b','orange','g']
-        m = ['o','x','o','+']
-        if len(label) == 0:
-            label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
-        if color:
-            plt.scatter(x[i][0],x[i][1],c=c[i],marker=m[i],label=label[i])
-        else:
-            plt.scatter(x[i][0],x[i][1],c=c[i])
-        # plt.scatter(x[i][0],x[i][1],c=np.arange(x[i].shape[1])*color)
-        if line:
-            plt.plot(x[i][0],x[i][1])
-        if text:
-            for j in range(len(x[i][0])):
-                plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
-
-        # plt.gca().set_xlim([0,1920])
-        # plt.gca().set_ylim([0,1080])
-        # plt.gca().invert_yaxis()
-
-        plt.xlabel('X')
-        plt.ylabel('Y')
     
-    if cam_center is not None and cam_center.shape[0] == 2 and cam_center.shape[1] > 0:
-        # plot camera position
-        plt.scatter(cam_center[0], cam_center[1], c='r',marker='*', label='Camera center')
+    if vec > 0:
+        # plot reprojection with vector
+        assert num % 2 == 0, 'incomplete input pairs'
+
+        for i in range(num // 2):
+            # plot base point
+            plt.scatter(x[2*i][0], x[2*i][1], c=c[2*i], marker=m[2*i], label=label[2*i], s=50)
+            # plot vector between base point and target
+            plt.quiver(x[2*i][0], x[2*i][1], vec*(x[2*i+1][0]-x[2*i][0]), vec*(x[2*i+1][1]-x[2*i][1]), color=c[2*i+1], angles='xy', scale_units='xy', scale=1, width=1e-2)
+    else:
+        for i in range(num):
+            # plt.subplot(1,num,i+1)
+            if len(label) == 0:
+                label = ['Raw points', 'Reconstruction points','Raw detections', 'Reconstructed trajectories']
+            if color:
+                plt.scatter(x[i][0],x[i][1],c=c[i],marker=m[i],label=label[i])
+            else:
+                plt.scatter(x[i][0],x[i][1],c=c[i])
+            # plt.scatter(x[i][0],x[i][1],c=np.arange(x[i].shape[1])*color)
+            if line:
+                plt.plot(x[i][0],x[i][1])
+            if text:
+                for j in range(len(x[i][0])):
+                    plt.text(x[i][0,j], x[i][1,j], str(j), color='red',fontsize=12)
+
+            # plt.gca().set_xlim([0,1920])
+            # plt.gca().set_ylim([0,1080])
+            # plt.gca().invert_yaxis()
+
+            plt.xlabel('X')
+            plt.ylabel('Y')
+    
+    # if cam_center is not None and cam_center.shape[0] == 2 and cam_center.shape[1] > 0:
+    #     # plot camera position
+    #     plt.scatter(cam_center[0], cam_center[1], c='r',marker='*', label='Camera center')
             
-    plt.legend(loc=1)
+    # plt.legend(loc=1)
+    plt.axis('off')
 
     if title:
-        plt.suptitle(title)
-        plt.savefig(output_dir+title+'.png')
+        # plt.suptitle(title)
+        plt.savefig(os.path.join(output_dir,title+'.png'),bbox_inches='tight',pad_inches = 0)
     else:
-        plt.savefig(output_dir+'reprojected.png')
+        plt.savefig(os.path.join(output_dir,'reprojected.png'),bbox_inches='tight',pad_inches = 0)
     # plt.show()
 
 
@@ -308,9 +323,9 @@ def show_3D_all(*X, title=None,color=True,line=True,flight=None, output_dir='',l
         handle.set_sizes([100])
     # plt.axis('off')
     if title:
-        plt.savefig(output_dir+title+'reconstructed_scene')
+        plt.savefig(os.path.join(output_dir,title+'.png'))
     else:
-        plt.savefig(output_dir+'reconstructed_scene.png')
+        plt.savefig(os.path.join(output_dir,'reconstructed_scene.png'))
     plt.show()
 
 
@@ -391,9 +406,9 @@ def error_boxplot(err, labels=[], title=None, ax=None, show_outliers=False, outp
     
     if title is not None:
         ax.set_title(title)
-        plt.savefig(output_dir+title)
+        plt.savefig(os.path.join(output_dir,title))
     else:
-        plt.savefig(output_dir+'error_boxplot.png')
+        plt.savefig(os.path.join(output_dir,'error_boxplot.png'))
     return ax
 
 def error_histogram(*errs, num_cams=2, labels=[], title=None, ax=None, xlim=40, num_bins=40, ylim=350, bin_width=0.1):
@@ -462,10 +477,12 @@ def draw_detection_matches(img1, d1, img2, d2, title='detection_mathches.png', o
     # print(dp2)
     matches = [cv2.DMatch(i, i, 0) for i in range(len(dp1))]
 
+    # outimg = cv2.drawMatches(img1, dp1, img2, dp2, matches, None, matchColor=(0,255,0))
     outimg = cv2.drawMatches(img1, dp1, img2, dp2, matches, None)
 
+
     plt.imshow(outimg), plt.show()
-    cv2.imwrite(output_dir+title, outimg)    
+    cv2.imwrite(os.path.join(output_dir,title), outimg)    
 
 def draw_matches(img1, kp1, img2, kp2, matches, matchesMask):
     '''

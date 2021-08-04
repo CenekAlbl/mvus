@@ -7,12 +7,14 @@ from reconstruction import synchronization as sync
 
 from reconstruction import epipolar as ep
 from tools.util import match_overlap, homogeneous
-from itertools import combinations
 from matplotlib import pyplot as plt
 import os
 import cv2
+import argparse
+from glob import glob
+import json
 
-def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', prefix='', flight=None, ax=None):
+def reproject_ground_truth(cameras, gt_pts, gt_dets, res_json, ref_cam=0, output_dir='', prefix='', flight=None, ax=None):
     '''
     Function:
         Compute and plot the reprojection errors of the ground truth matches
@@ -21,6 +23,10 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
         gt_pts = the ground truth matches
         n_bins = number of bins for plotting the histogram of the errors
     '''
+    f = open(os.path.join(output_dir, 'result.txt'), 'a')
+    f.write(prefix)
+
+    res = {}
 
     # triangulate points
     gt_pts2d = []
@@ -48,7 +54,7 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
     Traj_gt = ep.triangulate_matlab_mv(traj_pts2d, Projs)
 
     # plot the reconstructed scene
-    vis.show_3D_all(np.empty([3,0]), X_gt, np.empty([3,0]), Traj_gt, label=['','Reconstructed Ground Truth Matches','','Reconstructed Ground Truth Trajectory'], color=True, line=False, flight=flight, output_dir=output_dir+prefix)
+    vis.show_3D_all(np.empty([3,0]), X_gt, np.empty([3,0]), Traj_gt, label=['','Reconstructed Ground Truth Matches','','Reconstructed Ground Truth Trajectory'], color=True, line=False, flight=flight, output_dir=output_dir, title=prefix+'reconstructed_scene')
 
     gt_err = []
     traj_err = []
@@ -57,12 +63,21 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
     match_err = []
     match_labels = []
     for i, (cam, gt_pt, gt_det) in enumerate(zip(cameras, gt_pts, gt_dets)):
+        # log K and d after BA
+        f.write(f'\ncamera {i} K:\n {np.array2string(cam.K)}')
+        f.write(f'\ncamera {i} d:\n {np.array2string(cam.d)}')
+        cam_res = {}
+        cam_res['K'] = cam.K.tolist()
+        cam_res['d'] = cam.d.tolist()
+
         # reproject to image -- static matches
         pts = cam.undist_point(cam.kp[cam.index_registered_2d,:].T)
         err = ep.reprojection_error(pts, cam.projectPoint(flight.static[:,flight.inlier_mask==1]))
         match_err.append(err)
         match_labels.append('{}cam{}'.format(prefix,i))
         print("mean reprojection error of static features in camera %d is %f" %(i, np.mean(err)))
+        f.write(f'\n\nmean reprojection error of static features in camera {i} is {np.mean(err)}')
+        cam_res['err_static'] = np.mean(err)
 
         # reproject to image -- ground truth static matches
         gt_repro = cam.dist_point3d(X_gt[:-1].T)
@@ -70,6 +85,8 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
         gt_err.append(err1)
         gt_labels.append('{}cam{}'.format(prefix,i))
         print("mean reprojection error of the ground truth matches in camera %d is %f" %(i, np.mean(err1)))
+        f.write(f'\n\nmean reprojection error of the ground truth matches in camera {i} is {np.mean(err1)}')
+        cam_res['err_cp'] = np.mean(err1)
 
         # reproject trajectories -- detection matches
         # if static-dynamic -- use the fitted trajectory
@@ -82,6 +99,8 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
         traj_err.append(err2)
         traj_labels.append('{}cam{}'.format(prefix,i))
         print("mean reprojection error of the dynamic features in camera %d is %f" %(i, np.mean(err2)))
+        f.write(f'\n\nmean reprojection error of the dynamic features in camera {i} is {np.mean(err2)}')
+        cam_res['err_traj'] = np.mean(err2)
 
         # compute the camera center
         cam_centers = []
@@ -97,12 +116,18 @@ def reproject_ground_truth(cameras, gt_pts, gt_dets, ref_cam=0, output_dir='', p
         cam_centers = cam_centers[:,(cam_centers[0] >=0) & (cam_centers[0] <= w) & (cam_centers[1] >= 0) & (cam_centers[1] <= h)]
 
         # plot reprojected points on the image
-        vis.show_2D_all(gt_pt.T, gt_repro, cam.dist_point2d(traj_pts2d[2*i:2*i+2]), traj_repro, title=prefix+'cam'+str(i)+' ground truth reprojection', color=True, line=False, bg=cam.img, output_dir=output_dir, label=['ground truth matches', 'reconstructed ground truth matches', 'extracted dynamic features', 'reconstructed trajectories'], cam_center=cam_centers)
+        vis.show_2D_all(gt_pt.T, gt_repro, cam.dist_point2d(traj_pts2d[2*i:2*i+2]), traj_repro, vec=1, title=prefix+'cam'+str(i)+'_ground_truth_reprojection', color=True, line=False, bg=cam.img, output_dir=output_dir, label=['ground truth matches', 'reconstructed ground truth matches', 'extracted dynamic features', 'reconstructed trajectories'], cam_center=cam_centers)
 
+        res[f'cam{i}'] = cam_res
     # plot the reprojection error boxplot
     # vis.error_boxplot(gt_err, gt_labels, title=prefix+'reprojection_error_static_ground_truth.png', ax=ax[0])
     # vis.error_boxplot(traj_err, traj_labels, title=prefix+'reprojection_error_dynamic.png', ax=ax[1])
     # vis.error_boxplot(match_err, match_labels, title=prefix+'reprojection_error_static.png', ax=ax[2])
+
+    f.write('\n\n#################################################################\n\n')
+    f.close()
+
+    res_json[prefix[:-1]] = res
 
     return gt_err, gt_labels, traj_err, traj_labels, match_err, match_labels
 
@@ -134,86 +159,14 @@ def undistort_image(cam, output_dir = '', title=None):
         cv2.imwrite(os.path.join(output_dir, 'undistorted.png'), dst)
 
 
-def main():
-    # Output dir
-    output_dir = '../experiments/croatia_set3/eval_res_calibrated_30_new/'
-    output_dir = '../experiments/croatia_set3/eval_res_calibrated_30_scale/'
-    # output_dir = '../experiments/croatia_set3/eval_res_undistorted_30/'
-
-    # output_dir = '../experiments/nyc_set12/eval_res_calibrated_30/'
-    # output_dir = '../experiments/nyc_set17/eval_res_calibrated_10/'
-    # output_dir = '../experiments/nyc_set17/eval_res_calibrated_3cams_10/'
-
-    # output_dir = '../experiments/nyc_set17/eval_res_calibrated_10_obj0/'
-    # output_dir = '../experiments/nyc_set19/eval_res_calibrated_10/'
-
-    # output_dir = '../experiments/nyc_set17/eval_res_calibrated_4CA_10/'
-    # output_dir = '../experiments/nyc_set17/eval_res_calibrated_4CA_10_obj0/'
-    # output_dir = '../experiments/nyc_set19/eval_res_calibrated_4CA_10/'
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-
-    # Load ground truth
-    gt_static_file = ['../experiments/croatia_set3/static_gt/static_cam0.txt','../experiments/croatia_set3/static_gt/static_cam1.txt']
-    gt_dynamic_file = ['../experiments/croatia_set3/det_gt/cam0_3_det_gt.txt','../experiments/croatia_set3/det_gt/cam1_3_det_gt.txt']
-    
-    # gt_static_file = ['../experiments/croatia_set3/static_gt_un/static_cam0_un.txt','../experiments/croatia_set3/static_gt_un/static_cam1_un.txt']
-    # gt_dynamic_file = ['../experiments/croatia_set3/det_gt/cam0_3_det_gt_undistort_div.txt','../experiments/croatia_set3/det_gt/cam1_3_det_gt_undistort_div.txt']
-    
-    # gt_static_file = ['../experiments/nyc_set12/static_gt/static_cam0.txt','../experiments/nyc_set12/static_gt/static_cam2.txt']
-    # gt_static_file = ['../experiments/nyc_set12/static_gt_3cams/static_cam0.txt','../experiments/nyc_set12/static_gt_3cams/static_cam1.txt','../experiments/nyc_set12/static_gt_3cams/static_cam2.txt']
-
-    # gt_dynamic_file = ['../experiments/nyc_set12/det_gt/cam0_12.txt','../experiments/nyc_set12/det_gt/cam2_12.txt']
-    # gt_dynamic_file = ['../experiments/nyc_set17/det_opencv/cam0_set17_obj0.txt','../experiments/nyc_set17/det_opencv/cam2_set17_obj0.txt']
-    # gt_dynamic_file = ['../experiments/nyc_set19/det_opencv/cam0_set19.txt','../experiments/nyc_set19/det_opencv/cam2_set19.txt']
+def main(data_file_static, data_file_static_dynamic, data_file_static_dynamic_no_sync, gt_static_file, output_dir):
+    res_json = {}
 
     gt_static = []
     for gfs in gt_static_file:
         gt_static.append(np.loadtxt(gfs, delimiter=' '))
     
-    gt_dynamic = []
-    for gfd in gt_dynamic_file:
-        gt_dynamic.append(np.loadtxt(gfd, usecols=(2,0,1), delimiter=' ').T)
-
-    # Load scenes
-
-    # CALIBRATED
-    # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
-    # data_file_static = '../experiments/croatia_set3/static/croatia_static_superglue_30.pkl'
-    # data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic/croatia_static_dynamic_superglue_30.pkl'
-    # data_file_static_dynamic_no_sync = '../experiments/croatia_set3/static_dynamic_no_sync/croatia_static_dynamic_no_sync_superglue_30.pkl'
-    
-    data_file_static = '../experiments/croatia_set3/static/croatia_static_superglue_scale_30.pkl'
-    data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic/croatia_static_dynamic_superglue_scale_30.pkl'
-    data_file_static_dynamic_no_sync = '../experiments/croatia_set3/static_dynamic_no_sync/croatia_static_dynamic_no_sync_superglue_scale_30.pkl'
-    
-    # data_file_static = '../experiments/nyc_set17/static/nyc_static_superglue_10.pkl'
-    # data_file_static_dynamic = '../experiments/nyc_set17/static_dynamic/nyc_static_dynamic_superglue_10.pkl'
-    # data_file_static_dynamic_no_sync = '../experiments/nyc_set17/static_dynamic_no_sync/nyc_static_dynamic_no_sync_superglue_10.pkl'
-    
-    # data_file_static = '../experiments/nyc_set17/static_4CA/nyc_static_superglue_10.pkl'
-    # data_file_static_dynamic = '../experiments/nyc_set17/static_dynamic_4CA/nyc_static_dynamic_superglue_10.pkl'
-    # data_file_static_dynamic_no_sync = '../experiments/nyc_set17/static_dynamic_no_sync_4CA/nyc_static_dynamic_no_sync_superglue_10.pkl'
-    
-    # data_file_static = '../experiments/nyc_set17/static_dynamic_3cams/nyc_static_dynamic_superglue_10.pkl'
-    # data_file_static_dynamic = '../experiments/nyc_set17/static_dynamic_4CA/nyc_static_dynamic_superglue_10.pkl'
-    # data_file_static_dynamic_no_sync = '../experiments/nyc_set17/static_dynamic_no_sync_4CA/nyc_static_dynamic_no_sync_superglue_10.pkl'
-    
-    # UNDISTORT
-    # data_file_dynamic = '/scratch2/wuti/Repos/mvus/experiments/set12_obj0/undistort_dynamic/nyc_colmap_dynamic_ori_inlier_undistort_30.pkl'
-    # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
-    # data_file_static = '../experiments/croatia_set3/static_un/croatia_static_un_superglue_30.pkl'
-    # data_file_static_dynamic = '../experiments/croatia_set3/static_dynamic_un/croatia_static_dynamic_un_superglue_30.pkl'
-
-    # data_file_dynamic = '../experiments/croatia_set3/dynamic/croatia_dynamic_superglue_30.pkl'
-    # data_file_static = '../experiments/nyc_set12/static/nyc_static_superglue_30.pkl'
-    # data_file_static_dynamic = '../experiments/nyc_set12/static_dynamic/nyc_static_dynamic_superglue_30.pkl'
-
-
-    # with open(data_file_dynamic, 'rb') as file:
-    #     flight_dynamic = pickle.load(file)
-
+    # read result files
     with open(data_file_static, 'rb') as file:
         flight_static = pickle.load(file)
 
@@ -223,27 +176,17 @@ def main():
     with open(data_file_static_dynamic_no_sync, 'rb') as file:
         flight_static_dynamic_no_sync = pickle.load(file)
 
-    print("Undistort images")
-    for i, cam in enumerate(flight_static.cameras):
-        undistort_image(cam, output_dir=output_dir, title='static_only_cam{}.png'.format(i))
-    for i, cam in enumerate(flight_static_dynamic.cameras):
-        undistort_image(cam, output_dir=output_dir, title='static_dynamic_sync_cam{}.png'.format(i))
-    for i, cam in enumerate(flight_static_dynamic_no_sync.cameras):
-        undistort_image(cam, output_dir=output_dir, title='static_dynamic_unsync_cam{}.png'.format(i))
-
-    # with open(data_file_static_then_dynamic, 'rb') as file:
-    #     flight_static_then_dynamic = pickle.load(file)
+    # print("Undistort images")
+    # for i, cam in enumerate(flight_static.cameras):
+    #     undistort_image(cam, output_dir=output_dir, title='static_only_cam{}.png'.format(i))
+    # for i, cam in enumerate(flight_static_dynamic.cameras):
+    #     undistort_image(cam, output_dir=output_dir, title='static_dynamic_sync_cam{}.png'.format(i))
+    # for i, cam in enumerate(flight_static_dynamic_no_sync.cameras):
+    #     undistort_image(cam, output_dir=output_dir, title='static_dynamic_unsync_cam{}.png'.format(i))
 
     # Analysis
     # 2D reprojection error
     print("Plot reprojection error")
-    
-    # # dynamic only
-    # print("Reconstructions from dynamic-only setting")
-    # # convert dynamic part timestamp
-    # gt_dynamic1 = [gt_dynamic[x].copy() for x in flight_dynamic.sequence]
-    # gt_dynamic1 = convert_timestamps(gt_dynamic1, flight_dynamic.alpha, flight_dynamic.beta)
-    # reproject_ground_truth(flight_dynamic.cameras, gt_static, gt_dynamic1, output_dir=output_dir, prefix='dynamic_only_', flight=flight_dynamic)
     
     _, axs1 = plt.subplots(3, 1, sharey=True, tight_layout=True)
     _, axs2 = plt.subplots(3, 1, sharey=True, tight_layout=True)
@@ -251,15 +194,8 @@ def main():
 
     print('\n#################################################################\n')
     print("Reconstructions from static-only setting")
-    # gt_dynamic2 = [gt_dynamic[x].copy() for x in flight_static_dynamic.sequence]
-    # gt_dynamic2 = [flight_static_dynamic.detections[x].copy() for x in flight_static_dynamic.sequence]
-    # # no optimization for synchronization, use fps and manually aligned time offset to convert timestamps
-    # offsets = [562,25]
-    # # offsets = [0,0]
-    # for i, cam in enumerate(flight_static.cameras):
-    #     gt_dynamic2[i][0] -= offsets[i]
-    #     gt_dynamic2[i][0] *= flight_static.cameras[flight_static.ref_cam].fps/cam.fps
-    
+
+    # add detections to static-only
     flight_static.detections = flight_static_dynamic_no_sync.detections
     # flight_static.detections = [gt_dynamic[x].copy() for x in flight_static.sequence]
     flight_static.settings['cf_exact'] = True
@@ -269,33 +205,31 @@ def main():
     # Convert raw detections into the global timeline
     flight_static.detection_to_global()
     gt_dynamic2 = [flight_static.detections_global[x] for x in flight_static.sequence]
-    gt_err1, gt_label1, traj_err1, traj_label1, match_err1, match_label1 = reproject_ground_truth(flight_static.cameras, gt_static, gt_dynamic2,ref_cam=flight_static_dynamic.ref_cam, output_dir=output_dir, prefix='static_only_', flight=flight_static, ax=[axs1[0],axs2[0],axs3[0]])
+    gt_err1, gt_label1, traj_err1, traj_label1, match_err1, match_label1 = reproject_ground_truth(flight_static.cameras, gt_static, gt_dynamic2, res_json,ref_cam=flight_static_dynamic.ref_cam, output_dir=output_dir, prefix='static_only_', flight=flight_static, ax=[axs1[0],axs2[0],axs3[0]])
     plt.show()
     print('\n#################################################################\n')
     print("Reconstructions from static-dynamic setting")
-    # gt_dynamic3 = [gt_dynamic[x].copy() for x in flight_static_dynamic.sequence]
-    # gt_dynamic3 = convert_timestamps(gt_dynamic3, flight_static_dynamic.alpha, flight_static_dynamic.beta)
-    
-    gt_dynamic3 = [flight_static_dynamic.detections[x].copy() for x in flight_static_dynamic.sequence]
-    # gt_dynamic3 = convert_timestamps(gt_dynamic3, flight_static_dynamic.alpha, flight_static_dynamic.beta)
-    
+    gt_dynamic3 = [flight_static_dynamic.detections[x].copy() for x in flight_static_dynamic.sequence]    
     flight_static_dynamic.detections = flight_static_dynamic_no_sync.detections
     # flight_static_dynamic.detections = [gt_dynamic[x].copy() for x in flight_static_dynamic.sequence]
     flight_static_dynamic.detection_to_global()
     gt_dynamic3 = [flight_static_dynamic.detections_global[x] for x in flight_static_dynamic.sequence]
-    gt_err2, gt_label2, traj_err2, traj_label2, match_err2, match_label2 = reproject_ground_truth(flight_static_dynamic.cameras, gt_static, gt_dynamic3,ref_cam=flight_static_dynamic.ref_cam, output_dir=output_dir, prefix='static_dynamic_sync_', flight=flight_static_dynamic, ax=[axs1[1],axs2[1],axs3[1]])
+    gt_err2, gt_label2, traj_err2, traj_label2, match_err2, match_label2 = reproject_ground_truth(flight_static_dynamic.cameras, gt_static, gt_dynamic3, res_json,ref_cam=flight_static_dynamic.ref_cam, output_dir=output_dir, prefix='static_dynamic_sync_', flight=flight_static_dynamic, ax=[axs1[1],axs2[1],axs3[1]])
     plt.show()
     print('\n#################################################################\n')
     print("Reconstructions from static-dynamic-no-sync setting")
-
-
     # flight_static_dynamic_no_sync.detections = [gt_dynamic[x].copy() for x in flight_static_dynamic_no_sync.sequence]
     flight_static_dynamic_no_sync.detection_to_global()
     gt_dynamic4 = [flight_static_dynamic_no_sync.detections_global[x] for x in flight_static_dynamic_no_sync.sequence]
-    # gt_err2, gt_label2, traj_err2, traj_label2, match_err2, match_label2 = reproject_ground_truth(flight_static_dynamic.cameras, gt_static, gt_dynamic3,ref_cam=flight_static_dynamic.ref_cam, output_dir=output_dir, prefix='static_dynamic_', flight=flight_static_dynamic, ax=[axs1[2],axs2[2],axs3[2]])
-    gt_err3, gt_label3, traj_err3, traj_label3, match_err3, match_label3 = reproject_ground_truth(flight_static_dynamic_no_sync.cameras, gt_static, gt_dynamic4,ref_cam=flight_static_dynamic_no_sync.ref_cam, output_dir=output_dir, prefix='static_dynamic_unsync_', flight=flight_static_dynamic_no_sync, ax=[axs1[2],axs2[2],axs3[2]])
+    gt_err3, gt_label3, traj_err3, traj_label3, match_err3, match_label3 = reproject_ground_truth(flight_static_dynamic_no_sync.cameras, gt_static, gt_dynamic4, res_json,ref_cam=flight_static_dynamic_no_sync.ref_cam, output_dir=output_dir, prefix='static_dynamic_unsync_', flight=flight_static_dynamic_no_sync, ax=[axs1[2],axs2[2],axs3[2]])
 
+    # save result
+    with open(os.path.join(output_dir, 'result.json'), 'w') as fj:
+        json.dump(res_json, fj)
+    print('\n\n#################################################################\n')
+    print("Visualization")
 
+    print('\tVisualize reprojection box plot')
     # plot reprojection errors
     # reorder error terms
     gt_repro_errs = gt_err1+gt_err3+gt_err2
@@ -325,15 +259,15 @@ def main():
     traj_repro_errs2 = traj_repro_errs2[::2] + traj_repro_errs2[1:][::2]
     traj_repro_labels2 = traj_repro_labels2[::2] + traj_repro_labels2[1:][::2]
     vis.error_boxplot(traj_repro_errs2, traj_repro_labels2, title='reprojection_error_dynamic2.png', output_dir=output_dir)
+    # plt.show()
 
+    print('\tVisualize reprojection histogram')
     # plot error histograms
     width = 1
     fig_gt_hist, gt_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(gt_repro_errs))
     for i, (cam_err1, cam_label1, cam_err2, cam_label2, cam_err3, cam_label3) in enumerate(zip(gt_err1, gt_label1, gt_err2, gt_label2, gt_err2, gt_label3)):
         vis.error_histogram(cam_err1, cam_err2, cam_err3, labels=[cam_label1, cam_label2, cam_label3],ax=gt_hist_axs[i],title='cam '+str(i),xlim=80, num_bins=20, bin_width=width)
-    # loc2 = loc[1:-1]+0.5
-    # l2 = ["{:.0f}".format(x) for x in loc[1:-1]]
     xticks = np.arange(0,90,10)
     l2 = ["{:.0f}".format(x) for x in xticks]
     loc2 = xticks
@@ -343,7 +277,7 @@ def main():
     gt_hist_axs[1].set_xticklabels(l2)
     fig_gt_hist.suptitle('reprojection_error_histogram_static_ground_truth')
     fig_gt_hist.savefig(os.path.join(output_dir,'reprojection_error_histogram_static_ground_truth.png'))
-    plt.show()
+    # plt.show()
 
     fig_traj_hist, traj_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(traj_repro_errs))
@@ -354,7 +288,7 @@ def main():
     traj_hist_axs[1].set_xticklabels(l2)
     fig_traj_hist.suptitle('reprojection_error_histogram_dynamic')
     fig_traj_hist.savefig(os.path.join(output_dir,'reprojection_error_histogram_dynamic.png'))
-    plt.show()
+    # plt.show()
 
     fig_match_hist, match_hist_axs = plt.subplots(2, 1, sharex=True, sharey=True, dpi=300)
     xlim = np.max(np.hstack(match_repro_errs))
@@ -365,16 +299,29 @@ def main():
     match_hist_axs[1].set_xticklabels(l2)
     fig_match_hist.suptitle('reprojection_error_histogram_static')
     fig_match_hist.savefig(os.path.join(output_dir,'reprojection_error_histogram_static.png'))
-    plt.show()
-
-
-    # print('\n#################################################################\n')
-    # print("Reconstructions from static-then-dynamic setting")
-    # gt_dynamic4 = [gt_dynamic[x].copy() for x in flight_static_then_dynamic.sequence]
-    # gt_dynamic4 = convert_timestamps(gt_dynamic4, flight_static_then_dynamic.alpha, flight_static_then_dynamic.beta)
-    # reproject_ground_truth(flight_static_then_dynamic.cameras, gt_static, gt_dynamic4, output_dir=output_dir, prefix='static_then_dynamic_', flight=flight_static_then_dynamic)
+    # plt.show()
 
     print('Finish!')
 
 if __name__ == '__main__':
-    main()
+    a = argparse.ArgumentParser()
+    a.add_argument('--results', nargs='+', required=True, help='list of result files')
+    a.add_argument('--gt_path', type=str, required=True, help='path to ground truth folder')
+    a.add_argument('--output_dir', type=str, required=True, help='path to output folder')
+
+    opt = a.parse_args()
+
+    # read result files
+    assert len(opt.results) == 3, 'Wrong number of result files.'
+    data_file_static, data_file_static_dynamic, data_file_static_dynamic_no_sync = opt.results
+
+    # read gt control points
+    gt_static_file = sorted(glob(os.path.join(opt.gt_path, '*.txt')))
+    assert len(gt_static_file) >= 2, 'Not enough control point files found.'
+
+    # specify output directory
+    output_dir = opt.output_dir
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    main(data_file_static, data_file_static_dynamic, data_file_static_dynamic_no_sync, gt_static_file, output_dir)
