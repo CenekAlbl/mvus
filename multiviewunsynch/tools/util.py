@@ -56,7 +56,7 @@ def homogeneous(x):
     return np.vstack((x,np.ones(x.shape[1])))
 
 # @jit
-def find_intervals(x,gap=5,idx=False):
+def find_intervals(x,gap=15,idx=False):
     '''
     Given indices of detections, return a matrix that contains the start and the end of each
     continues part.

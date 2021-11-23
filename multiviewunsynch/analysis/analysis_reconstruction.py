@@ -153,6 +153,10 @@ def undistort_image(cam, output_dir = '', title=None):
     dst = cv2.undistort(cam.img, cam.K, cam.d, None, newK)
     x, y, w, h = roi
     dst = dst[y:y+h, x:x+w]
+    
+    if w == 0 or h == 0:
+        return
+
     if title is not None:
         cv2.imwrite(os.path.join(output_dir, title), dst)
     else:
@@ -176,16 +180,17 @@ def main(data_file_static, data_file_static_dynamic, data_file_static_dynamic_no
     with open(data_file_static_dynamic_no_sync, 'rb') as file:
         flight_static_dynamic_no_sync = pickle.load(file)
 
-    # print("Undistort images")
-    # for i, cam in enumerate(flight_static.cameras):
-    #     undistort_image(cam, output_dir=output_dir, title='static_only_cam{}.png'.format(i))
-    # for i, cam in enumerate(flight_static_dynamic.cameras):
-    #     undistort_image(cam, output_dir=output_dir, title='static_dynamic_sync_cam{}.png'.format(i))
-    # for i, cam in enumerate(flight_static_dynamic_no_sync.cameras):
-    #     undistort_image(cam, output_dir=output_dir, title='static_dynamic_unsync_cam{}.png'.format(i))
+    print("Undistort images")
+    for i, cam in enumerate(flight_static.cameras):
+        undistort_image(cam, output_dir=output_dir, title='static_only_cam{}.png'.format(i))
+    for i, cam in enumerate(flight_static_dynamic.cameras):
+        undistort_image(cam, output_dir=output_dir, title='static_dynamic_sync_cam{}.png'.format(i))
+    for i, cam in enumerate(flight_static_dynamic_no_sync.cameras):
+        undistort_image(cam, output_dir=output_dir, title='static_dynamic_unsync_cam{}.png'.format(i))
 
     # Analysis
     # 2D reprojection error
+    print('\n#################################################################\n')
     print("Plot reprojection error")
     
     _, axs1 = plt.subplots(3, 1, sharey=True, tight_layout=True)

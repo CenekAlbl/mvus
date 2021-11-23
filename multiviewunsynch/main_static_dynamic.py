@@ -96,7 +96,7 @@ while True:
     print('\nMean error of the static part in each camera after the second BA:    ', np.asarray([np.mean(flight.error_cam_static(x, debug=args.debug)) for x in flight.sequence[:cam_temp]]))
 
     print('\nRemove outliers far away from the center')
-    flight.remove_outliers_3d(flight.sequence[:cam_temp], thres=10, mode='camera', verbose=True, debug=args.debug)
+    flight.remove_outliers_3d(flight.sequence[:cam_temp], thres=flight.settings['thres_outlier'], mode='camera', verbose=True, debug=args.debug)
 
     num_end = flight.numCam if flight.find_order else len(flight.sequence)
     if cam_temp == num_end:

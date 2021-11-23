@@ -90,7 +90,7 @@ def matching_feature(kp1, kp2, des1, des2, method=1, ratio=0.7):
         return pts1, pts2, matches
 
 
-def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=True):
+def computeFundamentalMat(pts1, pts2, method=cv2.USAC_MAGSAC, error=3, inliers=True):
     '''
     Function:
             compute fundamental matrix given correspondences (at least 8)
@@ -99,6 +99,7 @@ def computeFundamentalMat(pts1, pts2, method=cv2.FM_RANSAC, error=3, inliers=Tru
             method = cv2.FM_RANSAC: Using RANSAC algorithm (default)
                      cv2.FM_LMEDS: Using least-median algorithm
                      cv2.FM_8POINT: Using 8 points algorithm
+                     cv2.USAC_MAGSAC: Using MAGSAC++
             error = reprojection threshold that describes maximal distance from a 
                     point to a epipolar line
             inlier = True: return F and the mask for inliers
